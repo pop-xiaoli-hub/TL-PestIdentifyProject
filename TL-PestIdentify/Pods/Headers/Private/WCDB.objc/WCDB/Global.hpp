@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/common/core/sqlite/Global.hpp

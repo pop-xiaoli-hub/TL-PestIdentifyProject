@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/objc/transaction/WCTDatabase+Transaction.h

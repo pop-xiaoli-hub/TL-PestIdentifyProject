@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/common/winq/extension/BaseBinding.hpp

@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/objc/builtin/NSObject+WCTColumnCoding.h

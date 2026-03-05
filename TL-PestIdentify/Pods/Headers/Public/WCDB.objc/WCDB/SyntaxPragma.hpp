@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/common/winq/syntax/identifier/SyntaxPragma.hpp

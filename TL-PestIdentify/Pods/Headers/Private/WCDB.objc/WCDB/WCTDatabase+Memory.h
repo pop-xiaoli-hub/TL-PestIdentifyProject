@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/objc/database/WCTDatabase+Memory.h

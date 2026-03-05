@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/objc/orm/macro/WCTIndexMacro.h

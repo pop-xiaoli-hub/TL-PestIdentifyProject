@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/common/core/InnerDatabase.hpp

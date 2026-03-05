@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		1D0DEAFCB336DAF43EC9E6EE /* libPods-TL-PestIdentify.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		0DAAA8F22F59C0BB00F327DC /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,9 +28,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0A2F7B969909B9DD055BBBE2 /* Pods-TL-PestIdentify.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TL-PestIdentify.release.xcconfig"; path = "Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify.release.xcconfig"; sourceTree = "<group>"; };
 		0DAAA8D62F59C0B800F327DC /* TL-PestIdentify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TL-PestIdentify.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8F12F59C0BB00F327DC /* TL-PestIdentifyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8FB2F59C0BB00F327DC /* TL-PestIdentifyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8457BB115BD60440BB3E020F /* Pods-TL-PestIdentify.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TL-PestIdentify.debug.xcconfig"; path = "Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify.debug.xcconfig"; sourceTree = "<group>"; };
+		A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-TL-PestIdentify.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -50,11 +57,15 @@
 		};
 		0DAAA8F42F59C0BB00F327DC /* TL-PestIdentifyTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "TL-PestIdentifyTests";
 			sourceTree = "<group>";
 		};
 		0DAAA8FE2F59C0BB00F327DC /* TL-PestIdentifyUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "TL-PestIdentifyUITests";
 			sourceTree = "<group>";
 		};
@@ -65,6 +76,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1D0DEAFCB336DAF43EC9E6EE /* libPods-TL-PestIdentify.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -92,6 +104,8 @@
 				0DAAA8F42F59C0BB00F327DC /* TL-PestIdentifyTests */,
 				0DAAA8FE2F59C0BB00F327DC /* TL-PestIdentifyUITests */,
 				0DAAA8D72F59C0B800F327DC /* Products */,
+				98C8BED53E946BBF5FCE10BE /* Pods */,
+				B350BCC6805633DF370785C6 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -105,6 +119,24 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		98C8BED53E946BBF5FCE10BE /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				8457BB115BD60440BB3E020F /* Pods-TL-PestIdentify.debug.xcconfig */,
+				0A2F7B969909B9DD055BBBE2 /* Pods-TL-PestIdentify.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		B350BCC6805633DF370785C6 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -112,9 +144,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 0DAAA9042F59C0BB00F327DC /* Build configuration list for PBXNativeTarget "TL-PestIdentify" */;
 			buildPhases = (
+				BB5802A209ACEFFFAFBD2DD7 /* [CP] Check Pods Manifest.lock */,
 				0DAAA8D22F59C0B800F327DC /* Sources */,
 				0DAAA8D32F59C0B800F327DC /* Frameworks */,
 				0DAAA8D42F59C0B800F327DC /* Resources */,
+				D082BDA4735630CA807D034F /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -124,8 +158,6 @@
 				0DAAA8D82F59C0B800F327DC /* TL-PestIdentify */,
 			);
 			name = "TL-PestIdentify";
-			packageProductDependencies = (
-			);
 			productName = "TL-PestIdentify";
 			productReference = 0DAAA8D62F59C0B800F327DC /* TL-PestIdentify.app */;
 			productType = "com.apple.product-type.application";
@@ -147,8 +179,6 @@
 				0DAAA8F42F59C0BB00F327DC /* TL-PestIdentifyTests */,
 			);
 			name = "TL-PestIdentifyTests";
-			packageProductDependencies = (
-			);
 			productName = "TL-PestIdentifyTests";
 			productReference = 0DAAA8F12F59C0BB00F327DC /* TL-PestIdentifyTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -170,8 +200,6 @@
 				0DAAA8FE2F59C0BB00F327DC /* TL-PestIdentifyUITests */,
 			);
 			name = "TL-PestIdentifyUITests";
-			packageProductDependencies = (
-			);
 			productName = "TL-PestIdentifyUITests";
 			productReference = 0DAAA8FB2F59C0BB00F327DC /* TL-PestIdentifyUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -243,6 +271,48 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		BB5802A209ACEFFFAFBD2DD7 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-TL-PestIdentify-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		D082BDA4735630CA807D034F /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		0DAAA8D22F59C0B800F327DC /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -283,6 +353,7 @@
 /* Begin XCBuildConfiguration section */
 		0DAAA9052F59C0BB00F327DC /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8457BB115BD60440BB3E020F /* Pods-TL-PestIdentify.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -309,6 +380,7 @@
 		};
 		0DAAA9062F59C0BB00F327DC /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0A2F7B969909B9DD055BBBE2 /* Pods-TL-PestIdentify.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

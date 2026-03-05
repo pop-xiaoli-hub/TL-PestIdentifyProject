@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/objc/monitor/WCTPerformanceInfo+Private.h

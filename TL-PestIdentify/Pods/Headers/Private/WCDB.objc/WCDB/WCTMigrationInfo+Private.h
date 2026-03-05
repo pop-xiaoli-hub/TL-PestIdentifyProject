@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/objc/migration/WCTMigrationInfo+Private.h

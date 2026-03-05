@@ -1,0 +1,1 @@
+../../../../WCDB.objc/src/objc/compression/WCTDatabase+Compression.h
