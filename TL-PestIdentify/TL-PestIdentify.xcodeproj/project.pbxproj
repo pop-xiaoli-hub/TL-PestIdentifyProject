@@ -57,16 +57,17 @@
 		};
 		0DAAA8F42F59C0BB00F327DC /* TL-PestIdentifyTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "TL-PestIdentifyTests";
 			sourceTree = "<group>";
 		};
 		0DAAA8FE2F59C0BB00F327DC /* TL-PestIdentifyUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "TL-PestIdentifyUITests";
+			sourceTree = "<group>";
+		};
+		4C9B4E8D2F5F040700016E29 /* TLWLogin */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TLWLogin;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -100,6 +101,7 @@
 		0DAAA8CD2F59C0B800F327DC = {
 			isa = PBXGroup;
 			children = (
+				4C9B4E8D2F5F040700016E29 /* TLWLogin */,
 				0DAAA8D82F59C0B800F327DC /* TL-PestIdentify */,
 				0DAAA8F42F59C0BB00F327DC /* TL-PestIdentifyTests */,
 				0DAAA8FE2F59C0BB00F327DC /* TL-PestIdentifyUITests */,
@@ -125,7 +127,6 @@
 				8457BB115BD60440BB3E020F /* Pods-TL-PestIdentify.debug.xcconfig */,
 				0A2F7B969909B9DD055BBBE2 /* Pods-TL-PestIdentify.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -156,6 +157,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				0DAAA8D82F59C0B800F327DC /* TL-PestIdentify */,
+				4C9B4E8D2F5F040700016E29 /* TLWLogin */,
 			);
 			name = "TL-PestIdentify";
 			productName = "TL-PestIdentify";
@@ -302,9 +304,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -359,6 +365,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JASSJ2R9D6;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TL-PestIdentify/Info.plist";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -386,6 +394,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JASSJ2R9D6;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TL-PestIdentify/Info.plist";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
