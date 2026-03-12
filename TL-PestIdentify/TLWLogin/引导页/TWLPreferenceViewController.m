@@ -5,6 +5,7 @@
 
 #import "TWLPreferenceViewController.h"
 #import "TWLPreferenceView.h"
+#import "TLWMainTabBarController.h"
 #import <Masonry/Masonry.h>
 
 // ─────────────────────────────────────────────
@@ -439,7 +440,15 @@ referenceSizeForHeaderInSection:(NSInteger)section {
 
 - (void)handleConfirm {
     NSLog(@"用户选择的农作物: %@", _selectedPlantNames);
-    // TODO: 保存偏好并跳转到主页
+    TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
+    tabBar.modalPresentationStyle = UIModalPresentationFullScreen;
+    UIWindow *window = self.view.window;
+    window.rootViewController = tabBar;
+    [UIView transitionWithView:window
+                      duration:0.3
+                       options:UIViewAnimationOptionTransitionCrossDissolve
+                    animations:nil
+                    completion:nil];
 }
 
 @end
