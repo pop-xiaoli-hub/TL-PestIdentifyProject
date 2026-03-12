@@ -2,7 +2,7 @@
 //  TLWWechatBindController.m
 //  TL-PestIdentify
 //
-//  微信登录绑定页 Controller
+//  Created by 吴桐 on 2026/3/12.
 //
 
 #import "TLWWechatBindController.h"

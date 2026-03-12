@@ -2,6 +2,8 @@
 //  TLWWechatBindView.m
 //  TL-PestIdentify
 //
+//  Created by 吴桐 on 2026/3/12.
+//
 
 #import "TLWWechatBindView.h"
 #import <Masonry/Masonry.h>

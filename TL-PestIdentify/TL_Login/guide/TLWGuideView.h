@@ -2,7 +2,7 @@
 //  TLWGuideView.h
 //  TL-PestIdentify
 //
-//  引导页 View — 询问用户是否需要适老化模式
+//  Created by 吴桐 on 2026/3/12.
 //
 
 #import <UIKit/UIKit.h>
