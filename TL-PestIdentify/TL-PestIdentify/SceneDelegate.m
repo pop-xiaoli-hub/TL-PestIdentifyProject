@@ -7,20 +7,25 @@
 
 #import "SceneDelegate.h"
 #import "TWLLoginViewController.h"
-
+#import "TLWMainTabBarController.h"
 @interface SceneDelegate ()
-
+@property (nonatomic, assign)BOOL isLogin;
 @end
 
 @implementation SceneDelegate
 
 
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
+  self.isLogin = NO;
   UIWindowScene *windowScene = (UIWindowScene *)scene;
   self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
-
-  TWLLoginViewController *loginVC = [[TWLLoginViewController alloc] init];
-  self.window.rootViewController = loginVC;
+  if (self.isLogin) {
+    TLWMainTabBarController* tab = [[TLWMainTabBarController alloc] init];
+    self.window.rootViewController = tab;
+  } else {
+    TWLLoginViewController *loginVC = [[TWLLoginViewController alloc] init];
+    self.window.rootViewController = loginVC;
+  }
   [self.window makeKeyAndVisible];
 }
 
