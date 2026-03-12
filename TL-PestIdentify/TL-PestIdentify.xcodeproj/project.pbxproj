@@ -68,6 +68,14 @@
 		4C9B4E8D2F5F040700016E29 /* TLWLogin */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = TLWLogin;
+		0DB0A9202F5FF6D3009E2E41 /* TL_HomePage */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TL_HomePage;
+			sourceTree = "<group>";
+		};
+		0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TL_PhotoIdentify;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -102,6 +110,8 @@
 			isa = PBXGroup;
 			children = (
 				4C9B4E8D2F5F040700016E29 /* TLWLogin */,
+				0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */,
+				0DB0A9202F5FF6D3009E2E41 /* TL_HomePage */,
 				0DAAA8D82F59C0B800F327DC /* TL-PestIdentify */,
 				0DAAA8F42F59C0BB00F327DC /* TL-PestIdentifyTests */,
 				0DAAA8FE2F59C0BB00F327DC /* TL-PestIdentifyUITests */,
@@ -158,6 +168,8 @@
 			fileSystemSynchronizedGroups = (
 				0DAAA8D82F59C0B800F327DC /* TL-PestIdentify */,
 				4C9B4E8D2F5F040700016E29 /* TLWLogin */,
+				0DB0A9202F5FF6D3009E2E41 /* TL_HomePage */,
+				0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */,
 			);
 			name = "TL-PestIdentify";
 			productName = "TL-PestIdentify";
@@ -452,7 +464,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -513,7 +525,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
