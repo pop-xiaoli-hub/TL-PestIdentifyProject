@@ -99,7 +99,8 @@
 
     [_collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_subtitleLabel.mas_bottom).offset(12);
-        make.left.right.bottom.equalTo(self);
+        make.left.equalTo(self).offset(10);
+        make.right.bottom.equalTo(self);
     }];
 }
 

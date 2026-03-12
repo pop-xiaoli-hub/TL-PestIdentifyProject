@@ -114,7 +114,7 @@
     descLabel.textAlignment = NSTextAlignmentCenter;
     [self addSubview:descLabel];
     [descLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(appLabel.mas_bottom).offset(140);
+        make.centerY.equalTo(self);
         make.centerX.equalTo(self);
     }];
 }
