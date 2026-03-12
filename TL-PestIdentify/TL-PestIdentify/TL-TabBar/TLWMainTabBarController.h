@@ -9,7 +9,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TLWMainTabBarController : UITabBarController
+@interface TLWMainTabBarController : UIViewController
 
 @end
 

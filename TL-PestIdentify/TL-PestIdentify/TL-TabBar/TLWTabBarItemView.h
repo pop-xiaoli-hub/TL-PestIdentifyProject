@@ -14,6 +14,7 @@ typedef void(^TLTabSelectionHandler)(NSInteger idx);
 @property (nonatomic, copy) TLTabSelectionHandler selectionHandler;
 @property (nonatomic, strong) UIView *circleView;
 @property (nonatomic, strong) UIImageView *iconView;
+@property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) CAGradientLayer *selectedGradient;
 @property (nonatomic, assign) BOOL tl_selected;
 - (instancetype)initWithTitle:(NSString *)title icon:(UIImage *)icon;
