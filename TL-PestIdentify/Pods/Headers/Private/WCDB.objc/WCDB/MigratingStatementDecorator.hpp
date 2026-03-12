@@ -1,1 +1,0 @@
-../../../../WCDB.objc/src/common/core/migration/MigratingStatementDecorator.hpp

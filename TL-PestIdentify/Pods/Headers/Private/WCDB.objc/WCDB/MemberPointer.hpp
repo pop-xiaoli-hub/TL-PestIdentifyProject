@@ -1,1 +1,0 @@
-../../../../WCDB.objc/src/common/base/MemberPointer.hpp

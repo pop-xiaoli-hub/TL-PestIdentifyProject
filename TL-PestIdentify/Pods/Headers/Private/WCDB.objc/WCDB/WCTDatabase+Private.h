@@ -1,1 +1,0 @@
-../../../../WCDB.objc/src/objc/database/WCTDatabase+Private.h

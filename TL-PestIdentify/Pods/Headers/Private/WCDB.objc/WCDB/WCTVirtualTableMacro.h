@@ -1,1 +1,0 @@
-../../../../WCDB.objc/src/objc/orm/macro/WCTVirtualTableMacro.h

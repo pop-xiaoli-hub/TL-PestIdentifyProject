@@ -1,1 +1,0 @@
-../../../../WCDB.objc/src/objc/table/WCTDatabase+Table.h
