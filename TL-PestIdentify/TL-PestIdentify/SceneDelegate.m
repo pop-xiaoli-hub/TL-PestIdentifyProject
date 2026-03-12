@@ -6,7 +6,7 @@
 //
 
 #import "SceneDelegate.h"
-#import "TWLLoginViewController.h"
+#import "TLWLoginController.h"
 
 @interface SceneDelegate ()
 
@@ -19,7 +19,7 @@
   UIWindowScene *windowScene = (UIWindowScene *)scene;
   self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
 
-  TWLLoginViewController *loginVC = [[TWLLoginViewController alloc] init];
+  TLWLoginController *loginVC = [[TLWLoginController alloc] init];
   self.window.rootViewController = loginVC;
   [self.window makeKeyAndVisible];
 }

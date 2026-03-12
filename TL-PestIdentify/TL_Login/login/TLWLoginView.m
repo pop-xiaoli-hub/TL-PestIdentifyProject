@@ -1,12 +1,12 @@
 //
-//  TWLLoginView.m
+//  TLWLoginView.m
 //  TL-PestIdentify
 //
 
-#import "TWLLoginView.h"
+#import "TLWLoginView.h"
 #import <Masonry/Masonry.h>
 
-@interface TWLLoginView ()
+@interface TLWLoginView ()
 
 // Logo 区域
 @property (nonatomic, strong) UIView           *logoBgView;
@@ -34,7 +34,7 @@
 
 @end
 
-@implementation TWLLoginView
+@implementation TLWLoginView
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];

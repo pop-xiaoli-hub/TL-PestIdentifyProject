@@ -1,5 +1,5 @@
 //
-//  TWLWechatBindView.h
+//  TLWWechatBindView.h
 //  TL-PestIdentify
 //
 //  微信登录绑定页 View
@@ -9,7 +9,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TWLWechatBindView : UIView
+@interface TLWWechatBindView : UIView
 
 @property (nonatomic, strong, readonly) UIButton *wechatAuthButton;    // 一键授权
 @property (nonatomic, strong, readonly) UIButton *qqLoginButton;

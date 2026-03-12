@@ -1,24 +1,24 @@
 //
-//  TWLWechatBindViewController.m
+//  TLWWechatBindController.m
 //  TL-PestIdentify
 //
-//  微信登录绑定页 ViewController
+//  微信登录绑定页 Controller
 //
 
-#import "TWLWechatBindViewController.h"
-#import "TWLWechatBindView.h"
-#import "TWLGuideViewController.h"
+#import "TLWWechatBindController.h"
+#import "TLWWechatBindView.h"
+#import "TLWGuideController.h"
 
-@interface TWLWechatBindViewController ()
+@interface TLWWechatBindController ()
 
-@property (nonatomic, strong) TWLWechatBindView *bindView;
+@property (nonatomic, strong) TLWWechatBindView *bindView;
 
 @end
 
-@implementation TWLWechatBindViewController
+@implementation TLWWechatBindController
 
 - (void)loadView {
-    self.bindView = [[TWLWechatBindView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    self.bindView = [[TLWWechatBindView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.view = self.bindView;
 }
 
@@ -42,7 +42,7 @@
 
 - (void)handleWechatAuth {
     // TODO: 接入微信 SDK 授权后再跳转，此处直接进入引导页
-    TWLGuideViewController *guideVC = [[TWLGuideViewController alloc] init];
+    TLWGuideController *guideVC = [[TLWGuideController alloc] init];
     guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
     [self presentViewController:guideVC animated:YES completion:nil];
 }

@@ -1,5 +1,5 @@
 //
-//  TWLPreferenceViewController.h
+//  TLWPreferenceController.h
 //  TL-PestIdentify
 //
 
@@ -7,7 +7,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TWLPreferenceViewController : UIViewController
+@interface TLWPreferenceController : UIViewController
 @end
 
 NS_ASSUME_NONNULL_END

@@ -1,14 +1,14 @@
 //
-//  TWLGuideView.m
+//  TLWGuideView.m
 //  TL-PestIdentify
 //
 //  引导页 View
 //
 
-#import "TWLGuideView.h"
+#import "TLWGuideView.h"
 #import <Masonry/Masonry.h>
 
-@interface TWLGuideView ()
+@interface TLWGuideView ()
 
 @property (nonatomic, strong) UILabel  *titleLabel;
 
@@ -18,7 +18,7 @@
 
 @end
 
-@implementation TWLGuideView
+@implementation TLWGuideView
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];

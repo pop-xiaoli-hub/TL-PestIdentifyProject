@@ -1,5 +1,5 @@
 //
-//  TWLLoginViewController.h
+//  TLWLoginController.h
 //  TL-PestIdentify
 //
 //  登录页面 1:1 还原
@@ -9,7 +9,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TWLLoginViewController : UIViewController
+@interface TLWLoginController : UIViewController
 
 @end
 

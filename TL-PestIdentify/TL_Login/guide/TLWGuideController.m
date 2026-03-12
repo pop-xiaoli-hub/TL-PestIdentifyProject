@@ -1,39 +1,39 @@
 //
-//  TWLGuideViewController.m
+//  TLWGuideController.m
 //  TL-PestIdentify
 //
-//  引导页 ViewController
+//  引导页 Controller
 //
 
-#import "TWLGuideViewController.h"
-#import "TWLGuideView.h"
-#import "TWLPreferenceViewController.h"
+#import "TLWGuideController.h"
+#import "TLWGuideView.h"
+#import "TLWPreferenceController.h"
 
 /// 选项枚举
-typedef NS_ENUM(NSInteger, TWLGuideOption) {
-    TWLGuideOptionNone   = -1,
-    TWLGuideOptionNeed   =  0,   // 需要适老化
-    TWLGuideOptionNoNeed =  1,   // 不需要
+typedef NS_ENUM(NSInteger, TLWGuideOption) {
+    TLWGuideOptionNone   = -1,
+    TLWGuideOptionNeed   =  0,   // 需要适老化
+    TLWGuideOptionNoNeed =  1,   // 不需要
 };
 
-@interface TWLGuideViewController ()
+@interface TLWGuideController ()
 
-@property (nonatomic, strong) TWLGuideView *guideView;
-@property (nonatomic, assign) TWLGuideOption selectedOption;
+@property (nonatomic, strong) TLWGuideView *guideView;
+@property (nonatomic, assign) TLWGuideOption selectedOption;
 
 @end
 
-@implementation TWLGuideViewController
+@implementation TLWGuideController
 
 - (void)loadView {
-    self.guideView = [[TWLGuideView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    self.guideView = [[TLWGuideView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.view = self.guideView;
 }
 
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.selectedOption = TWLGuideOptionNone;
+    self.selectedOption = TLWGuideOptionNone;
 
     [self.guideView.needButton addTarget:self
                                   action:@selector(handleNeed)
@@ -51,17 +51,17 @@ typedef NS_ENUM(NSInteger, TWLGuideOption) {
 #pragma mark - Actions
 
 - (void)handleNeed {
-    self.selectedOption = TWLGuideOptionNeed;
-    [self.guideView setSelectedOption:TWLGuideOptionNeed];
+    self.selectedOption = TLWGuideOptionNeed;
+    [self.guideView setSelectedOption:TLWGuideOptionNeed];
 }
 
 - (void)handleNoNeed {
-    self.selectedOption = TWLGuideOptionNoNeed;
-    [self.guideView setSelectedOption:TWLGuideOptionNoNeed];
+    self.selectedOption = TLWGuideOptionNoNeed;
+    [self.guideView setSelectedOption:TLWGuideOptionNoNeed];
 }
 
 - (void)handleConfirm {
-    if (self.selectedOption == TWLGuideOptionNone) {
+    if (self.selectedOption == TLWGuideOptionNone) {
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil
                                                                        message:@"请先选择一个选项"
                                                                 preferredStyle:UIAlertControllerStyleAlert];
@@ -70,10 +70,10 @@ typedef NS_ENUM(NSInteger, TWLGuideOption) {
         return;
     }
 
-    BOOL needElderMode = (self.selectedOption == TWLGuideOptionNeed);
+    BOOL needElderMode = (self.selectedOption == TLWGuideOptionNeed);
     NSLog(@"用户选择适老化模式: %@", needElderMode ? @"是" : @"否");
 
-    TWLPreferenceViewController *prefVC = [[TWLPreferenceViewController alloc] init];
+    TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
     prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
     [self presentViewController:prefVC animated:YES completion:nil];
 }

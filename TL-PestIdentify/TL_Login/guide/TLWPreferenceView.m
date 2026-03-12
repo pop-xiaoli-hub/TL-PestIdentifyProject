@@ -1,19 +1,19 @@
 //
-//  TWLPreferenceView.m
+//  TLWPreferenceView.m
 //  TL-PestIdentify
 //
 
-#import "TWLPreferenceView.h"
+#import "TLWPreferenceView.h"
 #import <Masonry/Masonry.h>
 
-@interface TWLPreferenceView ()
+@interface TLWPreferenceView ()
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *subtitleLabel;
 @property (nonatomic, strong, readwrite) UICollectionView *collectionView;
 @property (nonatomic, strong, readwrite) UIButton *confirmButton;
 @end
 
-@implementation TWLPreferenceView
+@implementation TLWPreferenceView
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];

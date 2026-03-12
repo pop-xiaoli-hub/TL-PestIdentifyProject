@@ -1,12 +1,12 @@
 //
-//  TWLWechatBindView.m
+//  TLWWechatBindView.m
 //  TL-PestIdentify
 //
 
-#import "TWLWechatBindView.h"
+#import "TLWWechatBindView.h"
 #import <Masonry/Masonry.h>
 
-@interface TWLWechatBindView ()
+@interface TLWWechatBindView ()
 
 // 公开控件（readwrite）
 @property (nonatomic, strong, readwrite) UIButton *wechatAuthButton;
@@ -15,7 +15,7 @@
 
 @end
 
-@implementation TWLWechatBindView
+@implementation TLWWechatBindView
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];

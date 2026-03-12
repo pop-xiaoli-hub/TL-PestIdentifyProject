@@ -1,5 +1,5 @@
 //
-//  TWLGuideView.h
+//  TLWGuideView.h
 //  TL-PestIdentify
 //
 //  引导页 View — 询问用户是否需要适老化模式
@@ -9,7 +9,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TWLGuideView : UIView
+@interface TLWGuideView : UIView
 
 @property (nonatomic, strong, readonly) UIButton *needButton;     // 需要（适老化）
 @property (nonatomic, strong, readonly) UIButton *noNeedButton;   // 不需要

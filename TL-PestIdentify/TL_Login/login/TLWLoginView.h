@@ -1,5 +1,5 @@
 //
-//  TWLLoginView.h
+//  TLWLoginView.h
 //  TL-PestIdentify
 //
 //  登录页 View：负责展示「病虫害App」PNG 切图和交互控件
@@ -9,7 +9,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TWLLoginView : UIView
+@interface TLWLoginView : UIView
 
 @property (nonatomic, strong, readonly) UITextField *phoneField;
 @property (nonatomic, strong, readonly) UIButton *sendCodeButton;

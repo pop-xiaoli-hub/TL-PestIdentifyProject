@@ -1,25 +1,25 @@
 //
-//  TWLLoginViewController.m
+//  TLWLoginController.m
 //  TL-PestIdentify
 //
-//  登录页 ViewController
+//  登录页 Controller
 //
 
-#import "TWLLoginViewController.h"
-#import "TWLLoginView.h"
-#import "TWLWechatBindViewController.h"
+#import "TLWLoginController.h"
+#import "TLWLoginView.h"
+#import "TLWWechatBindController.h"
 
-@interface TWLLoginViewController ()
+@interface TLWLoginController ()
 
-@property (nonatomic, strong) TWLLoginView *loginView;
+@property (nonatomic, strong) TLWLoginView *loginView;
 @property (nonatomic, assign) BOOL agreedToTerms;
 
 @end
 
-@implementation TWLLoginViewController
+@implementation TLWLoginController
 
 - (void)loadView {
-    self.loginView = [[TWLLoginView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    self.loginView = [[TLWLoginView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.view = self.loginView;
 }
 
@@ -80,7 +80,7 @@
 }
 
 - (void)handleWechatLogin {
-    TWLWechatBindViewController *bindVC = [[TWLWechatBindViewController alloc] init];
+    TLWWechatBindController *bindVC = [[TLWWechatBindController alloc] init];
     bindVC.modalPresentationStyle = UIModalPresentationFullScreen;
     [self presentViewController:bindVC animated:YES completion:nil];
 }

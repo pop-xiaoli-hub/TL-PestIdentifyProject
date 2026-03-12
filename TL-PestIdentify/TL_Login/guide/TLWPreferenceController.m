@@ -1,23 +1,23 @@
 //
-//  TWLPreferenceViewController.m
+//  TLWPreferenceController.m
 //  TL-PestIdentify
 //
 
-#import "TWLPreferenceViewController.h"
-#import "TWLPreferenceView.h"
+#import "TLWPreferenceController.h"
+#import "TLWPreferenceView.h"
 #import "TLWMainTabBarController.h"
 #import <Masonry/Masonry.h>
 
 // ─────────────────────────────────────────────
-#pragma mark - TWLCropCell
+#pragma mark - TLWCropCell
 // ─────────────────────────────────────────────
 
-@interface TWLCropCell : UICollectionViewCell
+@interface TLWCropCell : UICollectionViewCell
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) CAGradientLayer *selectedGradient;
 @end
 
-@implementation TWLCropCell
+@implementation TLWCropCell
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
@@ -79,14 +79,14 @@
 @end
 
 // ─────────────────────────────────────────────
-#pragma mark - TWLCustomInputCell
+#pragma mark - TLWCustomInputCell
 // ─────────────────────────────────────────────
 
-@interface TWLCustomInputCell : UICollectionViewCell
+@interface TLWCustomInputCell : UICollectionViewCell
 @property (nonatomic, strong) UITextField *textField;
 @end
 
-@implementation TWLCustomInputCell
+@implementation TLWCustomInputCell
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
@@ -127,13 +127,13 @@
 @end
 
 // ─────────────────────────────────────────────
-#pragma mark - TWLAddCropCell  ("+" button)
+#pragma mark - TLWAddCropCell  ("+" button)
 // ─────────────────────────────────────────────
 
-@interface TWLAddCropCell : UICollectionViewCell
+@interface TLWAddCropCell : UICollectionViewCell
 @end
 
-@implementation TWLAddCropCell
+@implementation TLWAddCropCell
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
@@ -165,14 +165,14 @@
 @end
 
 // ─────────────────────────────────────────────
-#pragma mark - TWLCropSectionHeaderView
+#pragma mark - TLWCropSectionHeaderView
 // ─────────────────────────────────────────────
 
-@interface TWLCropSectionHeaderView : UICollectionReusableView
+@interface TLWCropSectionHeaderView : UICollectionReusableView
 @property (nonatomic, strong) UILabel *titleLabel;
 @end
 
-@implementation TWLCropSectionHeaderView
+@implementation TLWCropSectionHeaderView
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
@@ -194,7 +194,7 @@
 @end
 
 // ─────────────────────────────────────────────
-#pragma mark - TWLPreferenceViewController
+#pragma mark - TLWPreferenceController
 // ─────────────────────────────────────────────
 
 static NSString * const kCropCellID   = @"CropCell";
@@ -202,25 +202,25 @@ static NSString * const kInputCellID  = @"InputCell";
 static NSString * const kAddCellID    = @"AddCell";
 static NSString * const kHeaderViewID = @"HeaderView";
 
-typedef NS_ENUM(NSInteger, TWLPrefSection) {
-    TWLPrefSectionCustom    = 0,
-    TWLPrefSectionGrain     = 1,   // 粮食作物
-    TWLPrefSectionVegetable = 2,   // 蔬菜
-    TWLPrefSectionFruit     = 3,   // 果树
+typedef NS_ENUM(NSInteger, TLWPrefSection) {
+    TLWPrefSectionCustom    = 0,
+    TLWPrefSectionGrain     = 1,   // 粮食作物
+    TLWPrefSectionVegetable = 2,   // 蔬菜
+    TLWPrefSectionFruit     = 3,   // 果树
 };
 
-@interface TWLPreferenceViewController () <UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, UITextFieldDelegate>
-@property (nonatomic, strong) TWLPreferenceView *preferenceView;
+@interface TLWPreferenceController () <UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDelegateFlowLayout, UITextFieldDelegate>
+@property (nonatomic, strong) TLWPreferenceView *preferenceView;
 @property (nonatomic, strong) NSMutableSet<NSString *> *selectedPlantNames;
 @property (nonatomic, strong) NSMutableArray<NSString *> *customCrops;
 @property (nonatomic, strong) NSArray<NSArray<NSString *> *> *plantSections;  // grain / veg / fruit
 @property (nonatomic, copy)   NSString *currentInputText;
 @end
 
-@implementation TWLPreferenceViewController
+@implementation TLWPreferenceController
 
 - (void)loadView {
-    self.preferenceView = [[TWLPreferenceView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    self.preferenceView = [[TLWPreferenceView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.view = self.preferenceView;
 }
 
@@ -238,10 +238,10 @@ typedef NS_ENUM(NSInteger, TWLPrefSection) {
     ];
 
     UICollectionView *cv = self.preferenceView.collectionView;
-    [cv registerClass:[TWLCropCell class]        forCellWithReuseIdentifier:kCropCellID];
-    [cv registerClass:[TWLCustomInputCell class] forCellWithReuseIdentifier:kInputCellID];
-    [cv registerClass:[TWLAddCropCell class]     forCellWithReuseIdentifier:kAddCellID];
-    [cv registerClass:[TWLCropSectionHeaderView class]
+    [cv registerClass:[TLWCropCell class]        forCellWithReuseIdentifier:kCropCellID];
+    [cv registerClass:[TLWCustomInputCell class] forCellWithReuseIdentifier:kInputCellID];
+    [cv registerClass:[TLWAddCropCell class]     forCellWithReuseIdentifier:kAddCellID];
+    [cv registerClass:[TLWCropSectionHeaderView class]
            forSupplementaryViewOfKind:UICollectionElementKindSectionHeader
                   withReuseIdentifier:kHeaderViewID];
     cv.dataSource = self;
@@ -270,20 +270,20 @@ typedef NS_ENUM(NSInteger, TWLPrefSection) {
 }
 
 - (NSInteger)collectionView:(UICollectionView *)cv numberOfItemsInSection:(NSInteger)section {
-    if (section == TWLPrefSectionCustom) {
+    if (section == TLWPrefSectionCustom) {
         return (NSInteger)_customCrops.count + 2;  // 自定义 crops + 输入框 + "+" 按钮
     }
     return (NSInteger)[_plantSections[section - 1] count];
 }
 
 - (UICollectionViewCell *)collectionView:(UICollectionView *)cv cellForItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == TWLPrefSectionCustom) {
+    if (indexPath.section == TLWPrefSectionCustom) {
         NSInteger inputIndex = (NSInteger)_customCrops.count;
         NSInteger addIndex   = inputIndex + 1;
 
         if (indexPath.item < inputIndex) {
             // 已添加的自定义农作物
-            TWLCropCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kCropCellID forIndexPath:indexPath];
+            TLWCropCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kCropCellID forIndexPath:indexPath];
             NSString *name = _customCrops[indexPath.item];
             cell.nameLabel.text = name;
             BOOL sel = [_selectedPlantNames containsObject:name];
@@ -297,7 +297,7 @@ typedef NS_ENUM(NSInteger, TWLPrefSection) {
 
         } else if (indexPath.item == inputIndex) {
             // 输入框 cell
-            TWLCustomInputCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kInputCellID forIndexPath:indexPath];
+            TLWCustomInputCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kInputCellID forIndexPath:indexPath];
             cell.textField.text = _currentInputText;
             cell.textField.delegate = self;
             [cell.textField removeTarget:nil action:nil forControlEvents:UIControlEventEditingChanged];
@@ -311,7 +311,7 @@ typedef NS_ENUM(NSInteger, TWLPrefSection) {
     }
 
     // 粮食 / 蔬菜 / 果树
-    TWLCropCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kCropCellID forIndexPath:indexPath];
+    TLWCropCell *cell = [cv dequeueReusableCellWithReuseIdentifier:kCropCellID forIndexPath:indexPath];
     NSString *name = _plantSections[indexPath.section - 1][indexPath.item];
     cell.nameLabel.text = name;
     BOOL sel = [_selectedPlantNames containsObject:name];
@@ -327,7 +327,7 @@ typedef NS_ENUM(NSInteger, TWLPrefSection) {
 - (UICollectionReusableView *)collectionView:(UICollectionView *)cv
            viewForSupplementaryElementOfKind:(NSString *)kind
                                  atIndexPath:(NSIndexPath *)indexPath {
-    TWLCropSectionHeaderView *header = [cv dequeueReusableSupplementaryViewOfKind:kind
+    TLWCropSectionHeaderView *header = [cv dequeueReusableSupplementaryViewOfKind:kind
                                                                withReuseIdentifier:kHeaderViewID
                                                                       forIndexPath:indexPath];
     NSArray *titles = @[@"自定义作物", @"粮食作物", @"蔬菜", @"果树"];
@@ -338,7 +338,7 @@ typedef NS_ENUM(NSInteger, TWLPrefSection) {
 #pragma mark - UICollectionViewDelegate
 
 - (BOOL)collectionView:(UICollectionView *)cv shouldSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == TWLPrefSectionCustom) {
+    if (indexPath.section == TLWPrefSectionCustom) {
         NSInteger inputIndex = (NSInteger)_customCrops.count;
         return indexPath.item != inputIndex;  // 输入框不可"选中"
     }
@@ -346,7 +346,7 @@ typedef NS_ENUM(NSInteger, TWLPrefSection) {
 }
 
 - (void)collectionView:(UICollectionView *)cv didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == TWLPrefSectionCustom) {
+    if (indexPath.section == TLWPrefSectionCustom) {
         NSInteger addIndex = (NSInteger)_customCrops.count + 1;
         if (indexPath.item == addIndex) {
             // 点击 "+" — 添加农作物
@@ -365,7 +365,7 @@ typedef NS_ENUM(NSInteger, TWLPrefSection) {
 }
 
 - (void)collectionView:(UICollectionView *)cv didDeselectItemAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == TWLPrefSectionCustom) {
+    if (indexPath.section == TLWPrefSectionCustom) {
         if (indexPath.item < (NSInteger)_customCrops.count) {
             [_selectedPlantNames removeObject:_customCrops[indexPath.item]];
         }
@@ -422,15 +422,15 @@ referenceSizeForHeaderInSection:(NSInteger)section {
     _currentInputText = @"";
 
     UICollectionView *cv = self.preferenceView.collectionView;
-    NSIndexPath *newIP = [NSIndexPath indexPathForItem:insertPos inSection:TWLPrefSectionCustom];
+    NSIndexPath *newIP = [NSIndexPath indexPathForItem:insertPos inSection:TLWPrefSectionCustom];
 
     [cv performBatchUpdates:^{
         [cv insertItemsAtIndexPaths:@[newIP]];
     } completion:^(BOOL finished) {
         // 清空输入框并收起键盘
         NSIndexPath *inputIP = [NSIndexPath indexPathForItem:(NSInteger)self->_customCrops.count
-                                                   inSection:TWLPrefSectionCustom];
-        TWLCustomInputCell *inputCell = (TWLCustomInputCell *)[cv cellForItemAtIndexPath:inputIP];
+                                                   inSection:TLWPrefSectionCustom];
+        TLWCustomInputCell *inputCell = (TLWCustomInputCell *)[cv cellForItemAtIndexPath:inputIP];
         inputCell.textField.text = @"";
         [inputCell.textField resignFirstResponder];
     }];
