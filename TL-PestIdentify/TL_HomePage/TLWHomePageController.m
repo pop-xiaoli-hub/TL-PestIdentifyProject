@@ -1,0 +1,188 @@
+//
+//  TLWHomePageController.m
+//  TL-PestIdentify
+//
+//  Created by xiaoli pop on 2026/3/9.
+//
+
+#import "TLWHomePageController.h"
+#import "TLWHomePageView.h"
+#import "TLWHomeCardCell.h"
+#import "TLWHomeCustomCell.h"
+#import "TLWIdentifyPageController.h"
+#import "TLWWarningModel.h"
+#import <Masonry.h>
+
+@interface TLWHomePageController () <UITableViewDelegate, UITableViewDataSource>
+
+@property (nonatomic, strong) TLWHomePageView *homePageView;
+@property (nonatomic, assign) BOOL warningExpanded;
+
+@end
+
+@implementation TLWHomePageController
+
+- (void)viewDidLoad {
+  [super viewDidLoad];
+  [self tl_setHomePageBackView];
+  [self tl_setupHomePageView];
+}
+
+- (void)tl_setHomePageBackView {
+  UIImage* image = [UIImage imageNamed:@"hp_backView.png"];
+  self.view.layer.contents = (__bridge id)image.CGImage;
+}
+
+- (void)tl_setupHomePageView {
+  self.homePageView.backgroundColor = [UIColor clearColor];
+  [self.view addSubview:self.homePageView];
+  [self.homePageView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(self.view);
+  }];
+  UITableView *tableView = self.homePageView.tableView;
+  tableView.delegate = self;
+  tableView.dataSource = self;
+  tableView.estimatedRowHeight = 180;
+  [tableView registerClass:[TLWHomeCardCell class] forCellReuseIdentifier:@"kTLWHomeCardCellIdentifier1"];
+  [tableView registerClass:[TLWHomeCardCell class] forCellReuseIdentifier:@"kTLWHomeCardCellIdentifier2"];
+  [tableView registerClass:[TLWHomeCustomCell class] forCellReuseIdentifier:@"kTLWHomeCustomCellIdentifier"];
+  tableView.estimatedRowHeight = 160.0;
+}
+
+- (TLWHomePageView *)homePageView {
+  if (!_homePageView) {
+    _homePageView = [[TLWHomePageView alloc] initWithFrame:CGRectZero];
+  }
+  return _homePageView;
+}
+
+#pragma mark - UITableViewDataSource
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+  return 4;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+  if (indexPath.row == 0) {
+    TLWHomeCardCell *cell = [tableView dequeueReusableCellWithIdentifier:@"kTLWHomeCardCellIdentifier1" forIndexPath:indexPath];
+    NSString* str = @"预计24小时内,我区地面最低温将降至-5℃以下,农作物面临严重冻害风险。请农户立即…面最低预计24小时内,我区地面最低温将降至-5℃以下,农作物面临严重冻害风险。请农户立即…面最低预计24小时内,我区地面最低温将降至-5℃以下,农作物面临严重冻害风险。请农户立即…面最低预计24小时内,我区地面最低温将降至-5℃以下,农作物面临严重冻害风险。请农户立即…面最低";
+    TLWWarningModel* textModel = [[TLWWarningModel alloc] init];
+    textModel.string = str;
+    // 注意：此时 cell 还没布局，bodyLabel.frame.width 为 0，不能直接使用
+    // 用 tableView 宽度减去左右内边距，近似计算 bodyLabel 可用宽度
+    CGFloat tableWidth = CGRectGetWidth(tableView.bounds);
+    // contentView 左右各 16，正文内部左 16、右 8，对应 TLWHomeCardCell 中的约束
+    CGFloat bodyWidth = tableWidth - 16.0 - 16.0 - 16.0 - 8.0;
+    textModel.shouldExpand = [self isTextViewExceedThreeLines:str width:bodyWidth];
+    [cell tl_configureWithWarning:textModel];
+    [cell tl_configureWarningExpanded:self.warningExpanded];
+    __weak typeof(self) weakSelf = self;
+    cell.clickWarningDetail = ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+      strongSelf.warningExpanded = !strongSelf.warningExpanded;
+      NSIndexPath *ip = [NSIndexPath indexPathForRow:0 inSection:0];
+      [tableView beginUpdates];
+      [tableView reloadRowsAtIndexPaths:@[ip] withRowAnimation:UITableViewRowAnimationNone];
+      [tableView endUpdates];
+    };
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    return cell;
+  } else if (indexPath.row == 1) {
+    TLWHomeCardCell *cell = [tableView dequeueReusableCellWithIdentifier:@"kTLWHomeCardCellIdentifier2" forIndexPath:indexPath];
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    __weak typeof(self) weakSelf = self;
+    cell.clickPhotoIdentification = ^{
+      TLWIdentifyPageController* identifyViewController = [[TLWIdentifyPageController alloc] init];
+      identifyViewController.hidesBottomBarWhenPushed = YES;
+      [weakSelf.navigationController pushViewController:identifyViewController animated:YES];
+    };
+    return cell;
+  }
+  TLWHomeCustomCell *cell = [tableView dequeueReusableCellWithIdentifier:@"kTLWHomeCustomCellIdentifier" forIndexPath:indexPath];
+  return cell;
+}
+
+#pragma mark - UITableViewDelegate
+
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+  if (indexPath.row == 0) {
+    return UITableViewAutomaticDimension;
+  } else if (indexPath.row == 1) {
+    // 功能入口卡片（拍照识别区域需要更高，保证正方形比例和留白）
+    return 210.0;
+  } else {
+    // 其他自定义 cell
+    return 300.0;
+  }
+}
+
+
+- (BOOL)isTextViewExceedThreeLines:(NSString *)text width:(CGFloat)width {
+  NSTextStorage *storage = [[NSTextStorage alloc] initWithString:text attributes:@{NSFontAttributeName: [UIFont systemFontOfSize:16]}];//管理文本内容和属性
+  NSLayoutManager *layoutManager = [[NSLayoutManager alloc] init];//将字符转换为字形，管理文本的布局过程
+  NSTextContainer *container = [[NSTextContainer alloc] initWithSize:CGSizeMake(width, CGFLOAT_MAX)];//定义文本的可占据区域
+  container.lineFragmentPadding = 0;
+  [layoutManager addTextContainer:container];
+  [storage addLayoutManager:layoutManager];
+  NSUInteger glyphCount = [layoutManager numberOfGlyphs];
+  __block NSInteger lines = 0;
+  [layoutManager enumerateLineFragmentsForGlyphRange:NSMakeRange(0, glyphCount) usingBlock:^(CGRect rect, CGRect usedRect, NSTextContainer * _Nonnull textContainer, NSRange glyphRange, BOOL * _Nonnull stop) {
+    lines++;
+    if (lines > 3) {
+      *stop = YES;
+    }
+  }];
+  return lines > 3;
+}
+
+
+#pragma mark -顶部导航栏配置
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self.navigationController setNavigationBarHidden:YES animated:NO];
+  //    UINavigationBar *navigationBar = self.navigationController.navigationBar;
+  //
+  //    // 1. 设置背景图片为空图像，移除背景色
+  //    [navigationBar setBackgroundImage:[UIImage new] forBarMetrics:UIBarMetricsDefault];
+  //
+  //    // 2. 设置阴影图片为空图像，移除底部的黑线
+  //    [navigationBar setShadowImage:[UIImage new]];
+  //
+  //    // 3. 确保导航栏是半透明的 (通常默认为 YES，但建议显式设置)
+  //    navigationBar.translucent = YES;
+  //
+  //    // 【可选】如果希望导航栏上的文字和按钮颜色适应透明背景（例如变为白色）
+  //    // 设置标题颜色
+  //    [navigationBar setTitleTextAttributes:@{NSForegroundColorAttributeName: [UIColor whiteColor]}];
+  //    // 设置整体色调（影响返回箭头和按钮颜色）
+  //    navigationBar.barTintColor = [UIColor clearColor];
+  //    navigationBar.tintColor = [UIColor whiteColor];
+}
+- (void)viewWillDisappear:(BOOL)animated {
+  [super viewWillDisappear:animated];
+  [self.navigationController setNavigationBarHidden:NO animated:NO];
+  //    // 恢复导航栏默认设置，避免影响其他页面
+  //    UINavigationBar *navigationBar = self.navigationController.navigationBar;
+  //
+  //    [navigationBar setBackgroundImage:nil forBarMetrics:UIBarMetricsDefault];
+  //    [navigationBar setShadowImage:nil];
+  //    navigationBar.translucent = YES; // 或者根据全局需求设置为 NO
+  //
+  //    // 恢复文字颜色等属性（如果有修改）
+  //    [navigationBar setTitleTextAttributes:nil];
+  //    navigationBar.tintColor = nil;
+}
+/*
+ #pragma mark - Navigation
+
+ // In a storyboard-based application, you will often want to do a little preparation before navigation
+ - (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+ // Get the new view controller using [segue destinationViewController].
+ // Pass the selected object to the new view controller.
+ }
+ */
+
+@end
