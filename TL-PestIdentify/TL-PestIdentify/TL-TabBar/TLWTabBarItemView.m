@@ -40,6 +40,13 @@
     self.iconView.contentMode = UIViewContentModeScaleAspectFit;
     [self.circleView addSubview:self.iconView];
 
+    // 文字放在圆圈内部，图标正下方
+    self.titleLabel = [UILabel new];
+    self.titleLabel.text = title;
+    self.titleLabel.textAlignment = NSTextAlignmentCenter;
+    self.titleLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightMedium];
+    self.titleLabel.textColor = [UIColor colorWithRed:0.00 green:0.62 blue:0.52 alpha:1.0];
+    [self.circleView addSubview:self.titleLabel];
 
     [self tl_applySelected:NO];
   }
@@ -58,8 +65,18 @@
   self.selectedGradient.frame = self.circleView.bounds;
   self.selectedGradient.cornerRadius = self.circleView.layer.cornerRadius;
 
-  CGFloat iconSize = 26.0;
-  self.iconView.frame = CGRectMake((circleSize - iconSize) / 2.0, (circleSize - iconSize) / 2.0 - 4.0, iconSize, iconSize);
+  // 图标 + 文字整体在圆圈内垂直居中
+  CGFloat iconSize = 20.0;
+  CGFloat labelHeight = 13.0;
+  CGFloat gap = 2.0;
+  CGFloat totalH = iconSize + gap + labelHeight;
+  CGFloat topY = (circleSize - totalH) / 2.0;
+
+  // 图标在上
+  self.iconView.frame = CGRectMake((circleSize - iconSize) / 2.0, topY, iconSize, iconSize);
+
+  // 文字紧接图标下方，宽度撑满圆圈
+  self.titleLabel.frame = CGRectMake(0, topY + iconSize + gap, circleSize, labelHeight);
 }
 
 - (void)tl_applySelected:(BOOL)selected {
@@ -76,6 +93,7 @@
     self.circleView.layer.shadowRadius = 18;
     self.circleView.layer.shadowOffset = CGSizeMake(0, 10);
     self.iconView.tintColor = UIColor.whiteColor;
+    self.titleLabel.textColor = UIColor.whiteColor;
   } else {
     [self.selectedGradient removeFromSuperlayer];
     self.circleView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.90];
@@ -84,6 +102,7 @@
     self.circleView.layer.shadowRadius = 10;
     self.circleView.layer.shadowOffset = CGSizeMake(0, 6);
     self.iconView.tintColor = green;
+    self.titleLabel.textColor = green;
   }
 }
 

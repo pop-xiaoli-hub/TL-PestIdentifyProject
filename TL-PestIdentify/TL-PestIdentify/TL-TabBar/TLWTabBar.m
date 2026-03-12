@@ -137,6 +137,7 @@
   self.pillGradient.cornerRadius = self.pillView.layer.cornerRadius;
   self.pillView.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.pillView.bounds cornerRadius:self.pillView.layer.cornerRadius].CGPath;
 
+
   CGFloat itemW = pillW / self.itemViews.count;
   for (NSInteger i = 0; i < (NSInteger)self.itemViews.count; i++) {
     TLWTabBarItemView *item = self.itemViews[i];
