@@ -10,6 +10,7 @@
 #import "TLWHomeCardCell.h"
 #import "TLWHomeCustomCell.h"
 #import "TLWIdentifyPageController.h"
+#import "TLWRecordController.h"
 #import "TLWWarningModel.h"
 #import <Masonry.h>
 
@@ -98,6 +99,11 @@
       TLWIdentifyPageController* identifyViewController = [[TLWIdentifyPageController alloc] init];
       identifyViewController.hidesBottomBarWhenPushed = YES;
       [weakSelf.navigationController pushViewController:identifyViewController animated:YES];
+    };
+    cell.clickRecordCard = ^{
+      TLWRecordController *recordVC = [[TLWRecordController alloc] init];
+      recordVC.hidesBottomBarWhenPushed = YES;
+      [weakSelf.navigationController pushViewController:recordVC animated:YES];
     };
     return cell;
   }

@@ -10,7 +10,7 @@
 #import "TLWHomePageController.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWMainTabBarController ()
+@interface TLWMainTabBarController () <UINavigationControllerDelegate>
 
 // 存放四个模块的 NavigationController
 @property (nonatomic, strong) NSArray<UIViewController *> *childVCs;
@@ -53,6 +53,11 @@
     UINavigationController *meNav = [[UINavigationController alloc] initWithRootViewController:meVC];
 
     _childVCs = @[homeNav, communityNav, msgNav, meNav];
+
+    // 监听每个 NavigationController 的跳转，用于控制 TabBar 显隐
+    for (UINavigationController *nav in _childVCs) {
+        nav.delegate = self;
+    }
 
     // ── 2. 注册子 VC，走正确的生命周期 ──────────────────────────
     // addChildViewController 会让子 VC 正确收到 viewWillAppear 等回调
@@ -123,6 +128,19 @@
 
     _whiteBgMask.path = path.CGPath;
     _whiteBgMask.frame = _whiteBg.bounds;
+}
+
+#pragma mark - UINavigationControllerDelegate
+
+- (void)navigationController:(UINavigationController *)navigationController
+      willShowViewController:(UIViewController *)viewController
+                    animated:(BOOL)animated {
+    BOOL hide = viewController.hidesBottomBarWhenPushed;
+    [UIView animateWithDuration:animated ? 0.25 : 0 animations:^{
+        self->_mainTabBar.alpha = hide ? 0 : 1;
+        self->_whiteBg.alpha   = hide ? 0 : 1;
+    }];
+    _mainTabBar.userInteractionEnabled = !hide;
 }
 
 #pragma mark - Tab 切换
