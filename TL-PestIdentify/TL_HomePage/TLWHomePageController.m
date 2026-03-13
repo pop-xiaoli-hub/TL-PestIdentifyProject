@@ -145,42 +145,6 @@
 }
 
 
-#pragma mark -顶部导航栏配置
-- (void)viewWillAppear:(BOOL)animated {
-  [super viewWillAppear:animated];
-  [self.navigationController setNavigationBarHidden:YES animated:NO];
-  //    UINavigationBar *navigationBar = self.navigationController.navigationBar;
-  //
-  //    // 1. 设置背景图片为空图像，移除背景色
-  //    [navigationBar setBackgroundImage:[UIImage new] forBarMetrics:UIBarMetricsDefault];
-  //
-  //    // 2. 设置阴影图片为空图像，移除底部的黑线
-  //    [navigationBar setShadowImage:[UIImage new]];
-  //
-  //    // 3. 确保导航栏是半透明的 (通常默认为 YES，但建议显式设置)
-  //    navigationBar.translucent = YES;
-  //
-  //    // 【可选】如果希望导航栏上的文字和按钮颜色适应透明背景（例如变为白色）
-  //    // 设置标题颜色
-  //    [navigationBar setTitleTextAttributes:@{NSForegroundColorAttributeName: [UIColor whiteColor]}];
-  //    // 设置整体色调（影响返回箭头和按钮颜色）
-  //    navigationBar.barTintColor = [UIColor clearColor];
-  //    navigationBar.tintColor = [UIColor whiteColor];
-}
-- (void)viewWillDisappear:(BOOL)animated {
-  [super viewWillDisappear:animated];
-  [self.navigationController setNavigationBarHidden:NO animated:NO];
-  //    // 恢复导航栏默认设置，避免影响其他页面
-  //    UINavigationBar *navigationBar = self.navigationController.navigationBar;
-  //
-  //    [navigationBar setBackgroundImage:nil forBarMetrics:UIBarMetricsDefault];
-  //    [navigationBar setShadowImage:nil];
-  //    navigationBar.translucent = YES; // 或者根据全局需求设置为 NO
-  //
-  //    // 恢复文字颜色等属性（如果有修改）
-  //    [navigationBar setTitleTextAttributes:nil];
-  //    navigationBar.tintColor = nil;
-}
 /*
  #pragma mark - Navigation
 
