@@ -80,6 +80,11 @@
 			path = TL_Login;
 			sourceTree = "<group>";
 		};
+		4CA891122F63A7A900928BBF /* TL_Record */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TL_Record;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +116,7 @@
 		0DAAA8CD2F59C0B800F327DC = {
 			isa = PBXGroup;
 			children = (
+				4CA891122F63A7A900928BBF /* TL_Record */,
 				4C9B4E8D2F5F040700016E29 /* TL_Login */,
 				0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */,
 				0DB0A9202F5FF6D3009E2E41 /* TL_HomePage */,
@@ -172,6 +178,7 @@
 				0DB0A9202F5FF6D3009E2E41 /* TL_HomePage */,
 				0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */,
 				4C9B4E8D2F5F040700016E29 /* TL_Login */,
+				4CA891122F63A7A900928BBF /* TL_Record */,
 			);
 			name = "TL-PestIdentify";
 			productName = "TL-PestIdentify";

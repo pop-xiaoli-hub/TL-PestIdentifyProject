@@ -7,6 +7,7 @@
 
 #import "TLWIdentifyPageController.h"
 #import "TLWIdentifyPageView.h"
+#import "TLWRecordController.h"
 #import <AVFoundation/AVFoundation.h>
 @interface TLWIdentifyPageController ()<UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 @property (nonatomic, strong)TLWIdentifyPageView* myView;
@@ -24,6 +25,7 @@
   [self.myView.backButton addTarget:self action:@selector(tl_dismissCurrentView:) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.flashButton addTarget:self action:@selector(tl_openFlash:) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.photosButton addTarget:self action:@selector(tl_openPhotoAlbum) forControlEvents:UIControlEventTouchUpInside];
+  [self.myView.recordButton addTarget:self action:@selector(tl_openRecord) forControlEvents:UIControlEventTouchUpInside];
 }
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
@@ -81,6 +83,11 @@
 
 - (void)tl_dismissCurrentView:(UIButton* )button {
   [self.navigationController popToRootViewControllerAnimated:YES];
+}
+
+- (void)tl_openRecord {
+  TLWRecordController *vc = [[TLWRecordController alloc] init];
+  [self.navigationController pushViewController:vc animated:YES];
 }
 
 - (void)tl_setupCamera {

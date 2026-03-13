@@ -14,6 +14,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIView *cardContainerView;
 /// 第二个卡片 cell：点击「拍照识别」
 @property (nonatomic, copy) void(^clickPhotoIdentification)(void);
+/// 第二个卡片 cell：点击「识别记录」
+@property (nonatomic, copy) void(^clickRecordCard)(void);
 
 /// 第一个预警 card：点击右下角「查看详细/收起」
 @property (nonatomic, copy) void(^clickWarningDetail)(void);

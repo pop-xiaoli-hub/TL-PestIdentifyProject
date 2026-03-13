@@ -439,7 +439,9 @@
 }
 
 - (void)tl_didTapRecordCard {
-    NSLog(@"点击按钮-记录");
+    if (self.clickRecordCard) {
+        self.clickRecordCard();
+    }
 }
 
 - (void)tl_didTapAssistantCard {
