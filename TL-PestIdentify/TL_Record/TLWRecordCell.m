@@ -55,7 +55,7 @@
 }
 
 - (void)configureWithItem:(TLWRecordItem *)item {
-    _nameLabel.text = item.pestName;
+    _nameLabel.text = item.topPestName;
 
     if (item.imageURL.length > 0) {
         // 图片加载成功后移除占位色，避免颜色闪烁

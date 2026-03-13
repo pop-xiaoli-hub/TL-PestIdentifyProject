@@ -54,8 +54,9 @@
 
     _childVCs = @[homeNav, communityNav, msgNav, meNav];
 
-    // 监听每个 NavigationController 的跳转，用于控制 TabBar 显隐
+    // 全局隐藏系统导航栏，所有页面统一使用自定义导航栏
     for (UINavigationController *nav in _childVCs) {
+        nav.navigationBarHidden = YES;
         nav.delegate = self;
     }
 

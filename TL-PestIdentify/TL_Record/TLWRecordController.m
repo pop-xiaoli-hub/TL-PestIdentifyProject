@@ -10,6 +10,7 @@
 #import "TLWRecordCell.h"
 #import "TLWRecordHeaderView.h"
 #import "TLWRecordModel.h"
+#import "TLWRecordDetailController.h"
 #import <Masonry/Masonry.h>
 
 static NSString *const kCellID   = @"TLWRecordCell";
@@ -62,21 +63,63 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 
 // TODO: 接口来了替换此方法内部实现，外部调用方式不变
 // 预期接口格式：
-// [{ "date": "2025-11-28", "items": [{ "recordId": "1", "pestName": "蚜虫", "imageURL": "https://..." }] }]
+// [{ "date": "2025-11-28", "items": [{
+//   "recordId": "1", "imageURL": "https://...", "recordTime": "2025-11-28 14:32",
+//   "results": [{ "pestName": "蚜虫", "confidence": 0.92, "solution": "..." }]
+// }] }]
 - (void)tl_fetchRecords {
     // Mock 数据
-    TLWRecordItem *item1 = [TLWRecordItem new]; item1.pestName = @"蚜虫";  item1.imageURL = @"";
-    TLWRecordItem *item2 = [TLWRecordItem new]; item2.pestName = @"蚜虫";  item2.imageURL = @"";
-    TLWRecordItem *item3 = [TLWRecordItem new]; item3.pestName = @"蚜虫";  item3.imageURL = @"";
-    TLWRecordItem *item4 = [TLWRecordItem new]; item4.pestName = @"蚜虫";  item4.imageURL = @"";
+    TLWRecordResult *r_aphid = [TLWRecordResult new];
+    r_aphid.pestName  = @"蚜虫";
+    r_aphid.confidence = 0.92f;
+    r_aphid.solution  = @"使用吡虫啉或噻虫嗪类杀虫剂进行喷雾处理，注意轮换用药以防产生抗药性。同时清除田间杂草，减少蚜虫越冬寄主。";
+
+    TLWRecordResult *r_powdery = [TLWRecordResult new];
+    r_powdery.pestName  = @"白粉病";
+    r_powdery.confidence = 0.95f;
+    r_powdery.solution  = @"喷施三唑酮（粉锈宁）或戊唑醇，重点喷施叶片正反两面。加强田间通风透光，降低株间湿度。";
+
+    TLWRecordResult *r_rust = [TLWRecordResult new];
+    r_rust.pestName  = @"锈病";
+    r_rust.confidence = 0.89f;
+    r_rust.solution  = @"喷施代森锰锌或三唑类杀菌剂，发病严重时可连续用药2~3次。合理密植，增强通风透光。";
+
+    TLWRecordResult *r_anthr = [TLWRecordResult new];
+    r_anthr.pestName  = @"炭疽病";
+    r_anthr.confidence = 0.87f;
+    r_anthr.solution  = @"发病初期喷施苯醚甲环唑或咪鲜胺，每隔7天喷1次，连续2~3次。注意雨后及时排水，避免湿度过高。";
+
+    TLWRecordItem *item1 = [TLWRecordItem new];
+    item1.recordId = @"1"; item1.imageURL = @""; item1.recordTime = @"2025-11-28 14:32";
+    item1.results = @[r_aphid];
+
+    TLWRecordItem *item2 = [TLWRecordItem new];
+    item2.recordId = @"2"; item2.imageURL = @""; item2.recordTime = @"2025-11-28 12:10";
+    item2.results = @[r_anthr, r_aphid];
+
+    TLWRecordItem *item3 = [TLWRecordItem new];
+    item3.recordId = @"3"; item3.imageURL = @""; item3.recordTime = @"2025-11-28 09:00";
+    item3.results = @[r_powdery];
+
+    TLWRecordItem *item4 = [TLWRecordItem new];
+    item4.recordId = @"4"; item4.imageURL = @""; item4.recordTime = @"2025-11-28 08:45";
+    item4.results = @[r_aphid];
 
     TLWRecordSection *sec1 = [TLWRecordSection new];
     sec1.dateString = @"2025-11-28";
     sec1.items = @[item1, item2, item3, item4];
 
-    TLWRecordItem *item5 = [TLWRecordItem new]; item5.pestName = @"白粉病"; item5.imageURL = @"";
-    TLWRecordItem *item6 = [TLWRecordItem new]; item6.pestName = @"锈病";   item6.imageURL = @"";
-    TLWRecordItem *item7 = [TLWRecordItem new]; item7.pestName = @"蚜虫";   item7.imageURL = @"";
+    TLWRecordItem *item5 = [TLWRecordItem new];
+    item5.recordId = @"5"; item5.imageURL = @""; item5.recordTime = @"2025-11-27 15:20";
+    item5.results = @[r_powdery, r_rust];
+
+    TLWRecordItem *item6 = [TLWRecordItem new];
+    item6.recordId = @"6"; item6.imageURL = @""; item6.recordTime = @"2025-11-27 11:05";
+    item6.results = @[r_rust];
+
+    TLWRecordItem *item7 = [TLWRecordItem new];
+    item7.recordId = @"7"; item7.imageURL = @""; item7.recordTime = @"2025-11-27 08:30";
+    item7.results = @[r_aphid];
 
     TLWRecordSection *sec2 = [TLWRecordSection new];
     sec2.dateString = @"2025-11-27";
@@ -121,6 +164,14 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
     return header;
 }
 
+#pragma mark - UICollectionViewDelegate
+
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    TLWRecordItem *item = self.sections[indexPath.section].items[indexPath.row];
+    TLWRecordDetailController *detail = [[TLWRecordDetailController alloc] initWithItem:item];
+    [self.navigationController pushViewController:detail animated:YES];
+}
+
 #pragma mark - Lifecycle
 
 - (TLWRecordView *)myView {
@@ -132,13 +183,9 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [self.navigationController setNavigationBarHidden:YES animated:NO];
-}
-
-- (void)viewWillDisappear:(BOOL)animated {
-    [super viewWillDisappear:animated];
-    // 在 pop 动画开始前恢复导航栏，避免过渡动画中导航栏突然闪现
-    [self.navigationController setNavigationBarHidden:NO animated:NO];
+    // 隐藏系统导航栏后手动恢复右滑返回手势
+    self.navigationController.interactivePopGestureRecognizer.enabled = YES;
+    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
 }
 
 @end

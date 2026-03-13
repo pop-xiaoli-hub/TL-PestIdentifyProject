@@ -87,6 +87,7 @@
 
 - (void)tl_openRecord {
   TLWRecordController *vc = [[TLWRecordController alloc] init];
+  vc.hidesBottomBarWhenPushed = YES;
   [self.navigationController pushViewController:vc animated:YES];
 }
 
@@ -129,13 +130,6 @@
   return _myView;
 }
 
-- (void)viewWillAppear:(BOOL)animated {
-  [self.navigationController setNavigationBarHidden:YES animated:NO];
-}
-
-- (void)viewDidDisappear:(BOOL)animated {
-  [self.navigationController setNavigationBarHidden:NO animated:NO];
-}
 
 /*
 #pragma mark - Navigation
