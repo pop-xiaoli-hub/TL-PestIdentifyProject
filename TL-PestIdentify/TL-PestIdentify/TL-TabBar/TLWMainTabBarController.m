@@ -9,7 +9,7 @@
 #import "TLWTabBar.h"
 #import "TLWHomePageController.h"
 #import <Masonry/Masonry.h>
-
+#import "TLWCommunityController.h"
 @interface TLWMainTabBarController () <UINavigationControllerDelegate>
 
 // 存放四个模块的 NavigationController
@@ -38,7 +38,7 @@
     UINavigationController *homeNav = [[UINavigationController alloc] initWithRootViewController:homeVC];
 
     // 社区：占位，待开发
-    UIViewController *communityVC = [UIViewController new];
+    TLWCommunityController *communityVC = [TLWCommunityController new];
     communityVC.view.backgroundColor = UIColor.whiteColor;
     UINavigationController *communityNav = [[UINavigationController alloc] initWithRootViewController:communityVC];
 
