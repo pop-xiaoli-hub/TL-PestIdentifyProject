@@ -145,7 +145,7 @@ static CGFloat const kItemGap = 10.0;
   layout.sectionInset = UIEdgeInsetsMake(12, kHorizontalInset, 20, kHorizontalInset);
 
   UICollectionView *collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:layout];
-  collectionView.backgroundColor = [UIColor whiteColor];
+  collectionView.backgroundColor = [UIColor systemGroupedBackgroundColor];
   collectionView.showsVerticalScrollIndicator = NO;
   collectionView.layer.masksToBounds = YES;
   collectionView.layer.cornerRadius = 20;
@@ -361,8 +361,6 @@ static CGFloat const kItemGap = 10.0;
 - (void)tl_searchSuggestionTapped:(UIButton *)sender {
   NSString *text = sender.currentTitle ?: @"";
   self.searchTextField.text = text;
-  // 选中推荐词后，直接视为一次搜索并关闭面板
-  [self tl_hideSearchOverlay];
 }
 
 - (void)tl_clearHistoryTapped {
