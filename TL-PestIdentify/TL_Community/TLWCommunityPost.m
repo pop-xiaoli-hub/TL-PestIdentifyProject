@@ -69,7 +69,7 @@
 
     for (NSInteger i = 0; i < titles.count; i++) {
         TLWCommunityPost *post = [[TLWCommunityPost alloc] init];
-        post.imageName = @"cm_placeholder"; // 占位图，后续可换成网络图片
+        post.imageName = @"hp_eg1.jpg"; // 占位图，后续可换成网络图片
         post.title = titles[i];
         post.userName = users[i];
         post.likeCount = likes[i].integerValue;
