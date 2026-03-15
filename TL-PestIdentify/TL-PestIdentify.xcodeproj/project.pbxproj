@@ -9,6 +9,14 @@
 /* Begin PBXBuildFile section */
 		1D0DEAFCB336DAF43EC9E6EE /* libPods-TL-PestIdentify.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */; };
 		4CA894FF2F64577500928BBF /* TLWCameraManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA894FD2F64577500928BBF /* TLWCameraManager.m */; };
+		4CA8A5902F66F9E100928BBF /* TLWMessageView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A58E2F66F9E100928BBF /* TLWMessageView.m */; };
+		4CA8A5912F66F9E100928BBF /* TLWMessageItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A58C2F66F9E100928BBF /* TLWMessageItem.m */; };
+		4CA8A5922F66F9E100928BBF /* TLWMessageController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A58A2F66F9E100928BBF /* TLWMessageController.m */; };
+		4CA8A5932F66F9E100928BBF /* TLWMessageCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A5882F66F9E100928BBF /* TLWMessageCell.m */; };
+		4CA8A5B92F66FA3300928BBF /* TLWNotificationCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A5B12F66FA3300928BBF /* TLWNotificationCell.m */; };
+		4CA8A5BA2F66FA3300928BBF /* TLWNotificationView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A5B72F66FA3300928BBF /* TLWNotificationView.m */; };
+		4CA8A5BB2F66FA3300928BBF /* TLWNotificationItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A5B52F66FA3300928BBF /* TLWNotificationItem.m */; };
+		4CA8A5BC2F66FA3300928BBF /* TLWNotificationController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A5B32F66FA3300928BBF /* TLWNotificationController.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -35,6 +43,22 @@
 		0DAAA8FB2F59C0BB00F327DC /* TL-PestIdentifyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4CA894FC2F64577500928BBF /* TLWCameraManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWCameraManager.h; sourceTree = "<group>"; };
 		4CA894FD2F64577500928BBF /* TLWCameraManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWCameraManager.m; sourceTree = "<group>"; };
+		4CA8A5872F66F9E100928BBF /* TLWMessageCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWMessageCell.h; sourceTree = "<group>"; };
+		4CA8A5882F66F9E100928BBF /* TLWMessageCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWMessageCell.m; sourceTree = "<group>"; };
+		4CA8A5892F66F9E100928BBF /* TLWMessageController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWMessageController.h; sourceTree = "<group>"; };
+		4CA8A58A2F66F9E100928BBF /* TLWMessageController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWMessageController.m; sourceTree = "<group>"; };
+		4CA8A58B2F66F9E100928BBF /* TLWMessageItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWMessageItem.h; sourceTree = "<group>"; };
+		4CA8A58C2F66F9E100928BBF /* TLWMessageItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWMessageItem.m; sourceTree = "<group>"; };
+		4CA8A58D2F66F9E100928BBF /* TLWMessageView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWMessageView.h; sourceTree = "<group>"; };
+		4CA8A58E2F66F9E100928BBF /* TLWMessageView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWMessageView.m; sourceTree = "<group>"; };
+		4CA8A5B02F66FA3300928BBF /* TLWNotificationCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWNotificationCell.h; sourceTree = "<group>"; };
+		4CA8A5B12F66FA3300928BBF /* TLWNotificationCell.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWNotificationCell.m; sourceTree = "<group>"; };
+		4CA8A5B22F66FA3300928BBF /* TLWNotificationController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWNotificationController.h; sourceTree = "<group>"; };
+		4CA8A5B32F66FA3300928BBF /* TLWNotificationController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWNotificationController.m; sourceTree = "<group>"; };
+		4CA8A5B42F66FA3300928BBF /* TLWNotificationItem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWNotificationItem.h; sourceTree = "<group>"; };
+		4CA8A5B52F66FA3300928BBF /* TLWNotificationItem.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWNotificationItem.m; sourceTree = "<group>"; };
+		4CA8A5B62F66FA3300928BBF /* TLWNotificationView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWNotificationView.h; sourceTree = "<group>"; };
+		4CA8A5B72F66FA3300928BBF /* TLWNotificationView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWNotificationView.m; sourceTree = "<group>"; };
 		8457BB115BD60440BB3E020F /* Pods-TL-PestIdentify.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TL-PestIdentify.debug.xcconfig"; path = "Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify.debug.xcconfig"; sourceTree = "<group>"; };
 		A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-TL-PestIdentify.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -134,6 +158,8 @@
 		0DAAA8CD2F59C0B800F327DC = {
 			isa = PBXGroup;
 			children = (
+				4CA8A5B82F66FA3300928BBF /* TL_Notification */,
+				4CA8A58F2F66F9E100928BBF /* TL_Message */,
 				4CA894FE2F64577500928BBF /* TL_Common */,
 				4CA894EF2F63FDF700928BBF /* TL_AiAssisstant */,
 				7D5BEC0BE2664D74B5CF37A0 /* TL_My */,
@@ -168,6 +194,36 @@
 				4CA894FD2F64577500928BBF /* TLWCameraManager.m */,
 			);
 			path = TL_Common;
+			sourceTree = "<group>";
+		};
+		4CA8A58F2F66F9E100928BBF /* TL_Message */ = {
+			isa = PBXGroup;
+			children = (
+				4CA8A5872F66F9E100928BBF /* TLWMessageCell.h */,
+				4CA8A5882F66F9E100928BBF /* TLWMessageCell.m */,
+				4CA8A5892F66F9E100928BBF /* TLWMessageController.h */,
+				4CA8A58A2F66F9E100928BBF /* TLWMessageController.m */,
+				4CA8A58B2F66F9E100928BBF /* TLWMessageItem.h */,
+				4CA8A58C2F66F9E100928BBF /* TLWMessageItem.m */,
+				4CA8A58D2F66F9E100928BBF /* TLWMessageView.h */,
+				4CA8A58E2F66F9E100928BBF /* TLWMessageView.m */,
+			);
+			path = TL_Message;
+			sourceTree = "<group>";
+		};
+		4CA8A5B82F66FA3300928BBF /* TL_Notification */ = {
+			isa = PBXGroup;
+			children = (
+				4CA8A5B02F66FA3300928BBF /* TLWNotificationCell.h */,
+				4CA8A5B12F66FA3300928BBF /* TLWNotificationCell.m */,
+				4CA8A5B22F66FA3300928BBF /* TLWNotificationController.h */,
+				4CA8A5B32F66FA3300928BBF /* TLWNotificationController.m */,
+				4CA8A5B42F66FA3300928BBF /* TLWNotificationItem.h */,
+				4CA8A5B52F66FA3300928BBF /* TLWNotificationItem.m */,
+				4CA8A5B62F66FA3300928BBF /* TLWNotificationView.h */,
+				4CA8A5B72F66FA3300928BBF /* TLWNotificationView.m */,
+			);
+			path = TL_Notification;
 			sourceTree = "<group>";
 		};
 		98C8BED53E946BBF5FCE10BE /* Pods */ = {
@@ -380,6 +436,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4CA8A5902F66F9E100928BBF /* TLWMessageView.m in Sources */,
+				4CA8A5912F66F9E100928BBF /* TLWMessageItem.m in Sources */,
+				4CA8A5B92F66FA3300928BBF /* TLWNotificationCell.m in Sources */,
+				4CA8A5BA2F66FA3300928BBF /* TLWNotificationView.m in Sources */,
+				4CA8A5BB2F66FA3300928BBF /* TLWNotificationItem.m in Sources */,
+				4CA8A5BC2F66FA3300928BBF /* TLWNotificationController.m in Sources */,
+				4CA8A5922F66F9E100928BBF /* TLWMessageController.m in Sources */,
+				4CA8A5932F66F9E100928BBF /* TLWMessageCell.m in Sources */,
 				4CA894FF2F64577500928BBF /* TLWCameraManager.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
