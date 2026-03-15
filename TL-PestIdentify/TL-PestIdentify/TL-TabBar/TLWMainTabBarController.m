@@ -42,7 +42,7 @@
     communityVC.view.backgroundColor = UIColor.whiteColor;
     UINavigationController *communityNav = [[UINavigationController alloc] initWithRootViewController:communityVC];
 
-    // 消息：占位，待开发
+    // 消息：占位，待开发git
     UIViewController *msgVC = [UIViewController new];
     msgVC.view.backgroundColor = UIColor.redColor;
     UINavigationController *msgNav = [[UINavigationController alloc] initWithRootViewController:msgVC];

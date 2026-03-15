@@ -23,9 +23,9 @@ static NSInteger const kTagItemsPerRow = 5;
 
 @property (nonatomic, strong, readwrite) UICollectionView *collectionView;
 @property (nonatomic, strong, readwrite) UITextField *searchTextField;
+@property (nonatomic, strong, readwrite) UIButton *voiceButton;
 @property (nonatomic, strong) UIView *searchContainer;
 /// 搜索时的毛玻璃覆盖层（含历史记录、猜你想搜）
-@property (nonatomic, strong) UIView *searchOverlay;
 @property (nonatomic, strong) UIVisualEffectView *searchBlurPanel;
 /// 历史记录行容器（垂直 StackView，每行一个水平 StackView）
 @property (nonatomic, strong) UIStackView *historyStackView;
@@ -62,8 +62,6 @@ static NSInteger const kTagItemsPerRow = 5;
   [self addSubview:container];
   self.searchContainer = container;
 
-
-
   UILabel *titleLabel = [[UILabel alloc] init];
   titleLabel.text = @"社区";
   titleLabel.textColor = [UIColor whiteColor];
@@ -84,6 +82,7 @@ static NSInteger const kTagItemsPerRow = 5;
   [voiceButton setImage:[UIImage imageNamed:@"cp_voice.png"] forState:UIControlStateNormal];
   voiceButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   [searchFieldBackground addSubview:voiceButton];
+  self.voiceButton = voiceButton;
 
   UITextField *textField = [[UITextField alloc] init];
   textField.placeholder = @"请输入关键词";
@@ -252,6 +251,10 @@ static NSInteger const kTagItemsPerRow = 5;
   dismissTap.delegate = self;
   [overlay addGestureRecognizer:dismissTap];
 
+  UISwipeGestureRecognizer *swipeDown = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(tl_dismissKeyboard)];
+  swipeDown.direction = UISwipeGestureRecognizerDirectionDown;
+  [overlay addGestureRecognizer:swipeDown];
+
   // 更强对比的毛玻璃背景
   UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialLight];
   UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
@@ -410,6 +413,10 @@ static NSInteger const kTagItemsPerRow = 5;
 - (void)tl_searchSuggestionTapped:(UIButton *)sender {
   NSString *text = sender.currentTitle ?: @"";
   self.searchTextField.text = text;
+}
+
+- (void)tl_dismissKeyboard {
+  [self endEditing:YES];
 }
 
 - (void)tl_clearHistoryTapped {

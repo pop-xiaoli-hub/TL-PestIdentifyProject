@@ -8,11 +8,12 @@
 #import "TLWCommunityCell.h"
 #import "TLWCommunityPost.h"
 #import "TLWCommunityWaterfallLayout.h"
+#import "TLWVoiceInputViewController.h"
 #import <Masonry/Masonry.h>
 
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
-@interface TLWCommunityController () <UICollectionViewDataSource, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate>
+@interface TLWCommunityController () <UICollectionViewDataSource, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate >
 
 @property (nonatomic, strong) TLWCommunityView *myView;
 @property (nonatomic, strong) NSArray<TLWCommunityPost *> *posts;
@@ -37,8 +38,10 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   [collectionView registerClass:[TLWCommunityCell class] forCellWithReuseIdentifier:kCommunityCellID];
   UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panAction:)];
   [self.myView.publishButton addGestureRecognizer:pan];
+
   [self.myView bringSubviewToFront:self.myView.publishButton];
   self.myView.searchTextField.delegate = self;
+  [self.myView.voiceButton addTarget:self action:@selector(tl_voiceButtonTapped) forControlEvents:UIControlEventTouchUpInside];
   [self tl_fetchCommunityFeed];
 }
 
@@ -108,6 +111,12 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
     _myView = [[TLWCommunityView alloc] initWithFrame:CGRectZero];
   }
   return _myView;
+}
+
+- (void)tl_voiceButtonTapped {
+  TLWVoiceInputViewController *vc = [[TLWVoiceInputViewController alloc] init];
+  vc.modalPresentationStyle = UIModalPresentationFullScreen;
+  [self presentViewController:vc animated:YES completion:nil];
 }
 
 #pragma mark - UITextFieldDelegate
