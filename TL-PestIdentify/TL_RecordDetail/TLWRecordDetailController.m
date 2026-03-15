@@ -7,7 +7,6 @@
 
 #import "TLWRecordDetailController.h"
 #import "TLWRecordDetailView.h"
-#import "TLWAIAssistantController.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/UIImageView+WebCache.h>
 
@@ -99,9 +98,7 @@
 }
 
 - (void)tl_openAIAssistant {
-    TLWRecordResult *result = (_selectedIndex < (NSInteger)_item.results.count) ? _item.results[_selectedIndex] : nil;
-    TLWAIAssistantController *aiVC = [[TLWAIAssistantController alloc] initWithInitialQuestion:result.pestName];
-    [self.navigationController pushViewController:aiVC animated:YES];
+    // TODO: 跳转 AI 助手页面，传入当前病害名称作为预填问题
 }
 
 #pragma mark - Lifecycle
@@ -113,5 +110,17 @@
     return _myView;
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self.navigationController setNavigationBarHidden:YES animated:NO];
+    // 隐藏系统导航栏后手动恢复右滑返回手势
+    self.navigationController.interactivePopGestureRecognizer.enabled = YES;
+    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self.navigationController setNavigationBarHidden:NO animated:NO];
+}
 
 @end

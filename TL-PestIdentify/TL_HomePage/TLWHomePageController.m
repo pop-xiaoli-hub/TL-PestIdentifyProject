@@ -11,6 +11,7 @@
 #import "TLWHomeCustomCell.h"
 #import "TLWIdentifyPageController.h"
 #import "TLWRecordController.h"
+#import "TLWAIAssistantController.h"
 #import "TLWWarningModel.h"
 #import <Masonry.h>
 
@@ -104,6 +105,10 @@
       TLWRecordController *recordVC = [[TLWRecordController alloc] init];
       recordVC.hidesBottomBarWhenPushed = YES;
       [weakSelf.navigationController pushViewController:recordVC animated:YES];
+    };
+    cell.clickAIAssistant = ^{
+      TLWAIAssistantController *aiVC = [[TLWAIAssistantController alloc] initWithInitialQuestion:nil];
+      [weakSelf.navigationController pushViewController:aiVC animated:YES];
     };
     return cell;
   }

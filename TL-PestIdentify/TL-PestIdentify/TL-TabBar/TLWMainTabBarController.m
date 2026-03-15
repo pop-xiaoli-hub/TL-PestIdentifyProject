@@ -8,6 +8,7 @@
 #import "TLWMainTabBarController.h"
 #import "TLWTabBar.h"
 #import "TLWHomePageController.h"
+#import "TLWMyController.h"
 #import <Masonry/Masonry.h>
 #import "TLWCommunityController.h"
 @interface TLWMainTabBarController () <UINavigationControllerDelegate>
@@ -47,9 +48,8 @@
     msgVC.view.backgroundColor = UIColor.redColor;
     UINavigationController *msgNav = [[UINavigationController alloc] initWithRootViewController:msgVC];
 
-    // 我的：占位，待开发
-    UIViewController *meVC = [UIViewController new];
-    meVC.view.backgroundColor = UIColor.yellowColor;
+    // 我的
+    TLWMyController *meVC = [TLWMyController new];
     UINavigationController *meNav = [[UINavigationController alloc] initWithRootViewController:meVC];
 
     _childVCs = @[homeNav, communityNav, msgNav, meNav];

@@ -8,6 +8,7 @@
 #import "TLWLoginController.h"
 #import "TLWLoginView.h"
 #import "TLWWechatBindController.h"
+#import "TLWMainTabBarController.h"
 
 @interface TLWLoginController ()
 
@@ -48,6 +49,10 @@
                                              action:@selector(handleLocalPhoneLogin)
                                    forControlEvents:UIControlEventTouchUpInside];
 
+    [self.loginView.skipButton addTarget:self
+                                  action:@selector(handleSkip)
+                        forControlEvents:UIControlEventTouchUpInside];
+
     // 点击空白处收起键盘
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
                                    initWithTarget:self action:@selector(dismissKeyboard)];
@@ -77,6 +82,17 @@
     }
     // TODO: 调用登录接口
     NSLog(@"登录 phone=%@ code=%@", phone, code);
+}
+
+- (void)handleSkip {
+    TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
+    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    window.rootViewController = tabBar;
+    [UIView transitionWithView:window
+                      duration:0.35
+                       options:UIViewAnimationOptionTransitionCrossDissolve
+                    animations:nil
+                    completion:nil];
 }
 
 - (void)handleWechatLogin {
