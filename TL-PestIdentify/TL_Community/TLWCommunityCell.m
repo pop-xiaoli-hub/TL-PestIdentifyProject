@@ -38,7 +38,6 @@
   [self.contentView addSubview:blurView];
   UIView *contentView = blurView.contentView;
   UIView *glassLayer = [[UIView alloc] init];
-  // 提高白色覆盖层透明度，让玻璃板更“亮”一些
   glassLayer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.32];
   glassLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
   [contentView addSubview:glassLayer];
@@ -88,7 +87,7 @@
     self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
     self.avatarView.clipsToBounds = YES;
     self.avatarView.layer.cornerRadius = 10.0;
-    self.avatarView.image = [UIImage imageNamed:@"cm_user"];
+    self.avatarView.image = [UIImage imageNamed:@"hp_avator.png"];
 
     self.userLabel = [[UILabel alloc] init];
     self.userLabel.font = [UIFont systemFontOfSize:11];

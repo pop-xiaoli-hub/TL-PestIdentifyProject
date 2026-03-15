@@ -16,6 +16,9 @@ static CGFloat const kHorizontalInset = 12.0;
 /// 瀑布流 item 间距
 static CGFloat const kItemGap = 10.0;
 
+/// 每行最多放置的标签个数（横向填满再换行）
+static NSInteger const kTagItemsPerRow = 5;
+
 @interface TLWCommunityView () <UIGestureRecognizerDelegate>
 
 @property (nonatomic, strong, readwrite) UICollectionView *collectionView;
@@ -24,7 +27,10 @@ static CGFloat const kItemGap = 10.0;
 /// 搜索时的毛玻璃覆盖层（含历史记录、猜你想搜）
 @property (nonatomic, strong) UIView *searchOverlay;
 @property (nonatomic, strong) UIVisualEffectView *searchBlurPanel;
+/// 历史记录行容器（垂直 StackView，每行一个水平 StackView）
 @property (nonatomic, strong) UIStackView *historyStackView;
+/// 猜你想搜行容器（垂直 StackView，每行一个水平 StackView）
+@property (nonatomic, strong) UIStackView *guessStackView;
 
 @end
 
@@ -166,6 +172,9 @@ static CGFloat const kItemGap = 10.0;
   [button setTitle:title forState:UIControlStateNormal];
   [button setTitleColor:[UIColor colorWithWhite:0.25 alpha:1.0] forState:UIControlStateNormal];
   button.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+  button.titleLabel.lineBreakMode = NSLineBreakByClipping;
+  // 文字完整展示，按钮宽度随内容自适应
+  [button setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
 
   // 胶囊样式：背景 + 描边 + 内边距
   button.contentEdgeInsets = UIEdgeInsetsMake(6, 14, 6, 14);
@@ -181,9 +190,7 @@ static CGFloat const kItemGap = 10.0;
   [button addTarget:self action:@selector(tl_tagTouchUp:) forControlEvents:UIControlEventTouchCancel];
   [button addTarget:self action:@selector(tl_tagTouchUp:) forControlEvents:UIControlEventTouchDragExit];
 
-  [button addTarget:self
-             action:@selector(tl_searchSuggestionTapped:)
-   forControlEvents:UIControlEventTouchUpInside];
+  [button addTarget:self action:@selector(tl_searchSuggestionTapped:) forControlEvents:UIControlEventTouchUpInside];
   return button;
 }
 
@@ -211,20 +218,28 @@ static CGFloat const kItemGap = 10.0;
     make.edges.equalTo(self);
   }];
 
-  // 全屏背景毛玻璃：用于让底层社区列表产生模糊感
   UIBlurEffect *bgEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight];
-  UIVisualEffectView *bgBlurView = [[UIVisualEffectView alloc] initWithEffect:bgEffect];
-  bgBlurView.alpha = 0.85;
-  // 不拦截点击，让点击落到 searchOverlay 上用于退出
-  bgBlurView.userInteractionEnabled = NO;
-  [overlay addSubview:bgBlurView];
-  [bgBlurView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.edges.equalTo(overlay);
+
+  UIVisualEffectView *bgBlurView1 = [[UIVisualEffectView alloc] initWithEffect:bgEffect];
+  bgBlurView1.alpha = 1.0;
+  bgBlurView1.userInteractionEnabled = NO;
+
+  [overlay addSubview:bgBlurView1];
+  [bgBlurView1 mas_makeConstraints:^(MASConstraintMaker *make) {
+      make.edges.equalTo(overlay);
   }];
 
+  UIVisualEffectView *bgBlurView2 = [[UIVisualEffectView alloc] initWithEffect:bgEffect];
+  bgBlurView2.alpha = 1.0;
+  bgBlurView2.userInteractionEnabled = NO;
+
+  [overlay addSubview:bgBlurView2];
+  [bgBlurView2 mas_makeConstraints:^(MASConstraintMaker *make) {
+      make.edges.equalTo(overlay);
+  }];
   // 轻微的暗色遮罩，增强层次但保持通透
   UIView *dimView = [[UIView alloc] init];
-  dimView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.08];
+  dimView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.25];
   // 不拦截点击，让点击落到 searchOverlay 上用于退出
   dimView.userInteractionEnabled = NO;
   [overlay addSubview:dimView];
@@ -237,28 +252,35 @@ static CGFloat const kItemGap = 10.0;
   dismissTap.delegate = self;
   [overlay addGestureRecognizer:dismissTap];
 
-  // 使用更亮的毛玻璃效果，整体显得更通透
-  UIBlurEffect *effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleExtraLight];
-  UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:effect];
+  // 更强对比的毛玻璃背景
+  UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialLight];
+  UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
   blurView.layer.masksToBounds = YES;
-  blurView.layer.cornerRadius = 20;
+  blurView.layer.cornerRadius = 14.0;
   [overlay addSubview:blurView];
-  self.searchBlurPanel = blurView;
-
+  UIView *contentView = blurView.contentView;
+  UIView *glassLayer = [[UIView alloc] init];
+  glassLayer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.32];
+  glassLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  [contentView addSubview:glassLayer];
+  // 边框
+  blurView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.55].CGColor;
+  blurView.layer.borderWidth = 1.0;
   [blurView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(overlay).offset(16);
     make.right.equalTo(overlay).offset(-16);
     // 毛玻璃板距离搜索栏底部 10pt，这里用覆盖层顶部再下移 10
     make.top.equalTo(self.searchContainer.mas_bottom).offset(10);
   }];
+  [glassLayer mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(contentView);
+  }];
+  
   [self bringSubviewToFront:self.searchContainer];
-
-  UIView *contentView = blurView.contentView;
-
   UILabel *historyTitle = [[UILabel alloc] init];
   historyTitle.text = @"历史记录";
   historyTitle.textColor = [UIColor systemBlueColor];
-  historyTitle.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+  historyTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
   [contentView addSubview:historyTitle];
 
   UIButton *clearButton = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -270,37 +292,31 @@ static CGFloat const kItemGap = 10.0;
         forControlEvents:UIControlEventTouchUpInside];
   [contentView addSubview:clearButton];
 
-  UIStackView *historyStack = [[UIStackView alloc] init];
-  historyStack.axis = UILayoutConstraintAxisVertical;
-  historyStack.alignment = UIStackViewAlignmentLeading;
-  historyStack.spacing = 4.0;
-  [contentView addSubview:historyStack];
-  self.historyStackView = historyStack;
-
-  NSArray<NSString *> *historyItems = @[ @"水稻", @"杨梅树", @"白菜" ];
-  for (NSString *item in historyItems) {
-    UIButton *btn = [self tl_tagButtonWithTitle:item];
-    [historyStack addArrangedSubview:btn];
-  }
+  // 历史记录行容器（内容通过 tl_setSearchHistoryItems: 设置）
+  UIStackView *historyRowsStack = [[UIStackView alloc] init];
+  historyRowsStack.axis = UILayoutConstraintAxisVertical;
+  historyRowsStack.alignment = UIStackViewAlignmentLeading;
+  historyRowsStack.spacing = 8.0;
+  [contentView addSubview:historyRowsStack];
+  self.historyStackView = historyRowsStack;
 
   UILabel *guessTitle = [[UILabel alloc] init];
   guessTitle.text = @"猜你想搜";
   guessTitle.textColor = [UIColor systemBlueColor];
   guessTitle.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-  [contentView addSubview:guessTitle];
 
-  UIStackView *guessStack = [[UIStackView alloc] init];
-  guessStack.axis = UILayoutConstraintAxisHorizontal;
-  guessStack.alignment = UIStackViewAlignmentCenter;
-  guessStack.spacing = 10.0;
-  guessStack.distribution = UIStackViewDistributionFillProportionally;
-  [contentView addSubview:guessStack];
+  // 猜你想搜行容器（内容通过 tl_setGuessYouWantToSearchItems: 设置）
+  UIStackView *guessRowsStack = [[UIStackView alloc] init];
+  guessRowsStack.axis = UILayoutConstraintAxisVertical;
+  guessRowsStack.alignment = UIStackViewAlignmentLeading;
+  guessRowsStack.spacing = 8.0;
+  self.guessStackView = guessRowsStack;
 
-  NSArray<NSString *> *guessItems = @[ @"水稻", @"小麦", @"白菜", @"地瓜" ];
-  for (NSString *item in guessItems) {
-    UIButton *btn = [self tl_tagButtonWithTitle:item];
-    [guessStack addArrangedSubview:btn];
-  }
+  UIStackView *guessSectionStack = [[UIStackView alloc] initWithArrangedSubviews:@[ guessTitle, guessRowsStack ]];
+  guessSectionStack.axis = UILayoutConstraintAxisVertical;
+  guessSectionStack.alignment = UIStackViewAlignmentLeading;
+  guessSectionStack.spacing = 8.0;
+  [contentView addSubview:guessSectionStack];
 
   [historyTitle mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(contentView).offset(14);
@@ -312,23 +328,56 @@ static CGFloat const kItemGap = 10.0;
     make.right.equalTo(contentView).offset(-16);
   }];
 
-  [historyStack mas_makeConstraints:^(MASConstraintMaker *make) {
+  [historyRowsStack mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(historyTitle.mas_bottom).offset(8);
     make.left.equalTo(contentView).offset(16);
     make.right.lessThanOrEqualTo(contentView).offset(-16);
   }];
 
-  [guessTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(historyStack.mas_bottom).offset(16);
-    make.left.equalTo(contentView).offset(16);
-  }];
-
-  [guessStack mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(guessTitle.mas_bottom).offset(8);
+  [guessSectionStack mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(historyRowsStack.mas_bottom).offset(16);
     make.left.equalTo(contentView).offset(16);
     make.right.lessThanOrEqualTo(contentView).offset(-16);
     make.bottom.equalTo(contentView).offset(-16);
   }];
+
+  // 默认展示数据，外部可通过接口覆盖
+  [self tl_setSearchHistoryItems:@[ @"水稻", @"杨梅树", @"白菜", @"地瓜", @"水稻", @"小麦", @"白菜", @"地瓜", @"水稻", @"小麦", @"白菜", @"地瓜" ]];
+  [self tl_setGuessYouWantToSearchItems:@[ @"水稻", @"小麦", @"白菜" ]];
+}
+
+#pragma mark - 搜索历史 / 猜你想搜 数据接口
+
+- (void)tl_rebuildTagRowsInStackView:(UIStackView *)stackView withItems:(NSArray<NSString *> *)items {
+  for (UIView *subview in stackView.arrangedSubviews) {
+    [stackView removeArrangedSubview:subview];
+    [subview removeFromSuperview];
+  }
+  if (items.count == 0) {
+    return;
+  }
+  for (NSInteger i = 0; i < items.count; i += kTagItemsPerRow) {
+    NSInteger count = MIN(kTagItemsPerRow, (NSInteger)items.count - i);
+    NSArray<NSString *> *rowItems = [items subarrayWithRange:NSMakeRange((NSUInteger)i, (NSUInteger)count)];
+    UIStackView *rowStack = [[UIStackView alloc] init];
+    rowStack.axis = UILayoutConstraintAxisHorizontal;
+    rowStack.alignment = UIStackViewAlignmentCenter;
+    rowStack.spacing = 10.0;
+    rowStack.distribution = UIStackViewDistributionFill;
+    for (NSString *item in rowItems) {
+      UIButton *btn = [self tl_tagButtonWithTitle:item];
+      [rowStack addArrangedSubview:btn];
+    }
+    [stackView addArrangedSubview:rowStack];
+  }
+}
+
+- (void)tl_setSearchHistoryItems:(NSArray<NSString *> *)items {
+  [self tl_rebuildTagRowsInStackView:self.historyStackView withItems:items ?: @[]];
+}
+
+- (void)tl_setGuessYouWantToSearchItems:(NSArray<NSString *> *)items {
+  [self tl_rebuildTagRowsInStackView:self.guessStackView withItems:items ?: @[]];
 }
 
 - (void)tl_showSearchOverlay {
