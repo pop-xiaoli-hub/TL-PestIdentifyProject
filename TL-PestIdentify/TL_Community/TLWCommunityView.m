@@ -126,15 +126,15 @@ static NSInteger const kTagItemsPerRow = 5;
   }];
 
   [searchIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(searchFieldBackground).offset(12);
+    make.left.equalTo(searchFieldBackground).offset(8);
     make.centerY.equalTo(searchFieldBackground);
-    make.width.height.mas_equalTo(18);
+    make.width.height.mas_equalTo(32);
   }];
 
   [voiceButton mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.right.equalTo(searchFieldBackground).offset(-12);
+    make.right.equalTo(searchFieldBackground).offset(-8);
     make.centerY.equalTo(searchFieldBackground);
-    make.width.height.mas_equalTo(18);
+    make.width.height.mas_equalTo(32);
   }];
 
   [textField mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -153,7 +153,7 @@ static NSInteger const kTagItemsPerRow = 5;
   layout.sectionInset = UIEdgeInsetsMake(12, kHorizontalInset, 20, kHorizontalInset);
 
   UICollectionView *collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:layout];
-  collectionView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+  collectionView.backgroundColor = [UIColor whiteColor];
   collectionView.showsVerticalScrollIndicator = NO;
   collectionView.layer.masksToBounds = YES;
   collectionView.layer.cornerRadius = 20;

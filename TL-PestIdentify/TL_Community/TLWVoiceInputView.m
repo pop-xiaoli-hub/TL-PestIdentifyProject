@@ -63,23 +63,8 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
 #pragma mark - Setup
 
 - (void)tl_setupBackground {
-  self.backgroundColor = [UIColor colorWithRed:0.4 green:0.55 blue:0.5 alpha:0.3];
-  UIImage *bgImage = [UIImage imageNamed:@"hp_backView.png"];
-  if (bgImage) {
-    UIImageView *bgImageView = [[UIImageView alloc] initWithImage:bgImage];
-    bgImageView.contentMode = UIViewContentModeScaleAspectFill;
-    bgImageView.clipsToBounds = YES;
-    [self addSubview:bgImageView];
-    [bgImageView mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.edges.equalTo(self);
-    }];
-  }
-  UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleDark]];
-  blurView.alpha = 0.4;
-  [self addSubview:blurView];
-  [blurView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.edges.equalTo(self);
-  }];
+  UIImage* image = [UIImage imageNamed:@"cp_backView.png"];
+  self.layer.contents = (__bridge id)image.CGImage;
 }
 
 - (void)tl_setupHeader {
@@ -93,10 +78,8 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
   }];
 
   UIButton *backBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-  backBtn.backgroundColor = [UIColor colorWithWhite:0.9 alpha:0.95];
-  backBtn.layer.cornerRadius = 20.0;
   backBtn.clipsToBounds = YES;
-  UIImage *backImage = [UIImage imageNamed:@"cp_back"];
+  UIImage *backImage = [UIImage imageNamed:@"iconBack"];
   if (backImage) {
     [backBtn setImage:backImage forState:UIControlStateNormal];
   } else {
@@ -159,22 +142,14 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
 }
 
 - (void)tl_updateHeaderGradient {
-  if (!self.headerGradientContainer || self.headerGradientContainer.bounds.size.height < 1) return;
-  for (CALayer *layer in self.headerGradientContainer.layer.sublayers) {
+  // 顶部背景改为透明：移除已有渐变图层，不再叠加新的背景
+  if (!self.headerGradientContainer) return;
+  NSArray<CALayer *> *sublayers = [self.headerGradientContainer.layer.sublayers copy];
+  for (CALayer *layer in sublayers) {
     if ([layer isKindOfClass:[CAGradientLayer class]]) {
       [layer removeFromSuperlayer];
-      break;
     }
   }
-  CAGradientLayer *gradient = [CAGradientLayer layer];
-  gradient.frame = self.headerGradientContainer.bounds;
-  gradient.colors = @[
-    (id)[UIColor colorWithRed:0.22 green:0.6 blue:0.58 alpha:1.0].CGColor,
-    (id)[UIColor colorWithRed:0.45 green:0.75 blue:0.82 alpha:1.0].CGColor
-  ];
-  gradient.startPoint = CGPointMake(0, 0.5);
-  gradient.endPoint = CGPointMake(1, 0.5);
-  [self.headerGradientContainer.layer insertSublayer:gradient atIndex:0];
 }
 
 - (void)tl_setupCenterIndicator {
@@ -183,10 +158,7 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
   [self addSubview:container];
   self.centerCircleContainer = container;
 
-  UIView *circleBg = [[UIView alloc] init];
-  circleBg.layer.cornerRadius = kCenterCircleSize / 2.0;
-  circleBg.clipsToBounds = YES;
-  circleBg.tag = 100;
+  UIImageView* circleBg = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_voiceload.png"]];
   [container addSubview:circleBg];
 
   NSMutableArray<UIView *> *bars = [NSMutableArray arrayWithCapacity:4];
@@ -221,14 +193,14 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
     UIView *bar = bars[i];
     CGFloat x = startX + i * (kEqualizerBarWidth + kEqualizerBarSpacing);
     [bar mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.centerX.equalTo(container.mas_left).offset(x);
+      make.centerX.equalTo(container.mas_left).offset(x - 6);
       make.centerY.equalTo(container).offset(-12);
       make.width.mas_equalTo(kEqualizerBarWidth);
       make.height.mas_equalTo(kEqualizerBarMaxHeight * (0.4 + (i % 3) * 0.25));
     }];
   }
   [label mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(container.mas_centerY).offset(8);
+    make.top.equalTo(container.mas_centerY).offset(12);
     make.centerX.equalTo(container);
   }];
 }
@@ -282,10 +254,8 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
 
 - (void)tl_setupBottomHint {
   UIButton *micBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-  micBtn.backgroundColor = [UIColor colorWithWhite:0.92 alpha:0.95];
-  micBtn.layer.cornerRadius = 28.0;
   micBtn.clipsToBounds = YES;
-  UIImage *micImg = [UIImage imageNamed:@"cp_voice.png"];
+  UIImage *micImg = [UIImage imageNamed:@"cp_voiceInput.png"];
   if (micImg) {
     [micBtn setImage:micImg forState:UIControlStateNormal];
     micBtn.tintColor = [UIColor darkGrayColor];
@@ -295,20 +265,11 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
   [self addSubview:micBtn];
   self.longPressMicButton = micBtn;
 
-  UILabel *hint = [[UILabel alloc] init];
-  hint.text = @"长按语音输入";
-  hint.textColor = [UIColor colorWithWhite:1.0 alpha:0.9];
-  hint.font = [UIFont systemFontOfSize:14];
-  [self addSubview:hint];
-
   [micBtn mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self);
     make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-56);
-    make.width.height.mas_equalTo(56);
-  }];
-  [hint mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(micBtn.mas_bottom).offset(10);
-    make.centerX.equalTo(self);
+    make.height.mas_equalTo(131.63);
+    make.width.mas_equalTo(101.37);
   }];
 }
 

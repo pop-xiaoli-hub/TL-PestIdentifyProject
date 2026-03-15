@@ -17,6 +17,12 @@
 - (void)loadView {
   self.view = [[TLWVoiceInputView alloc] initWithFrame:UIScreen.mainScreen.bounds];
   self.voiceView = (TLWVoiceInputView *)self.view;
+  UITapGestureRecognizer* tap =  [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_hideKeyboard)];
+  [self.voiceView addGestureRecognizer:tap];
+}
+
+-(void)tl_hideKeyboard {
+  [self.voiceView endEditing:YES];
 }
 
 - (void)viewDidLoad {
