@@ -31,6 +31,8 @@ static NSInteger const kTagItemsPerRow = 5;
 @property (nonatomic, strong) UIStackView *historyStackView;
 /// 猜你想搜行容器（垂直 StackView，每行一个水平 StackView）
 @property (nonatomic, strong) UIStackView *guessStackView;
+/// 搜索区域点击手势（用于排除点击语音按钮时触发）
+@property (nonatomic, strong) UITapGestureRecognizer *searchFieldTapGesture;
 
 @end
 
@@ -92,11 +94,12 @@ static NSInteger const kTagItemsPerRow = 5;
   [searchFieldBackground addSubview:textField];
   self.searchTextField = textField;
 
-  // 点击整个搜索区域时也可以唤起搜索面板
+  // 点击整个搜索区域时也可以唤起搜索面板（需排除语音按钮，让语音按钮能正常跳转）
   searchFieldBackground.userInteractionEnabled = YES;
-  UITapGestureRecognizer *searchTap = [[UITapGestureRecognizer alloc] initWithTarget:self
-                                                                              action:@selector(tl_showSearchOverlay)];
+  UITapGestureRecognizer *searchTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_showSearchOverlay)];
+  searchTap.delegate = self;
   [searchFieldBackground addGestureRecognizer:searchTap];
+  self.searchFieldTapGesture = searchTap;
 
   self.publishButton = [UIButton buttonWithType:UIButtonTypeCustom];
   [self.publishButton setImage:[UIImage imageNamed:@"cp_publish.png"] forState:UIControlStateNormal];
@@ -429,7 +432,14 @@ static NSInteger const kTagItemsPerRow = 5;
 #pragma mark - UIGestureRecognizerDelegate
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
-  // 仅当点击在覆盖层空白区域时才触发收起，点击毛玻璃内容区域不收起
+  // 搜索区域点击：点击在语音按钮上时不触发，让语音按钮响应跳转
+  if (gestureRecognizer == self.searchFieldTapGesture) {
+    if (touch.view == self.voiceButton || [touch.view isDescendantOfView:self.voiceButton]) {
+      return NO;
+    }
+    return YES;
+  }
+  // 覆盖层点击：仅当点击在覆盖层空白区域时才触发收起，点击毛玻璃内容区域不收起
   if (touch.view != self.searchOverlay) {
     return NO;
   }
