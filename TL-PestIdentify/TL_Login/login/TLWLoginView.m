@@ -33,6 +33,7 @@
 @property (nonatomic, strong, readwrite) UIButton    *wechatLoginButton;
 @property (nonatomic, strong, readwrite) UIButton    *qqLoginButton;
 @property (nonatomic, strong, readwrite) UIButton    *localPhoneLoginButton;
+@property (nonatomic, strong, readwrite) UIButton    *skipButton;
 
 @end
 
@@ -63,6 +64,7 @@
     [self setupLogoArea];
     [self setupForm];
     [self setupTermsRow];
+    [self setupSkipButton];
     [self setupBottomSection];
 }
 
@@ -306,6 +308,18 @@
         make.right.equalTo(wrapper);
         make.centerY.equalTo(wrapper);
         make.height.mas_equalTo(32);
+    }];
+}
+
+- (void)setupSkipButton {
+    _skipButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_skipButton setTitle:@"跳过登录，直接进入首页 →" forState:UIControlStateNormal];
+    [_skipButton setTitleColor:[UIColor colorWithWhite:1.0 alpha:0.55] forState:UIControlStateNormal];
+    _skipButton.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    [self addSubview:_skipButton];
+    [_skipButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_loginTapButton.mas_bottom).offset(56);
+        make.centerX.equalTo(self);
     }];
 }
 

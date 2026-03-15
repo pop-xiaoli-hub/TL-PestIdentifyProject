@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1D0DEAFCB336DAF43EC9E6EE /* libPods-TL-PestIdentify.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */; };
+		4CA894FF2F64577500928BBF /* TLWCameraManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA894FD2F64577500928BBF /* TLWCameraManager.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,6 +33,8 @@
 		0DAAA8D62F59C0B800F327DC /* TL-PestIdentify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TL-PestIdentify.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8F12F59C0BB00F327DC /* TL-PestIdentifyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8FB2F59C0BB00F327DC /* TL-PestIdentifyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4CA894FC2F64577500928BBF /* TLWCameraManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWCameraManager.h; sourceTree = "<group>"; };
+		4CA894FD2F64577500928BBF /* TLWCameraManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWCameraManager.m; sourceTree = "<group>"; };
 		8457BB115BD60440BB3E020F /* Pods-TL-PestIdentify.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TL-PestIdentify.debug.xcconfig"; path = "Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify.debug.xcconfig"; sourceTree = "<group>"; };
 		A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-TL-PestIdentify.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -85,6 +88,16 @@
 			path = TL_Record;
 			sourceTree = "<group>";
 		};
+		4CA894EF2F63FDF700928BBF /* TL_AiAssisstant */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TL_AiAssisstant;
+			sourceTree = "<group>";
+		};
+		7D5BEC0BE2664D74B5CF37A0 /* TL_My */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TL_My;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +129,9 @@
 		0DAAA8CD2F59C0B800F327DC = {
 			isa = PBXGroup;
 			children = (
+				4CA894FE2F64577500928BBF /* TL_Common */,
+				4CA894EF2F63FDF700928BBF /* TL_AiAssisstant */,
+				7D5BEC0BE2664D74B5CF37A0 /* TL_My */,
 				4CA891122F63A7A900928BBF /* TL_Record */,
 				4C9B4E8D2F5F040700016E29 /* TL_Login */,
 				0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */,
@@ -137,6 +153,15 @@
 				0DAAA8FB2F59C0BB00F327DC /* TL-PestIdentifyUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4CA894FE2F64577500928BBF /* TL_Common */ = {
+			isa = PBXGroup;
+			children = (
+				4CA894FC2F64577500928BBF /* TLWCameraManager.h */,
+				4CA894FD2F64577500928BBF /* TLWCameraManager.m */,
+			);
+			path = TL_Common;
 			sourceTree = "<group>";
 		};
 		98C8BED53E946BBF5FCE10BE /* Pods */ = {
@@ -179,6 +204,8 @@
 				0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */,
 				4C9B4E8D2F5F040700016E29 /* TL_Login */,
 				4CA891122F63A7A900928BBF /* TL_Record */,
+				4CA894EF2F63FDF700928BBF /* TL_AiAssisstant */,
+				7D5BEC0BE2664D74B5CF37A0 /* TL_My */,
 			);
 			name = "TL-PestIdentify";
 			productName = "TL-PestIdentify";
@@ -238,6 +265,7 @@
 				TargetAttributes = {
 					0DAAA8D52F59C0B800F327DC = {
 						CreatedOnToolsVersion = 16.2;
+						LastSwiftMigration = 2630;
 					};
 					0DAAA8F02F59C0BB00F327DC = {
 						CreatedOnToolsVersion = 16.2;
@@ -325,9 +353,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -341,6 +373,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4CA894FF2F64577500928BBF /* TLWCameraManager.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -380,6 +413,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JASSJ2R9D6;
@@ -401,6 +435,8 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.xiaoli.TL-PestIdentify";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -411,6 +447,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = JASSJ2R9D6;
@@ -432,6 +469,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "com.xiaoli.TL-PestIdentify";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
