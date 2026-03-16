@@ -6,9 +6,13 @@
 #import "TLWEditProfileController.h"
 #import "TLWEditProfileView.h"
 #import "TLWEditNicknameController.h"
+#import "TLWAvatarCropController.h"
+#import "TLWPhotoPickerController.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWEditProfileController () <TLWEditNicknameDelegate>
+NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotification";
+
+@interface TLWEditProfileController () <TLWEditNicknameDelegate, TLWAvatarCropDelegate>
 @property (nonatomic, strong) TLWEditProfileView *myView;
 @property (nonatomic, copy)   NSString           *nickname;
 @end
@@ -68,7 +72,22 @@
 }
 
 - (void)onAvatarTap {
-    // TODO: 调用 POST /user/avatar 上传头像（选图 / 拍照后上传）
+    TLWPhotoPickerController *picker = [[TLWPhotoPickerController alloc] init];
+    picker.cropDelegate = self;
+    [self.navigationController pushViewController:picker animated:YES];
+}
+
+#pragma mark - TLWAvatarCropDelegate
+
+- (void)avatarCropController:(TLWAvatarCropController *)vc didConfirmImage:(UIImage *)image {
+    _myView.avatarImageView.image = image;
+    [[NSNotificationCenter defaultCenter]
+        postNotificationName:TLWAvatarDidUpdateNotification
+                      object:nil
+                    userInfo:@{@"avatar": image}];
+    [self showToast:@"头像已更新"];
+    // 同时把 Picker 和 Crop 两个页面都弹出，回到编辑资料页
+    [self.navigationController popToViewController:self animated:YES];
 }
 
 - (void)onNicknameTap {
@@ -78,7 +97,8 @@
 }
 
 - (void)onBackgroundTap {
-    // TODO: 跳转背景图选择页，调用 POST /user/background
+    // TODO: push 背景图选择页（待建），用户选图后回调
+    //   成功回调：POST /user/background，参数为所选图片；更新 myView.backgroundImageView
 }
 
 #pragma mark - TLWEditNicknameDelegate
