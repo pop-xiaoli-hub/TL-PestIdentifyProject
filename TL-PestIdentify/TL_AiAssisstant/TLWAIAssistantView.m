@@ -12,6 +12,7 @@ static CGFloat const kRoundBaseHeight    = 53.0;   // inputBar 可见区域高�
 static CGFloat const kInputBoxHeight     = 54.0;   // 圆角输入框高度
 static CGFloat const kTextViewBaseHeight = 34.0;   // inputTextField 初始高度
 static CGFloat const kPreviewAreaHeight  = 96.0;   // 8(上边距) + 80(图片) + 8(与inputRow间距)
+static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
 
 @interface TLWAIAssistantView () <UITextViewDelegate>
 @property (nonatomic, strong, readwrite) UIButton    *backButton;
@@ -19,6 +20,8 @@ static CGFloat const kPreviewAreaHeight  = 96.0;   // 8(上边距) + 80(图片) 
 @property (nonatomic, strong, readwrite) UIButton    *micButton;
 @property (nonatomic, strong, readwrite) UIButton    *galleryButton;
 @property (nonatomic, strong, readwrite) UIButton    *removePreviewButton;
+@property (nonatomic, strong, readwrite) UIImageView *voiceSpeechImageView;
+@property (nonatomic, strong) UIView                 *voicePanel;
 @property (nonatomic, strong) UIView        *inputBar;
 @property (nonatomic, strong) UIView        *roundContainer;
 @property (nonatomic, strong) UIView        *previewRow;
@@ -28,6 +31,8 @@ static CGFloat const kPreviewAreaHeight  = 96.0;   // 8(上边距) + 80(图片) 
 @property (nonatomic, strong) MASConstraint *chatScrollBottomConstraint;
 @property (nonatomic, strong) MASConstraint *textViewHeightConstraint;
 @property (nonatomic, strong) MASConstraint *roundContainerHeightConstraint;
+@property (nonatomic, strong) MASConstraint *roundContainerCenterYConstraint;
+@property (nonatomic, strong) MASConstraint *roundContainerTopConstraint;
 @property (nonatomic, strong) MASConstraint *inputRowHeightConstraint;
 @property (nonatomic, assign) CGFloat        safeBottomInset;
 @property (nonatomic, assign) CGFloat        currentTextViewHeight;
@@ -172,14 +177,19 @@ static CGFloat const kPreviewAreaHeight  = 96.0;   // 8(上边距) + 80(图片) 
     [_inputBar addSubview:_roundContainer];
     CGFloat inputBoxVerticalPadding = (kRoundBaseHeight - kInputBoxHeight) / 2.0;
     __block MASConstraint *roundContainerHeightConstraint;
+    __block MASConstraint *roundContainerCenterYConstraint;
+    __block MASConstraint *roundContainerTopConstraint;
     [_roundContainer mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(_inputBar).offset(16);
         make.right.equalTo(_inputBar).offset(-16);
-        // bottom 锚定：底部距离 = 安全区 + 居中留白，向上增长
-        make.centerY.equalTo(_inputBar);
+        roundContainerCenterYConstraint = make.centerY.equalTo(_inputBar);
+        roundContainerTopConstraint = make.top.equalTo(_inputBar).offset(8);
         roundContainerHeightConstraint = make.height.mas_equalTo(kInputBoxHeight);
     }];
     _roundContainerHeightConstraint = roundContainerHeightConstraint;
+    _roundContainerCenterYConstraint = roundContainerCenterYConstraint;
+    _roundContainerTopConstraint = roundContainerTopConstraint;
+    [_roundContainerTopConstraint deactivate];
 
     // ── previewRow（roundContainer 顶部，图片选中后显示）──
     _previewRow = [[UIView alloc] init];
@@ -281,6 +291,28 @@ static CGFloat const kPreviewAreaHeight  = 96.0;   // 8(上边距) + 80(图片) 
         make.top.equalTo(_cameraButton.mas_top);
         self.textViewHeightConstraint = make.height.mas_equalTo(kTextViewBaseHeight);
     }];
+
+    // ── voicePanel（roundContainer 下方，语音模式时展开）──
+    _voicePanel = [[UIView alloc] init];
+    _voicePanel.hidden = YES;
+    [_inputBar addSubview:_voicePanel];
+    [_voicePanel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_roundContainer.mas_bottom);
+        make.left.right.equalTo(_inputBar);
+        make.height.mas_equalTo(kVoicePanelHeight);
+    }];
+
+    // 语音图标
+    _voiceSpeechImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconSpeechInput"]];
+    _voiceSpeechImageView.contentMode = UIViewContentModeScaleAspectFit;
+    _voiceSpeechImageView.userInteractionEnabled = YES;
+    [_voicePanel addSubview:_voiceSpeechImageView];
+    [_voiceSpeechImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(_voicePanel);
+        make.top.mas_equalTo(20);
+        make.width.height.mas_equalTo(110);
+    }];
+
 }
 
 #pragma mark - Height update
@@ -289,14 +321,37 @@ static CGFloat const kPreviewAreaHeight  = 96.0;   // 8(上边距) + 80(图片) 
     CGFloat inputBoxVerticalPadding = (kRoundBaseHeight - kInputBoxHeight) / 2.0;
     CGFloat textViewExtra        = _currentTextViewHeight - kTextViewBaseHeight;
     CGFloat previewExtra         = _previewRow.hidden ? 0 : kPreviewAreaHeight;
+    CGFloat voiceExtra           = _voicePanel.hidden ? 0 : kVoicePanelHeight;
     CGFloat inputRowHeight       = kInputBoxHeight + textViewExtra;
     CGFloat roundContainerHeight = inputRowHeight + previewExtra;
-    CGFloat inputBarHeight       = roundContainerHeight + _safeBottomInset + inputBoxVerticalPadding * 2;
+    CGFloat inputBarHeight       = roundContainerHeight + _safeBottomInset + inputBoxVerticalPadding * 2 + voiceExtra;
 
     _inputRowHeightConstraint.offset       = inputRowHeight;
     _roundContainerHeightConstraint.offset = roundContainerHeight;
     _inputBarHeightConstraint.offset       = inputBarHeight;
     _chatScrollBottomConstraint.offset     = -(inputBarHeight + _keyboardHeight);
+}
+
+#pragma mark - Voice Panel
+
+- (void)showVoicePanel {
+    _voicePanel.hidden = NO;
+    [_roundContainerCenterYConstraint deactivate];
+    [_roundContainerTopConstraint activate];
+    [self tl_updateInputBarHeight];
+    [UIView animateWithDuration:0.25 animations:^{
+        [self layoutIfNeeded];
+    }];
+}
+
+- (void)hideVoicePanel {
+    _voicePanel.hidden = YES;
+    [_roundContainerTopConstraint deactivate];
+    [_roundContainerCenterYConstraint activate];
+    [self tl_updateInputBarHeight];
+    [UIView animateWithDuration:0.25 animations:^{
+        [self layoutIfNeeded];
+    }];
 }
 
 #pragma mark - UITextViewDelegate

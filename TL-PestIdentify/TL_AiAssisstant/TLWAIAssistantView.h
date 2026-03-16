@@ -13,9 +13,12 @@
 @property (nonatomic, strong, readonly) UIButton    *micButton;
 @property (nonatomic, strong, readonly) UIButton    *galleryButton;
 @property (nonatomic, strong, readonly) UIButton    *removePreviewButton;
+@property (nonatomic, strong, readonly) UIImageView *voiceSpeechImageView;
 
 /// 键盘弹出/收起时调用，height=0 表示收起
 - (void)adjustForKeyboardHeight:(CGFloat)height duration:(NSTimeInterval)duration;
 - (void)showSelectedImage:(UIImage *)image;
 - (void)hideSelectedImage;
+- (void)showVoicePanel;
+- (void)hideVoicePanel;
 @end

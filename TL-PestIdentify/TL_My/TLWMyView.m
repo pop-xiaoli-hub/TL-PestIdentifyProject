@@ -8,12 +8,13 @@
 
 @interface TLWMyView ()
 
-@property (nonatomic, strong, readwrite) UILabel  *userNameLabel;
-@property (nonatomic, strong, readwrite) UILabel  *favCountLabel;
-@property (nonatomic, strong, readwrite) UILabel  *recordCountLabel;
-@property (nonatomic, strong, readwrite) UIButton *editProfileButton;
-@property (nonatomic, strong, readwrite) UIButton *settingButton;
-@property (nonatomic, strong, readwrite) UIButton *shareButton;
+@property (nonatomic, strong, readwrite) UIImageView *avatarImageView;
+@property (nonatomic, strong, readwrite) UILabel     *userNameLabel;
+@property (nonatomic, strong, readwrite) UILabel     *favCountLabel;
+@property (nonatomic, strong, readwrite) UILabel     *recordCountLabel;
+@property (nonatomic, strong, readwrite) UIButton    *editProfileButton;
+@property (nonatomic, strong, readwrite) UIButton    *settingButton;
+@property (nonatomic, strong, readwrite) UIButton    *shareButton;
 
 @end
 
@@ -61,14 +62,14 @@
 #pragma mark - 头像 / 昵称 / 统计行
 
 - (UIView *)setupHeader {
-    UIImageView *avatar = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
-    avatar.contentMode      = UIViewContentModeScaleAspectFill;
-    avatar.clipsToBounds    = YES;
-    avatar.layer.cornerRadius = 42;
-    avatar.layer.borderWidth  = 3;
-    avatar.layer.borderColor  = [UIColor colorWithWhite:1.0 alpha:0.9].CGColor;
-    [self addSubview:avatar];
-    [avatar mas_makeConstraints:^(MASConstraintMaker *make) {
+    _avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
+    _avatarImageView.contentMode      = UIViewContentModeScaleAspectFill;
+    _avatarImageView.clipsToBounds    = YES;
+    _avatarImageView.layer.cornerRadius = 42;
+    _avatarImageView.layer.borderWidth  = 3;
+    _avatarImageView.layer.borderColor  = [UIColor colorWithWhite:1.0 alpha:0.9].CGColor;
+    [self addSubview:_avatarImageView];
+    [_avatarImageView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(20);
         make.centerX.equalTo(self);
         make.width.height.mas_equalTo(84);
@@ -79,7 +80,7 @@
     _userNameLabel.textColor = UIColor.whiteColor;
     [self addSubview:_userNameLabel];
     [_userNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(avatar.mas_bottom).offset(12);
+        make.top.equalTo(_avatarImageView.mas_bottom).offset(12);
         make.centerX.equalTo(self);
     }];
 

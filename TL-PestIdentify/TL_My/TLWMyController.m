@@ -6,7 +6,10 @@
 #import "TLWMyController.h"
 #import "TLWMyView.h"
 #import "TLWEditProfileController.h"
+#import "TLWSettingViewController.h"
 #import <Masonry/Masonry.h>
+
+extern NSString * const TLWAvatarDidUpdateNotification;
 
 @interface TLWMyController ()
 
@@ -24,6 +27,14 @@
     }];
     [self setupMockData];
     [self setupActions];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onAvatarUpdated:)
+                                                 name:TLWAvatarDidUpdateNotification
+                                               object:nil];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)setupMockData {
@@ -51,7 +62,15 @@
     TLWEditProfileController *vc = [[TLWEditProfileController alloc] init];
     [self.navigationController pushViewController:vc animated:YES];
 }
-- (void)onSetting     { /* TODO: 跳转设置页 */ }
-- (void)onShare       { /* TODO: 分享 */ }
+- (void)onSetting {
+    TLWSettingViewController *vc = [[TLWSettingViewController alloc] init];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+- (void)onShare { /* TODO: 分享 */ }
+
+- (void)onAvatarUpdated:(NSNotification *)noti {
+    UIImage *avatar = noti.userInfo[@"avatar"];
+    if (avatar) _myView.avatarImageView.image = avatar;
+}
 
 @end

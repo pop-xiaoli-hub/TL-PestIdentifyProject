@@ -68,8 +68,9 @@
         [self showAlertWithMessage:@"请输入正确的手机号"];
         return;
     }
-    // TODO: 调用发送验证码接口
-    NSLog(@"发送验证码到: %@", phone);
+    // TODO: POST /api/auth/sendCode，参数 {"phone": phone}
+    //   成功回调：开始 60s 倒计时，禁用发送按钮
+    //   失败回调：弹 toast 提示
 }
 
 - (void)handleLogin {
@@ -80,8 +81,9 @@
         [self showAlertWithMessage:@"请输入手机号和验证码"];
         return;
     }
-    // TODO: 调用登录接口
-    NSLog(@"登录 phone=%@ code=%@", phone, code);
+    // TODO: POST /api/auth/login，参数 {"phone": phone, "code": code}
+    //   成功回调：持久化 token（NSUserDefaults），调用 [self handleSkip] 跳转主页
+    //   失败回调：弹 toast 提示验证码错误
 }
 
 - (void)handleSkip {

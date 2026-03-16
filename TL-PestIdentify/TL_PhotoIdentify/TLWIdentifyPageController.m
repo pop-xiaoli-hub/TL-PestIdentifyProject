@@ -17,6 +17,7 @@
 @property (nonatomic, strong) AVCapturePhotoOutput *photoOutput;
 @property (nonatomic, strong) UIImageView *capturedImageView;
 @property (nonatomic, strong) UIActivityIndicatorView* indicator;
+@property (nonatomic, strong) UIImage *capturedImage; // 待识别的图片，接口调用时从此属性读取
 @end
 
 @implementation TLWIdentifyPageController
@@ -63,10 +64,11 @@
     if (!image) {
       return;
     }
+    weakSelf.capturedImage = image;
     weakSelf.capturedImageView.image = image;
     weakSelf.capturedImageView.hidden = NO;
     weakSelf.previewLayer.hidden = YES;
-    [self tl_identifyFromAI];
+    [weakSelf tl_identifyFromAI];
   }];
 }
 
@@ -223,22 +225,24 @@
     return;
   }
   dispatch_async(dispatch_get_main_queue(), ^{
+    self.capturedImage = image;
     self.capturedImageView.image = image;
     self.capturedImageView.hidden = NO;
     self.previewLayer.hidden = YES;
+    [self tl_identifyFromAI];
   });
-  // TODO: 在这里把 image 传给识别逻辑或结果页
-  [self tl_identifyFromAI];
 }
 
 - (void)tl_identifyFromAI {
+  // 待识别图片：self.capturedImage
+  // TODO: POST /api/identify，参数为 self.capturedImage（转 Base64 或 multipart）
+  //   成功回调：[self tl_stopLoadingIndicator]; 跳转结果页，传入识别结果 model
+  //   失败回调：[self tl_stopLoadingIndicator]; 弹 toast 提示
   [self tl_showLoadingIndicator];
-  //TODO:调用接口方法，回调跳转，并暂停loading动画
 }
 
 
 - (void)tl_showLoadingIndicator {
-  NSLog(@"开始识别");
   dispatch_async(dispatch_get_main_queue(), ^{
     if (!self.indicator) {
       self.indicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
@@ -249,7 +253,12 @@
     [self.myView bringSubviewToFront:self.indicator];
     [self.indicator startAnimating];
   });
+}
 
+- (void)tl_stopLoadingIndicator {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.indicator stopAnimating];
+  });
 }
 
 - (TLWIdentifyPageView *)myView {
