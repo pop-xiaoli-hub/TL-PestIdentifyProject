@@ -17,6 +17,8 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
 @property (nonatomic, strong, readwrite) UIButton *backButton;
 @property (nonatomic, strong, readwrite) UITextField *searchTextField;
 @property (nonatomic, strong, readwrite) UIButton *longPressMicButton;
+@property (nonatomic, strong) CAShapeLayer *ringLayer;
+@property (nonatomic, assign) BOOL isRecording;
 @property (nonatomic, strong) UIView *headerGradientContainer;
 @property (nonatomic, strong) UIView *centerCircleContainer;
 @property (nonatomic, strong) NSArray<UIView *> *equalizerBars;
@@ -54,7 +56,6 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
 - (void)didMoveToWindow {
   [super didMoveToWindow];
   if (self.window) {
-    [self tl_startEqualizerAnimation];
   } else {
     [self tl_stopEqualizerAnimation];
   }
@@ -161,6 +162,14 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
   UIImageView* circleBg = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_voiceload.png"]];
   [container addSubview:circleBg];
 
+  CAShapeLayer *ringLayer = [CAShapeLayer layer];
+  ringLayer.fillColor = [UIColor clearColor].CGColor;
+  ringLayer.strokeColor = [UIColor colorWithRed:0.1 green:0.8 blue:0.6 alpha:1.0].CGColor;
+  ringLayer.lineWidth = 6.0;
+  ringLayer.opacity = 0.0;
+  [container.layer addSublayer:ringLayer];
+  self.ringLayer = ringLayer;
+
   NSMutableArray<UIView *> *bars = [NSMutableArray arrayWithCapacity:4];
   for (NSInteger i = 0; i < 4; i++) {
     UIView *bar = [[UIView alloc] init];
@@ -177,6 +186,7 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
   label.textColor = [UIColor whiteColor];
   label.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
   [container addSubview:label];
+  label.alpha = 0.0;
   self.inputtingLabel = label;
 
   [container mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -203,6 +213,14 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
     make.top.equalTo(container.mas_centerY).offset(12);
     make.centerX.equalTo(container);
   }];
+
+  dispatch_async(dispatch_get_main_queue(), ^{
+    CGFloat radius = kCenterCircleSize / 2.0 - 10.0;
+    CGPoint center = CGPointMake(kCenterCircleSize / 2.0, kCenterCircleSize / 2.0);
+    UIBezierPath *path = [UIBezierPath bezierPathWithArcCenter:center radius:radius startAngle:-M_PI_2 endAngle:3 * M_PI_2 clockwise:YES];
+    self.ringLayer.frame = container.bounds;
+    self.ringLayer.path = path.CGPath;
+  });
 }
 
 - (void)tl_updateCenterGradient {
@@ -227,6 +245,9 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
 }
 
 - (void)tl_startEqualizerAnimation {
+  if (!self.isRecording) {
+    return;
+  }
   if (self.equalizerBars.count == 0) {
     return;
   }
@@ -234,6 +255,7 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
 }
 
 - (void)tl_animateEqualizerBarAtIndex:(NSInteger)index {
+  if (!self.isRecording) return;
   if (index >= (NSInteger)self.equalizerBars.count || !self.window) return;
   UIView *bar = self.equalizerBars[index];
   CGFloat targetH = kEqualizerBarMaxHeight * (0.3 + (arc4random_uniform(70) / 100.0));
@@ -251,7 +273,10 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
 }
 
 - (void)tl_stopEqualizerAnimation {
-  // 可在此取消动画，当前用 didMoveToWindow 里判断 window 为 nil 时不再继续
+  self.isRecording = NO;
+  for (UIView *bar in self.equalizerBars) {
+    [bar.layer removeAllAnimations];
+  }
 }
 
 - (void)tl_setupBottomHint {
@@ -273,6 +298,70 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
     make.height.mas_equalTo(131.63);
     make.width.mas_equalTo(101.37);
   }];
+
+  UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(tl_handleMicLongPress:)];
+  longPress.minimumPressDuration = 0.3;
+  [micBtn addGestureRecognizer:longPress];
+}
+
+- (void)tl_startRingAnimation {
+  if (!self.ringLayer) { return; }
+  self.ringLayer.opacity = 1.0;
+  [self.ringLayer removeAllAnimations];
+
+  CABasicAnimation *scale = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
+  scale.fromValue = @(1.0);
+  scale.toValue = @(1.12);
+  scale.duration = 0.5;
+  scale.autoreverses = YES;
+  scale.repeatCount = HUGE_VALF;
+
+  CABasicAnimation *opacity = [CABasicAnimation animationWithKeyPath:@"opacity"];
+  opacity.fromValue = @(0.6);
+  opacity.toValue = @(1.0);
+  opacity.duration = 0.5;
+  opacity.autoreverses = YES;
+  opacity.repeatCount = HUGE_VALF;
+
+  CAAnimationGroup *group = [CAAnimationGroup animation];
+  group.animations = @[scale, opacity];
+  group.duration = 0.5;
+  group.autoreverses = YES;
+  group.repeatCount = HUGE_VALF;
+
+  [self.ringLayer addAnimation:group forKey:@"pulseRing"];
+}
+
+- (void)tl_stopRingAnimation {
+  if (!self.ringLayer) { return; }
+  [self.ringLayer removeAllAnimations];
+  self.ringLayer.opacity = 0.0;
+}
+
+- (void)tl_handleMicLongPress:(UILongPressGestureRecognizer *)gesture {
+  switch (gesture.state) {
+    case UIGestureRecognizerStateBegan: {
+      self.isRecording = YES;
+      [UIView animateWithDuration:0.2 animations:^{
+        self.inputtingLabel.alpha = 1.0;
+      }];
+      [self tl_startRingAnimation];
+      [self tl_startEqualizerAnimation];
+      break;
+    }
+    case UIGestureRecognizerStateEnded:
+    case UIGestureRecognizerStateCancelled:
+    case UIGestureRecognizerStateFailed: {
+      self.isRecording = NO;
+      [UIView animateWithDuration:0.2 animations:^{
+        self.inputtingLabel.alpha = 0.0;
+      }];
+      [self tl_stopRingAnimation];
+      break;
+    }
+    default:
+      break;
+  }
 }
 
 @end
