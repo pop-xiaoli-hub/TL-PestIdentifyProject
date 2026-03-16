@@ -11,11 +11,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, readonly) UIButton *backButton;
 @property (nonatomic, strong, readonly) UIButton *cropSelectButton;
+@property (nonatomic, strong, readonly) UICollectionView *cropsCollectionView;
 @property (nonatomic, strong, readonly) UITextView *contentTextView;
 @property (nonatomic, strong, readonly) UIButton *addImageButton;
 @property (nonatomic, strong, readonly) UIButton *confirmPublishButton;
 @property (nonatomic, strong) UIView *middleCardView;
 @property (nonatomic, strong, readonly) UICollectionView *imagesCollectionView;
+
+/// 根据是否有选中的作物，切换顶部卡片的占位文案 / 标签列表展示
+- (void)tl_updateCropSelectionVisible:(BOOL)hasSelection;
 
 @end
 

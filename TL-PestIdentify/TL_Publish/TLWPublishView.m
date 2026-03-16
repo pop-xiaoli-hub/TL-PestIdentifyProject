@@ -12,12 +12,15 @@ static CGFloat const kCardCornerRadius = 14.0;
 
 @property (nonatomic, strong, readwrite) UIButton *backButton;
 @property (nonatomic, strong, readwrite) UIButton *cropSelectButton;
+@property (nonatomic, strong, readwrite) UICollectionView *cropsCollectionView;
 @property (nonatomic, strong, readwrite) UITextView *contentTextView;
 @property (nonatomic, strong, readwrite) UIButton *addImageButton;
 @property (nonatomic, strong, readwrite) UIButton *confirmPublishButton;
 @property (nonatomic, strong, readwrite) UICollectionView *imagesCollectionView;
 
 @property (nonatomic, strong) UIView *topCardView;
+@property (nonatomic, strong) UILabel *cropPlaceholderLabel;
+@property (nonatomic, strong) UIButton *cropArrowButton;
 
 @end
 
@@ -120,27 +123,51 @@ static CGFloat const kCardCornerRadius = 14.0;
   cropTitle.text = @"请选择您要发布的农作物";
   cropTitle.font = [UIFont systemFontOfSize:20];
   cropTitle.textColor = [UIColor darkTextColor];
+  [topCard addSubview:cropTitle];
+  self.cropPlaceholderLabel = cropTitle;
 
   UIButton *arrowButton = [UIButton buttonWithType:UIButtonTypeSystem];
   [arrowButton setTitle:@">" forState:UIControlStateNormal];
   [arrowButton setTitleColor:[UIColor lightGrayColor] forState:UIControlStateNormal];
   arrowButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+  [topCard addSubview:arrowButton];
+  self.cropArrowButton = arrowButton;
 
+  // 顶部整卡点击区域（仅在无选中作物时可见）
   UIButton *cropButton = [UIButton buttonWithType:UIButtonTypeCustom];
   cropButton.backgroundColor = [UIColor clearColor];
-  [cropButton addSubview:cropTitle];
-  [cropButton addSubview:arrowButton];
   [topCard addSubview:cropButton];
   self.cropSelectButton = cropButton;
 
   [cropButton mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.edges.equalTo(topCard).insets(UIEdgeInsetsMake(0, 12, 0, 12));
+    make.edges.equalTo(topCard);
   }];
   [cropTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.left.centerY.equalTo(cropButton);
+    make.left.equalTo(topCard).offset(12);
+    make.centerY.equalTo(topCard);
   }];
   [arrowButton mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.right.centerY.equalTo(cropButton);
+    make.right.equalTo(topCard).offset(-12);
+    make.centerY.equalTo(topCard);
+  }];
+
+  // 顶部横向已选作物标签列表，初始隐藏
+  UICollectionViewFlowLayout *cropFlow = [[UICollectionViewFlowLayout alloc] init];
+  cropFlow.scrollDirection = UICollectionViewScrollDirectionHorizontal;
+  cropFlow.minimumLineSpacing = 10;
+  cropFlow.minimumInteritemSpacing = 10;
+  cropFlow.sectionInset = UIEdgeInsetsMake(0, 12, 0, 12);
+  cropFlow.itemSize = CGSizeMake(110, 40);
+
+  UICollectionView *cropsCollectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:cropFlow];
+  cropsCollectionView.backgroundColor = [UIColor clearColor];
+  cropsCollectionView.showsHorizontalScrollIndicator = NO;
+  cropsCollectionView.hidden = YES;
+  [topCard addSubview:cropsCollectionView];
+  self.cropsCollectionView = cropsCollectionView;
+
+  [cropsCollectionView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(topCard);
   }];
 
   // 中间卡片：发布内容 + 上传图片（统一悬浮在一个卡片上）
@@ -209,6 +236,13 @@ static CGFloat const kCardCornerRadius = 14.0;
   [addImageButton setImage:[UIImage imageNamed:@"addPhoto"] forState:UIControlStateNormal];
   self.addImageButton = addImageButton;
 
+}
+
+- (void)tl_updateCropSelectionVisible:(BOOL)hasSelection {
+  self.cropsCollectionView.hidden = !hasSelection;
+  self.cropPlaceholderLabel.hidden = hasSelection;
+  self.cropArrowButton.hidden = hasSelection;
+  self.cropSelectButton.hidden = hasSelection;
 }
 
 - (void)tl_setupConfirmButton {
