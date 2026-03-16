@@ -227,7 +227,9 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
 }
 
 - (void)tl_startEqualizerAnimation {
-  if (self.equalizerBars.count == 0) return;
+  if (self.equalizerBars.count == 0) {
+    return;
+  }
   [self tl_animateEqualizerBarAtIndex:0];
 }
 
