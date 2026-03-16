@@ -9,6 +9,7 @@
 #import "TLWCommunityPost.h"
 #import "TLWCommunityWaterfallLayout.h"
 #import "TLWVoiceInputViewController.h"
+#import "TLWPublishController.h"
 #import <Masonry/Masonry.h>
 
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
@@ -38,6 +39,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   [collectionView registerClass:[TLWCommunityCell class] forCellWithReuseIdentifier:kCommunityCellID];
   UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(panAction:)];
   [self.myView.publishButton addGestureRecognizer:pan];
+  [self.myView.publishButton addTarget:self action:@selector(tl_publishButtonTapped) forControlEvents:UIControlEventTouchUpInside];
 
   [self.myView bringSubviewToFront:self.myView.publishButton];
   self.myView.searchTextField.delegate = self;
@@ -115,6 +117,12 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
 - (void)tl_voiceButtonTapped {
   TLWVoiceInputViewController *vc = [[TLWVoiceInputViewController alloc] init];
+  vc.modalPresentationStyle = UIModalPresentationFullScreen;
+  [self presentViewController:vc animated:YES completion:nil];
+}
+
+- (void)tl_publishButtonTapped {
+  TLWPublishController *vc = [[TLWPublishController alloc] init];
   vc.modalPresentationStyle = UIModalPresentationFullScreen;
   [self presentViewController:vc animated:YES completion:nil];
 }
