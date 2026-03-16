@@ -13,9 +13,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, readonly) UICollectionView *collectionView;
 @property (nonatomic, strong, readonly) UITextField *searchTextField;
+@property (nonatomic, strong, readonly) UIButton *voiceButton;
 @property (nonatomic, strong, readonly) UIButton *uploadButton;
 @property (nonatomic, strong) UIButton *publishButton;
-
+@property (nonatomic, strong) UIView *searchOverlay;
 /// 显示/隐藏搜索浮层
 - (void)tl_showSearchOverlay;
 - (void)tl_hideSearchOverlay;

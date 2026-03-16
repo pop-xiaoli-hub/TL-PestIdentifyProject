@@ -23,14 +23,16 @@ static NSInteger const kTagItemsPerRow = 5;
 
 @property (nonatomic, strong, readwrite) UICollectionView *collectionView;
 @property (nonatomic, strong, readwrite) UITextField *searchTextField;
+@property (nonatomic, strong, readwrite) UIButton *voiceButton;
 @property (nonatomic, strong) UIView *searchContainer;
 /// 搜索时的毛玻璃覆盖层（含历史记录、猜你想搜）
-@property (nonatomic, strong) UIView *searchOverlay;
 @property (nonatomic, strong) UIVisualEffectView *searchBlurPanel;
 /// 历史记录行容器（垂直 StackView，每行一个水平 StackView）
 @property (nonatomic, strong) UIStackView *historyStackView;
 /// 猜你想搜行容器（垂直 StackView，每行一个水平 StackView）
 @property (nonatomic, strong) UIStackView *guessStackView;
+/// 搜索区域点击手势（用于排除点击语音按钮时触发）
+@property (nonatomic, strong) UITapGestureRecognizer *searchFieldTapGesture;
 
 @end
 
@@ -62,8 +64,6 @@ static NSInteger const kTagItemsPerRow = 5;
   [self addSubview:container];
   self.searchContainer = container;
 
-
-
   UILabel *titleLabel = [[UILabel alloc] init];
   titleLabel.text = @"社区";
   titleLabel.textColor = [UIColor whiteColor];
@@ -84,6 +84,7 @@ static NSInteger const kTagItemsPerRow = 5;
   [voiceButton setImage:[UIImage imageNamed:@"cp_voice.png"] forState:UIControlStateNormal];
   voiceButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   [searchFieldBackground addSubview:voiceButton];
+  self.voiceButton = voiceButton;
 
   UITextField *textField = [[UITextField alloc] init];
   textField.placeholder = @"请输入关键词";
@@ -93,11 +94,12 @@ static NSInteger const kTagItemsPerRow = 5;
   [searchFieldBackground addSubview:textField];
   self.searchTextField = textField;
 
-  // 点击整个搜索区域时也可以唤起搜索面板
+  // 点击整个搜索区域时也可以唤起搜索面板（需排除语音按钮，让语音按钮能正常跳转）
   searchFieldBackground.userInteractionEnabled = YES;
-  UITapGestureRecognizer *searchTap = [[UITapGestureRecognizer alloc] initWithTarget:self
-                                                                              action:@selector(tl_showSearchOverlay)];
+  UITapGestureRecognizer *searchTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_showSearchOverlay)];
+  searchTap.delegate = self;
   [searchFieldBackground addGestureRecognizer:searchTap];
+  self.searchFieldTapGesture = searchTap;
 
   self.publishButton = [UIButton buttonWithType:UIButtonTypeCustom];
   [self.publishButton setImage:[UIImage imageNamed:@"cp_publish.png"] forState:UIControlStateNormal];
@@ -124,15 +126,15 @@ static NSInteger const kTagItemsPerRow = 5;
   }];
 
   [searchIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(searchFieldBackground).offset(12);
+    make.left.equalTo(searchFieldBackground).offset(8);
     make.centerY.equalTo(searchFieldBackground);
-    make.width.height.mas_equalTo(18);
+    make.width.height.mas_equalTo(32);
   }];
 
   [voiceButton mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.right.equalTo(searchFieldBackground).offset(-12);
+    make.right.equalTo(searchFieldBackground).offset(-8);
     make.centerY.equalTo(searchFieldBackground);
-    make.width.height.mas_equalTo(18);
+    make.width.height.mas_equalTo(32);
   }];
 
   [textField mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -151,7 +153,7 @@ static NSInteger const kTagItemsPerRow = 5;
   layout.sectionInset = UIEdgeInsetsMake(12, kHorizontalInset, 20, kHorizontalInset);
 
   UICollectionView *collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero collectionViewLayout:layout];
-  collectionView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+  collectionView.backgroundColor = [UIColor whiteColor];
   collectionView.showsVerticalScrollIndicator = NO;
   collectionView.layer.masksToBounds = YES;
   collectionView.layer.cornerRadius = 20;
@@ -251,6 +253,10 @@ static NSInteger const kTagItemsPerRow = 5;
   UITapGestureRecognizer *dismissTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_hideSearchOverlay)];
   dismissTap.delegate = self;
   [overlay addGestureRecognizer:dismissTap];
+
+  UISwipeGestureRecognizer *swipeDown = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(tl_dismissKeyboard)];
+  swipeDown.direction = UISwipeGestureRecognizerDirectionDown;
+  [overlay addGestureRecognizer:swipeDown];
 
   // 更强对比的毛玻璃背景
   UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialLight];
@@ -412,6 +418,10 @@ static NSInteger const kTagItemsPerRow = 5;
   self.searchTextField.text = text;
 }
 
+- (void)tl_dismissKeyboard {
+  [self endEditing:YES];
+}
+
 - (void)tl_clearHistoryTapped {
   for (UIView *subview in self.historyStackView.arrangedSubviews) {
     [self.historyStackView removeArrangedSubview:subview];
@@ -422,7 +432,14 @@ static NSInteger const kTagItemsPerRow = 5;
 #pragma mark - UIGestureRecognizerDelegate
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
-  // 仅当点击在覆盖层空白区域时才触发收起，点击毛玻璃内容区域不收起
+  // 搜索区域点击：点击在语音按钮上时不触发，让语音按钮响应跳转
+  if (gestureRecognizer == self.searchFieldTapGesture) {
+    if (touch.view == self.voiceButton || [touch.view isDescendantOfView:self.voiceButton]) {
+      return NO;
+    }
+    return YES;
+  }
+  // 覆盖层点击：仅当点击在覆盖层空白区域时才触发收起，点击毛玻璃内容区域不收起
   if (touch.view != self.searchOverlay) {
     return NO;
   }
