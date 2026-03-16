@@ -445,7 +445,9 @@
 }
 
 - (void)tl_didTapAssistantCard {
-    NSLog(@"点击按钮-助手");
+    if (self.clickAIAssistant) {
+        self.clickAIAssistant();
+    }
 }
 
 - (void)tl_didTapPhotoCard {

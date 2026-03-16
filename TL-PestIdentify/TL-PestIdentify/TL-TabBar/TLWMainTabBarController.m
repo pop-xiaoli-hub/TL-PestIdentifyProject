@@ -8,8 +8,10 @@
 #import "TLWMainTabBarController.h"
 #import "TLWTabBar.h"
 #import "TLWHomePageController.h"
-#import <Masonry/Masonry.h>
 #import "TLWCommunityController.h"
+#import "TLWMessageController.h"
+#import "TLWMyController.h"
+#import <Masonry/Masonry.h>
 @interface TLWMainTabBarController () <UINavigationControllerDelegate>
 
 // 存放四个模块的 NavigationController
@@ -37,19 +39,16 @@
     TLWHomePageController *homeVC = [TLWHomePageController new];
     UINavigationController *homeNav = [[UINavigationController alloc] initWithRootViewController:homeVC];
 
-    // 社区：占位，待开发
+    // 社区
     TLWCommunityController *communityVC = [TLWCommunityController new];
-    communityVC.view.backgroundColor = UIColor.whiteColor;
     UINavigationController *communityNav = [[UINavigationController alloc] initWithRootViewController:communityVC];
 
-    // 消息：占位，待开发git
-    UIViewController *msgVC = [UIViewController new];
-    msgVC.view.backgroundColor = UIColor.redColor;
+    // 消息
+    TLWMessageController *msgVC = [TLWMessageController new];
     UINavigationController *msgNav = [[UINavigationController alloc] initWithRootViewController:msgVC];
 
-    // 我的：占位，待开发
-    UIViewController *meVC = [UIViewController new];
-    meVC.view.backgroundColor = UIColor.yellowColor;
+    // 我的
+    TLWMyController *meVC = [TLWMyController new];
     UINavigationController *meNav = [[UINavigationController alloc] initWithRootViewController:meVC];
 
     _childVCs = @[homeNav, communityNav, msgNav, meNav];
