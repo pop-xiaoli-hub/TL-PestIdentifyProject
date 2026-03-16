@@ -5,6 +5,8 @@
 
 #import "TLWPublishController.h"
 #import "TLWPublishView.h"
+#import "TLWImagePickerController.h"
+#import "TLWCropPickerController.h"
 #import <Masonry/Masonry.h>
 
 @interface TLWPublishController ()<UIGestureRecognizerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
@@ -12,6 +14,7 @@
 @property (nonatomic, strong) TLWPublishView *myView;
 @property (nonatomic, strong, nullable) id draftObject;
 @property (nonatomic, strong) NSMutableArray<UIImage *> *selectedImages;
+@property (nonatomic, strong) NSMutableArray<NSString *> *selectedCrops;
 
 @end
 
@@ -34,7 +37,14 @@
   self.myView.imagesCollectionView.dataSource = self;
   self.myView.imagesCollectionView.delegate = self;
   [self.myView.imagesCollectionView registerClass:[UICollectionViewCell class] forCellWithReuseIdentifier:@"PublishImageCell"];
+
+  self.myView.cropsCollectionView.dataSource = self;
+  self.myView.cropsCollectionView.delegate = self;
+  [self.myView.cropsCollectionView registerClass:[UICollectionViewCell class] forCellWithReuseIdentifier:@"PublishCropTagCell"];
+
   self.selectedImages = [NSMutableArray array];
+  self.selectedCrops = [NSMutableArray array];
+  [self.myView tl_updateCropSelectionVisible:NO];
   UITapGestureRecognizer* tap = [[UITapGestureRecognizer alloc]  initWithTarget:self action:@selector(hideKeyboard)];
   tap.delegate = self;
   tap.cancelsTouchesInView = NO;
@@ -52,6 +62,9 @@
   if (touch.view == self.myView.imagesCollectionView || [touch.view isDescendantOfView:self.myView.imagesCollectionView]) {
     return NO;
   }
+  if (touch.view == self.myView.cropsCollectionView || [touch.view isDescendantOfView:self.myView.cropsCollectionView]) {
+    return NO;
+  }
   return YES;
 }
 
@@ -63,44 +76,103 @@
 #pragma mark - UICollectionViewDataSource
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
-  // 第 0 个为“添加图片”按钮，其余为已选图片，最多 9 个格子
-  NSInteger count = self.selectedImages.count + 1;
-  return MIN(count, 9);
+  if (collectionView == self.myView.imagesCollectionView) {
+    // 第 0 个为“添加图片”按钮，其余为已选图片，最多 9 个格子
+    NSInteger count = self.selectedImages.count + 1;
+    return MIN(count, 9);
+  }
+  // 顶部作物标签列表：仅展示已选作物
+  return self.selectedCrops.count;
 }
 
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
-  UICollectionViewCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"PublishImageCell" forIndexPath:indexPath];
+  if (collectionView == self.myView.imagesCollectionView) {
+    UICollectionViewCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"PublishImageCell" forIndexPath:indexPath];
+    for (UIView *sub in cell.contentView.subviews) {
+      [sub removeFromSuperview];
+    }
+
+    if (indexPath.item == 0) {
+      // 添加图片按钮：暗色块 + 悬浮阴影 + 中间十字
+      UIView *bgView = [[UIView alloc] initWithFrame:cell.contentView.bounds];
+      bgView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+      bgView.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
+      bgView.layer.cornerRadius = 12.0;
+      bgView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.35].CGColor;
+      bgView.layer.shadowOpacity = 0.8;
+      bgView.layer.shadowRadius = 8.0;
+      bgView.layer.shadowOffset = CGSizeMake(0, 4);
+
+      CGFloat crossSize = MIN(bgView.bounds.size.width, bgView.bounds.size.height) * 0.5;
+      CGFloat barThickness = 3.0;
+      CGRect bounds = bgView.bounds;
+      CGPoint center = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+
+      UIView *horizontal = [[UIView alloc] initWithFrame:CGRectMake(0, 0, crossSize, barThickness)];
+      horizontal.center = center;
+      horizontal.backgroundColor = [UIColor whiteColor];
+      horizontal.layer.cornerRadius = barThickness / 2.0;
+
+      UIView *vertical = [[UIView alloc] initWithFrame:CGRectMake(0, 0, barThickness, crossSize)];
+      vertical.center = center;
+      vertical.backgroundColor = [UIColor whiteColor];
+      vertical.layer.cornerRadius = barThickness / 2.0;
+
+      [bgView addSubview:horizontal];
+      [bgView addSubview:vertical];
+      [cell.contentView addSubview:bgView];
+    } else {
+      UIImageView *imageView = [[UIImageView alloc] initWithFrame:cell.contentView.bounds];
+      imageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+      imageView.contentMode = UIViewContentModeScaleAspectFill;
+      imageView.clipsToBounds = YES;
+      imageView.layer.cornerRadius = 10.0;
+      imageView.image = self.selectedImages[indexPath.item - 1];
+      [cell.contentView addSubview:imageView];
+    }
+    return cell;
+  }
+
+  // 顶部作物标签 cell：绿色胶囊、立体感
+  UICollectionViewCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"PublishCropTagCell" forIndexPath:indexPath];
   for (UIView *sub in cell.contentView.subviews) {
     [sub removeFromSuperview];
   }
 
-  UIImageView *imageView = [[UIImageView alloc] initWithFrame:cell.contentView.bounds];
-  imageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-  imageView.contentMode = UIViewContentModeScaleAspectFill;
-  imageView.clipsToBounds = YES;
-  imageView.layer.cornerRadius = 10.0;
+  UIView *bgView = [[UIView alloc] initWithFrame:cell.contentView.bounds];
+  bgView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  bgView.backgroundColor = [UIColor colorWithRed:0.0 green:0.8 blue:0.55 alpha:1.0];
+  bgView.layer.cornerRadius = 16.0;
+  bgView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.25].CGColor;
+  bgView.layer.shadowOpacity = 0.7;
+  bgView.layer.shadowRadius = 6.0;
+  bgView.layer.shadowOffset = CGSizeMake(0, 3);
 
-  if (indexPath.item == 0) {
-    // 添加图片按钮样式
-    imageView.image = [UIImage imageNamed:@"addPhoto"];
-    imageView.backgroundColor = [UIColor colorWithWhite:0.97 alpha:1.0];
-    imageView.contentMode = UIViewContentModeCenter;
-  } else {
-    imageView.image = self.selectedImages[indexPath.item - 1];
-  }
+  UILabel *label = [[UILabel alloc] initWithFrame:CGRectInset(bgView.bounds, 12, 4)];
+  label.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  label.textAlignment = NSTextAlignmentCenter;
+  label.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+  label.textColor = [UIColor whiteColor];
+  label.text = self.selectedCrops[indexPath.item];
 
-  [cell.contentView addSubview:imageView];
+  [bgView addSubview:label];
+  [cell.contentView addSubview:bgView];
   return cell;
 }
 
 #pragma mark - UICollectionViewDelegate
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
-  if (indexPath.item == 0) {
-    [self tl_addImageTapped];
-  } else {
-    // 这里可以做预览或删除，暂时不处理
+  if (collectionView == self.myView.imagesCollectionView) {
+    if (indexPath.item == 0) {
+      [self tl_addImageTapped];
+    } else {
+      // 这里可以做预览或删除，暂时不处理
+    }
+    return;
   }
+  // 顶部作物标签点击后也可再次进入选择页
+  [self tl_cropSelectTapped];
 }
 
 #pragma mark - UIImagePickerControllerDelegate
@@ -147,21 +219,43 @@
 }
 
 /// 选择要发布的农作物
-/// TODO: 在此处弹出作物选择器（列表 / 搜索），选择结果回写到 myView.cropSelectButton 文案
 - (void)tl_cropSelectTapped {
-  // 预留方法体，待后续接入业务逻辑
+  TLWCropPickerController *vc = [[TLWCropPickerController alloc] init];
+  vc.initialSelectedCropNames = [self.selectedCrops copy];
+  __weak typeof(self) weakSelf = self;
+  vc.completionHandler = ^(NSArray<NSString *> *selectedCropNames) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf.selectedCrops removeAllObjects];
+    [strongSelf.selectedCrops addObjectsFromArray:selectedCropNames ?: @[]];
+    BOOL hasSelection = strongSelf.selectedCrops.count > 0;
+    [strongSelf.myView tl_updateCropSelectionVisible:hasSelection];
+    [strongSelf.myView.cropsCollectionView reloadData];
+  };
+  vc.modalPresentationStyle = UIModalPresentationFullScreen;
+  [self presentViewController:vc animated:YES completion:nil];
 }
 
 - (void)tl_addImageTapped {
-  // 打开系统相册选择图片，最多支持 8 张用户图片（加上第 0 个“添加”占位，共 9 格）
-  if (self.selectedImages.count >= 8) {
-    return;
-  }
-  UIImagePickerController *picker = [[UIImagePickerController alloc] init];
-  picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
-  picker.allowsEditing = NO;
-  picker.delegate = (id<UINavigationControllerDelegate, UIImagePickerControllerDelegate>)self;
-  [self presentViewController:picker animated:YES completion:nil];
+  // 仿照 TLWPreferenceController，新开中间选择页，暂时只透传/回传图片数组
+  TLWImagePickerController *vc = [[TLWImagePickerController alloc] init];
+  vc.initialImages = self.selectedImages;
+  __weak typeof(self) weakSelf = self;
+  vc.completionHandler = ^(NSArray *selectedImages) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+    [strongSelf.selectedImages removeAllObjects];
+    for (id obj in selectedImages) {
+      if ([obj isKindOfClass:[UIImage class]]) {
+        [strongSelf.selectedImages addObject:obj];
+      }
+    }
+    [strongSelf.myView.imagesCollectionView reloadData];
+  };
+  vc.modalPresentationStyle = UIModalPresentationFullScreen;
+  [self presentViewController:vc animated:YES completion:nil];
 }
 
 /// 确认发布按钮
