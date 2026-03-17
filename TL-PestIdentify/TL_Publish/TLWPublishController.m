@@ -98,10 +98,7 @@
       bgView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
       bgView.backgroundColor = [UIColor colorWithWhite:0.85 alpha:1.0];
       bgView.layer.cornerRadius = 12.0;
-      bgView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.35].CGColor;
-      bgView.layer.shadowOpacity = 0.8;
-      bgView.layer.shadowRadius = 8.0;
-      bgView.layer.shadowOffset = CGSizeMake(0, 4);
+    bgView.layer.shadowOpacity = 0.0;
 
       CGFloat crossSize = MIN(bgView.bounds.size.width, bgView.bounds.size.height) * 0.5;
       CGFloat barThickness = 3.0;

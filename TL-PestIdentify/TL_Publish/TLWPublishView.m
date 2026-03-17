@@ -183,6 +183,9 @@ static CGFloat const kCardCornerRadius = 14.0;
   textView.textColor = [UIColor darkTextColor];
   textView.text = @"点击输入您要发布的内容";
   textView.textColor = [UIColor lightGrayColor];
+  textView.backgroundColor = [[UIColor lightGrayColor] colorWithAlphaComponent:0.4];
+  textView.layer.masksToBounds = YES;
+  textView.layer.cornerRadius = 10;
   [middleCard addSubview:textView];
   self.contentTextView = textView;
 
