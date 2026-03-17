@@ -26,20 +26,20 @@ static NSString * const kPublishImageCellID = @"PublishImageCellID";
 
 - (void)viewDidLoad {
   [super viewDidLoad];
+  UIImage* image = [UIImage imageNamed:@"hp_eg1.jpg"];
+  NSMutableArray* mutableArray = [NSMutableArray array];
+  for (int i = 0; i < 10; i++) {
+    [mutableArray addObject:image];
+  }
+  self.initialImages = [NSArray arrayWithArray:mutableArray];
 
   self.mutableSelectedItems = [NSMutableArray arrayWithArray:self.initialImages ?: @[]];
   self.selectedIndexes = [NSMutableIndexSet indexSet];
-  // 默认将传入的 initialImages 视为已选中
-  NSUInteger count = self.mutableSelectedItems.count;
-  if (count > 0) {
-    [self.selectedIndexes addIndexesInRange:NSMakeRange(0, count)];
-  }
-
   UICollectionView *cv = self.pickerView.collectionView;
   [cv registerClass:[UICollectionViewCell class] forCellWithReuseIdentifier:kPublishImageCellID];
   cv.dataSource = self;
   cv.delegate = self;
-  cv.allowsMultipleSelection = YES;
+  cv.allowsMultipleSelection = YES;//打开多选模式
 
   [self.pickerView.confirmButton addTarget:self action:@selector(tl_handleConfirm) forControlEvents:UIControlEventTouchUpInside];
 }
@@ -119,9 +119,7 @@ static NSString * const kPublishImageCellID = @"PublishImageCellID";
 
 #pragma mark - UICollectionViewDelegateFlowLayout
 
-- (CGSize)collectionView:(UICollectionView *)collectionView
-                  layout:(UICollectionViewLayout *)layout
-  sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
+- (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
   CGFloat margin  = 22.0;
   CGFloat gap     = 10.0;
   CGFloat columns = 4.0;
