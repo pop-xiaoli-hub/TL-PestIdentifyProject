@@ -9,11 +9,14 @@
 #import "TLWLoginView.h"
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
+#import "TLWNetworkManager.h"
 
 @interface TLWLoginController ()
 
 @property (nonatomic, strong) TLWLoginView *loginView;
 @property (nonatomic, assign) BOOL agreedToTerms;
+@property (nonatomic, strong) NSTimer *countdownTimer;
+@property (nonatomic, assign) NSInteger countdown;
 
 @end
 
@@ -68,9 +71,35 @@
         [self showAlertWithMessage:@"请输入正确的手机号"];
         return;
     }
-    // TODO: POST /api/auth/sendCode，参数 {"phone": phone}
-    //   成功回调：开始 60s 倒计时，禁用发送按钮
-    //   失败回调：弹 toast 提示
+
+    self.loginView.sendCodeButton.enabled = NO;
+
+    [[TLWNetworkManager shared] POST:@"/api/auth/send-code"
+                          parameters:@{@"phone": phone}
+                             success:^(id data) {
+        [self startCountdown];
+    } failure:^(NSString *message) {
+        self.loginView.sendCodeButton.enabled = YES;
+        [self showAlertWithMessage:message];
+    }];
+}
+
+- (void)startCountdown {
+    self.countdown = 60;
+    [self.loginView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)self.countdown] forState:UIControlStateDisabled];
+    self.loginView.sendCodeButton.enabled = NO;
+
+    self.countdownTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
+        self.countdown--;
+        if (self.countdown <= 0) {
+            [timer invalidate];
+            self.countdownTimer = nil;
+            self.loginView.sendCodeButton.enabled = YES;
+            [self.loginView.sendCodeButton setTitle:@"获取验证码" forState:UIControlStateNormal];
+        } else {
+            [self.loginView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)self.countdown] forState:UIControlStateDisabled];
+        }
+    }];
 }
 
 - (void)handleLogin {
@@ -81,9 +110,19 @@
         [self showAlertWithMessage:@"请输入手机号和验证码"];
         return;
     }
-    // TODO: POST /api/auth/login，参数 {"phone": phone, "code": code}
-    //   成功回调：持久化 token（NSUserDefaults），调用 [self handleSkip] 跳转主页
-    //   失败回调：弹 toast 提示验证码错误
+
+    [[TLWNetworkManager shared] POST:@"/api/auth/login-by-sms"
+                          parameters:@{@"phone": phone, @"code": code}
+                             success:^(id data) {
+        TLWNetworkManager *nm = [TLWNetworkManager shared];
+        nm.token        = data[@"token"];
+        nm.refreshToken = data[@"refreshToken"];
+        nm.userId       = [data[@"userId"] integerValue];
+        nm.username     = data[@"username"];
+        [self handleSkip];
+    } failure:^(NSString *message) {
+        [self showAlertWithMessage:message];
+    }];
 }
 
 - (void)handleSkip {
