@@ -9,11 +9,15 @@
 #import "TLWLoginView.h"
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
+#import "TLWAuthAPI.h"
+#import "TLWGuideController.h"
 
 @interface TLWLoginController ()
 
 @property (nonatomic, strong) TLWLoginView *loginView;
 @property (nonatomic, assign) BOOL agreedToTerms;
+@property (nonatomic, strong) NSTimer *countdownTimer;
+@property (nonatomic, assign) NSInteger countdown;
 
 @end
 
@@ -26,6 +30,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    self.navigationController.navigationBarHidden = YES;
 
     self.agreedToTerms = NO;
 
@@ -68,9 +73,33 @@
         [self showAlertWithMessage:@"请输入正确的手机号"];
         return;
     }
-    // TODO: POST /api/auth/sendCode，参数 {"phone": phone}
-    //   成功回调：开始 60s 倒计时，禁用发送按钮
-    //   失败回调：弹 toast 提示
+
+    self.loginView.sendCodeButton.enabled = NO;
+
+    [TLWAuthAPI sendCodeWithPhone:phone success:^(id data) {
+        [self startCountdown];
+    } failure:^(NSString *message) {
+        self.loginView.sendCodeButton.enabled = YES;
+        [self showAlertWithMessage:message];
+    }];
+}
+
+- (void)startCountdown {
+    self.countdown = 60;
+    [self.loginView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)self.countdown] forState:UIControlStateDisabled];
+    self.loginView.sendCodeButton.enabled = NO;
+
+    self.countdownTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
+        self.countdown--;
+        if (self.countdown <= 0) {
+            [timer invalidate];
+            self.countdownTimer = nil;
+            self.loginView.sendCodeButton.enabled = YES;
+            [self.loginView.sendCodeButton setTitle:@"获取验证码" forState:UIControlStateNormal];
+        } else {
+            [self.loginView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)self.countdown] forState:UIControlStateDisabled];
+        }
+    }];
 }
 
 - (void)handleLogin {
@@ -81,9 +110,14 @@
         [self showAlertWithMessage:@"请输入手机号和验证码"];
         return;
     }
-    // TODO: POST /api/auth/login，参数 {"phone": phone, "code": code}
-    //   成功回调：持久化 token（NSUserDefaults），调用 [self handleSkip] 跳转主页
-    //   失败回调：弹 toast 提示验证码错误
+
+    [TLWAuthAPI loginBySmsWithPhone:phone code:code success:^(id data) {
+        TLWGuideController *guideVC = [[TLWGuideController alloc] init];
+        guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
+        [self presentViewController:guideVC animated:YES completion:nil];
+    } failure:^(NSString *message) {
+        [self showAlertWithMessage:message];
+    }];
 }
 
 - (void)handleSkip {
@@ -109,8 +143,7 @@
 }
 
 - (void)handleLocalPhoneLogin {
-    NSLog(@"本机号码一键登录");
-    // TODO: 接入运营商一键登录 SDK
+    [self.navigationController popViewControllerAnimated:YES];
 }
 
 - (void)dismissKeyboard {
