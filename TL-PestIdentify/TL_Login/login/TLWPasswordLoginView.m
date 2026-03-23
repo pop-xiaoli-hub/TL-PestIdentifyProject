@@ -1,14 +1,12 @@
 //
-//  TLWLoginView.m
+//  TLWPasswordLoginView.m
 //  TL-PestIdentify
 //
-//  Created by 吴桐 on 2026/3/12.
-//
 
-#import "TLWLoginView.h"
+#import "TLWPasswordLoginView.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWLoginView ()
+@interface TLWPasswordLoginView ()
 
 // Logo 区域
 @property (nonatomic, strong) UIView           *logoBgView;
@@ -17,27 +15,24 @@
 @property (nonatomic, strong) UILabel          *titleLabel;
 @property (nonatomic, strong) UILabel          *sectionLabel;
 
-// 表单 - 手机号
-@property (nonatomic, strong) UIView           *phoneContainer;
-@property (nonatomic, strong) UIView           *sendCodeBg;
-@property (nonatomic, strong) CAGradientLayer  *sendCodeGradient;
-
-// 表单 - 验证码
-@property (nonatomic, strong) UIView           *codeContainer;
+// 表单容器
+@property (nonatomic, strong) UIView           *accountContainer;
+@property (nonatomic, strong) UIView           *passwordContainer;
 
 // 公开控件（readwrite）
-@property (nonatomic, strong, readwrite) UITextField *phoneField;
-@property (nonatomic, strong, readwrite) UIButton    *sendCodeButton;
-@property (nonatomic, strong, readwrite) UITextField *codeField;
-@property (nonatomic, strong, readwrite) UIButton    *loginTapButton;
-@property (nonatomic, strong, readwrite) UIButton    *wechatLoginButton;
-@property (nonatomic, strong, readwrite) UIButton    *qqLoginButton;
-@property (nonatomic, strong, readwrite) UIButton    *localPhoneLoginButton;
-@property (nonatomic, strong, readwrite) UIButton    *skipButton;
+@property (nonatomic, strong, readwrite) UITextField *accountField;
+@property (nonatomic, strong, readwrite) UITextField *passwordField;
+@property (nonatomic, strong, readwrite) UIButton *togglePasswordButton;
+@property (nonatomic, strong, readwrite) UIButton *loginTapButton;
+@property (nonatomic, strong, readwrite) UIButton *wechatLoginButton;
+@property (nonatomic, strong, readwrite) UIButton *qqLoginButton;
+@property (nonatomic, strong, readwrite) UIButton *phoneLoginButton;
+@property (nonatomic, strong, readwrite) UIButton *skipButton;
+@property (nonatomic, strong, readwrite) UIButton *backButton;
 
 @end
 
-@implementation TLWLoginView
+@implementation TLWPasswordLoginView
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
@@ -53,14 +48,14 @@
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    _logoGradient.frame     = _logoBgView.bounds;
-    _sendCodeGradient.frame = _sendCodeBg.bounds;
+    _logoGradient.frame = _logoBgView.bounds;
 }
 
 #pragma mark - Setup
 
 - (void)setupView {
     [self setupBackground];
+    [self setupBackButton];
     [self setupLogoArea];
     [self setupForm];
     [self setupTermsRow];
@@ -85,6 +80,22 @@
     [rectView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.right.bottom.equalTo(self);
         make.height.mas_equalTo(792);
+    }];
+}
+
+#pragma mark - 返回按钮
+
+- (void)setupBackButton {
+    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:20 weight:UIImageSymbolWeightMedium];
+    UIImage *chevron = [UIImage systemImageNamed:@"chevron.left" withConfiguration:config];
+    [_backButton setImage:chevron forState:UIControlStateNormal];
+    _backButton.tintColor = [UIColor colorWithWhite:1.0 alpha:0.9];
+    [self addSubview:_backButton];
+    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(10);
+        make.left.equalTo(self).offset(16);
+        make.width.height.mas_equalTo(44);
     }];
 }
 
@@ -137,7 +148,7 @@
     }];
 
     _sectionLabel = [[UILabel alloc] init];
-    _sectionLabel.text      = @"手机验证登录";
+    _sectionLabel.text      = @"账号密码登录";
     _sectionLabel.font      = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     _sectionLabel.textColor = [UIColor colorWithWhite:1.0 alpha:0.9];
     [self addSubview:_sectionLabel];
@@ -153,100 +164,82 @@
     CGFloat margin = 43.0;
     CGFloat fieldH = 55.0;
 
-    // ── 手机号容器 ──
-    _phoneContainer = [[UIView alloc] init];
-    _phoneContainer.backgroundColor = [UIColor colorWithRed:1 green:1 blue:1 alpha:0.85];
-    _phoneContainer.layer.cornerRadius = 27;
-    _phoneContainer.clipsToBounds = YES;
-    [self addSubview:_phoneContainer];
-    [_phoneContainer mas_makeConstraints:^(MASConstraintMaker *make) {
+    // ── 账号容器 ──
+    _accountContainer = [[UIView alloc] init];
+    _accountContainer.backgroundColor = [UIColor colorWithRed:1 green:1 blue:1 alpha:0.85];
+    _accountContainer.layer.cornerRadius = 27;
+    _accountContainer.clipsToBounds = YES;
+    [self addSubview:_accountContainer];
+    [_accountContainer mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_sectionLabel.mas_bottom).offset(13);
         make.left.equalTo(self.mas_safeAreaLayoutGuideLeft).offset(margin);
         make.right.equalTo(self.mas_safeAreaLayoutGuideRight).offset(-margin);
         make.height.mas_equalTo(fieldH);
     }];
 
-    _phoneField = [[UITextField alloc] init];
-    _phoneField.keyboardType  = UIKeyboardTypeNumberPad;
-    _phoneField.backgroundColor = UIColor.clearColor;
-    _phoneField.borderStyle   = UITextBorderStyleNone;
-    _phoneField.font          = [UIFont systemFontOfSize:16];
-    _phoneField.textColor     = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1.0];
-    _phoneField.tintColor     = [UIColor colorWithRed:0.0  green:0.74 blue:0.67 alpha:1.0];
-    _phoneField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入手机号" attributes:@{
+    _accountField = [[UITextField alloc] init];
+    _accountField.backgroundColor = UIColor.clearColor;
+    _accountField.borderStyle   = UITextBorderStyleNone;
+    _accountField.font          = [UIFont systemFontOfSize:16];
+    _accountField.textColor     = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1.0];
+    _accountField.tintColor     = [UIColor colorWithRed:0.0  green:0.74 blue:0.67 alpha:1.0];
+    _accountField.autocorrectionType = UITextAutocorrectionTypeNo;
+    _accountField.autocapitalizationType = UITextAutocapitalizationTypeNone;
+    _accountField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输用户名" attributes:@{
         NSForegroundColorAttributeName: [UIColor colorWithRed:0.42 green:0.42 blue:0.42 alpha:1.0],
         NSFontAttributeName:            [UIFont systemFontOfSize:16],
     }];
-    _phoneField.leftView     = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 24, 0)];
-    _phoneField.leftViewMode = UITextFieldViewModeAlways;
-    [_phoneContainer addSubview:_phoneField];
-    [_phoneField mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.top.bottom.equalTo(_phoneContainer);
-        make.right.equalTo(_phoneContainer).offset(-108);
+    _accountField.leftView     = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 24, 0)];
+    _accountField.leftViewMode = UITextFieldViewModeAlways;
+    [_accountContainer addSubview:_accountField];
+    [_accountField mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(_accountContainer);
     }];
 
-    // 发送验证码绿色渐变胶囊
-    _sendCodeBg = [[UIView alloc] init];
-    _sendCodeBg.layer.cornerRadius = 20.5;
-    _sendCodeBg.clipsToBounds = YES;
-    [_phoneContainer addSubview:_sendCodeBg];
-    [_sendCodeBg mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.equalTo(_phoneContainer).offset(-6);
-        make.centerY.equalTo(_phoneContainer);
-        make.width.mas_equalTo(97);
-        make.height.mas_equalTo(41);
-    }];
-
-    _sendCodeGradient = [CAGradientLayer layer];
-    _sendCodeGradient.colors = @[
-        (__bridge id)[UIColor colorWithRed:0.0  green:0.902 blue:0.549 alpha:1.0].CGColor,
-        (__bridge id)[UIColor colorWithRed:0.0  green:0.745 blue:0.671 alpha:1.0].CGColor,
-    ];
-    _sendCodeGradient.startPoint   = CGPointMake(0, 0.5);
-    _sendCodeGradient.endPoint     = CGPointMake(1, 0.5);
-    _sendCodeGradient.cornerRadius = 20.5;
-    [_sendCodeBg.layer insertSublayer:_sendCodeGradient atIndex:0];
-
-    _sendCodeButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    _sendCodeButton.backgroundColor = UIColor.clearColor;
-    [_sendCodeButton setTitle:@"发送验证码" forState:UIControlStateNormal];
-    [_sendCodeButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    [_sendCodeButton setTitleColor:UIColor.whiteColor forState:UIControlStateDisabled];
-    _sendCodeButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
-    [_sendCodeBg addSubview:_sendCodeButton];
-    [_sendCodeButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(_sendCodeBg);
-    }];
-
-    // ── 验证码容器 ──
-    _codeContainer = [[UIView alloc] init];
-    _codeContainer.backgroundColor = [UIColor colorWithRed:1 green:1 blue:1 alpha:0.85];
-    _codeContainer.layer.cornerRadius = 27;
-    _codeContainer.clipsToBounds = YES;
-    [self addSubview:_codeContainer];
-    [_codeContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_phoneContainer.mas_bottom).offset(15);
+    // ── 密码容器 ──
+    _passwordContainer = [[UIView alloc] init];
+    _passwordContainer.backgroundColor = [UIColor colorWithRed:1 green:1 blue:1 alpha:0.85];
+    _passwordContainer.layer.cornerRadius = 27;
+    _passwordContainer.clipsToBounds = YES;
+    [self addSubview:_passwordContainer];
+    [_passwordContainer mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_accountContainer.mas_bottom).offset(15);
         make.left.equalTo(self.mas_safeAreaLayoutGuideLeft).offset(margin);
         make.right.equalTo(self.mas_safeAreaLayoutGuideRight).offset(-margin);
         make.height.mas_equalTo(fieldH);
     }];
 
-    _codeField = [[UITextField alloc] init];
-    _codeField.keyboardType   = UIKeyboardTypeNumberPad;
-    _codeField.backgroundColor = UIColor.clearColor;
-    _codeField.borderStyle    = UITextBorderStyleNone;
-    _codeField.font           = [UIFont systemFontOfSize:16];
-    _codeField.textColor      = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1.0];
-    _codeField.tintColor      = [UIColor colorWithRed:0.0  green:0.74 blue:0.67 alpha:1.0];
-    _codeField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入验证码" attributes:@{
+    _passwordField = [[UITextField alloc] init];
+    _passwordField.secureTextEntry = YES;
+    _passwordField.backgroundColor = UIColor.clearColor;
+    _passwordField.borderStyle    = UITextBorderStyleNone;
+    _passwordField.font           = [UIFont systemFontOfSize:16];
+    _passwordField.textColor      = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1.0];
+    _passwordField.tintColor      = [UIColor colorWithRed:0.0  green:0.74 blue:0.67 alpha:1.0];
+    _passwordField.autocorrectionType = UITextAutocorrectionTypeNo;
+    _passwordField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入密码" attributes:@{
         NSForegroundColorAttributeName: [UIColor colorWithRed:0.42 green:0.42 blue:0.42 alpha:1.0],
         NSFontAttributeName:            [UIFont systemFontOfSize:16],
     }];
-    _codeField.leftView     = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 24, 0)];
-    _codeField.leftViewMode = UITextFieldViewModeAlways;
-    [_codeContainer addSubview:_codeField];
-    [_codeField mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(_codeContainer);
+    _passwordField.leftView     = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 24, 0)];
+    _passwordField.leftViewMode = UITextFieldViewModeAlways;
+    [_passwordContainer addSubview:_passwordField];
+    [_passwordField mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.top.bottom.equalTo(_passwordContainer);
+        make.right.equalTo(_passwordContainer).offset(-50);
+    }];
+
+    // 显示/隐藏密码按钮
+    _togglePasswordButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImageSymbolConfiguration *eyeConfig = [UIImageSymbolConfiguration configurationWithPointSize:16 weight:UIImageSymbolWeightRegular];
+    [_togglePasswordButton setImage:[UIImage systemImageNamed:@"eye.slash" withConfiguration:eyeConfig] forState:UIControlStateNormal];
+    [_togglePasswordButton setImage:[UIImage systemImageNamed:@"eye" withConfiguration:eyeConfig] forState:UIControlStateSelected];
+    _togglePasswordButton.tintColor = [UIColor colorWithRed:0.42 green:0.42 blue:0.42 alpha:1.0];
+    [_passwordContainer addSubview:_togglePasswordButton];
+    [_togglePasswordButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.right.equalTo(_passwordContainer).offset(-16);
+        make.centerY.equalTo(_passwordContainer);
+        make.width.height.mas_equalTo(36);
     }];
 
     // ── 登录按钮 ──
@@ -262,11 +255,12 @@
     _loginTapButton.titleLabel.font = [UIFont systemFontOfSize:21 weight:UIFontWeightMedium];
     [self addSubview:_loginTapButton];
     [_loginTapButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_codeContainer.mas_bottom).offset(22);
+        make.top.equalTo(_passwordContainer.mas_bottom).offset(22);
         make.left.equalTo(self.mas_safeAreaLayoutGuideLeft).offset(margin);
         make.right.equalTo(self.mas_safeAreaLayoutGuideRight).offset(-margin);
         make.height.mas_equalTo(54);
     }];
+
 }
 
 #pragma mark - 条款行
@@ -277,8 +271,7 @@
     [self addSubview:wrapper];
     [wrapper mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_loginTapButton.mas_bottom).offset(14);
-        make.centerX.equalTo(self);
-        make.width.equalTo(_loginTapButton).offset(-40);
+        make.left.equalTo(_loginTapButton).offset(20);
         make.height.mas_equalTo(36);
     }];
 
@@ -286,7 +279,7 @@
     checkImageView.contentMode = UIViewContentModeScaleAspectFit;
     [wrapper addSubview:checkImageView];
     [checkImageView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(wrapper).offset(40);
+        make.left.equalTo(wrapper);
         make.centerY.equalTo(wrapper);
         make.width.height.mas_equalTo(20);
     }];
@@ -426,11 +419,11 @@
         make.bottom.equalTo(_qqLoginButton);
     }];
 
-    // ── 本机号码登录 ──
-    _localPhoneLoginButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    _localPhoneLoginButton.backgroundColor = UIColor.clearColor;
-    [self addSubview:_localPhoneLoginButton];
-    [_localPhoneLoginButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    // ── 手机号登录 ──
+    _phoneLoginButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    _phoneLoginButton.backgroundColor = UIColor.clearColor;
+    [self addSubview:_phoneLoginButton];
+    [_phoneLoginButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-20);
         make.centerX.equalTo(self).offset(90);
         make.width.mas_equalTo(90);
@@ -442,24 +435,24 @@
     phoneIcon.clipsToBounds = YES;
     phoneIcon.layer.cornerRadius = 27;
     phoneIcon.userInteractionEnabled = NO;
-    [_localPhoneLoginButton addSubview:phoneIcon];
+    [_phoneLoginButton addSubview:phoneIcon];
     [phoneIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_localPhoneLoginButton);
-        make.centerX.equalTo(_localPhoneLoginButton);
+        make.top.equalTo(_phoneLoginButton);
+        make.centerX.equalTo(_phoneLoginButton);
         make.width.height.mas_equalTo(54);
     }];
 
     UILabel *phoneLabel = [[UILabel alloc] init];
-    phoneLabel.text          = @"账号密码登录";
+    phoneLabel.text          = @"手机号登录";
     phoneLabel.font          = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     phoneLabel.textColor     = [UIColor colorWithRed:0.298 green:0.298 blue:0.298 alpha:0.8];
     phoneLabel.textAlignment = NSTextAlignmentCenter;
     phoneLabel.userInteractionEnabled = NO;
-    [_localPhoneLoginButton addSubview:phoneLabel];
+    [_phoneLoginButton addSubview:phoneLabel];
     [phoneLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(phoneIcon.mas_bottom).offset(6);
-        make.centerX.equalTo(_localPhoneLoginButton);
-        make.bottom.equalTo(_localPhoneLoginButton);
+        make.centerX.equalTo(_phoneLoginButton);
+        make.bottom.equalTo(_phoneLoginButton);
     }];
 }
 

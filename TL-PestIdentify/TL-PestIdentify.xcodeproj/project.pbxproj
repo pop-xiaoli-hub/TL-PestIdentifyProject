@@ -20,6 +20,8 @@
 		4CA8AAA72F67B30D00928BBF /* Speech.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CA8AAA52F67B30100928BBF /* Speech.framework */; };
 		4CA8AAAC2F67B32A00928BBF /* TWLSpeechManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8AAAB2F67B32A00928BBF /* TWLSpeechManager.m */; };
 		4CA8BB032F6E8A0100928BBF /* TLWNetworkManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8BB022F6E8A0100928BBF /* TLWNetworkManager.m */; };
+		4CA8BB062F6E8A0200928BBF /* TLWAuthAPI.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8BB052F6E8A0200928BBF /* TLWAuthAPI.m */; };
+		4CA8BB092F6E8A0300928BBF /* TLWUserAPI.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8BB082F6E8A0300928BBF /* TLWUserAPI.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +69,10 @@
 		4CA8AAAB2F67B32A00928BBF /* TWLSpeechManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TWLSpeechManager.m; sourceTree = "<group>"; };
 		4CA8BB012F6E8A0100928BBF /* TLWNetworkManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWNetworkManager.h; sourceTree = "<group>"; };
 		4CA8BB022F6E8A0100928BBF /* TLWNetworkManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWNetworkManager.m; sourceTree = "<group>"; };
+		4CA8BB042F6E8A0200928BBF /* TLWAuthAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWAuthAPI.h; sourceTree = "<group>"; };
+		4CA8BB052F6E8A0200928BBF /* TLWAuthAPI.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWAuthAPI.m; sourceTree = "<group>"; };
+		4CA8BB072F6E8A0300928BBF /* TLWUserAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWUserAPI.h; sourceTree = "<group>"; };
+		4CA8BB082F6E8A0300928BBF /* TLWUserAPI.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWUserAPI.m; sourceTree = "<group>"; };
 		8457BB115BD60440BB3E020F /* Pods-TL-PestIdentify.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TL-PestIdentify.debug.xcconfig"; path = "Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify.debug.xcconfig"; sourceTree = "<group>"; };
 		A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-TL-PestIdentify.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -205,12 +211,11 @@
 		4CA894FE2F64577500928BBF /* TL_Common */ = {
 			isa = PBXGroup;
 			children = (
+				4CA8BB0A2F6E8B0100928BBF /* Network */,
 				4CA894FC2F64577500928BBF /* TLWCameraManager.h */,
 				4CA894FD2F64577500928BBF /* TLWCameraManager.m */,
 				4CA8AAAA2F67B32A00928BBF /* TWLSpeechManager.h */,
 				4CA8AAAB2F67B32A00928BBF /* TWLSpeechManager.m */,
-				4CA8BB012F6E8A0100928BBF /* TLWNetworkManager.h */,
-				4CA8BB022F6E8A0100928BBF /* TLWNetworkManager.m */,
 			);
 			path = TL_Common;
 			sourceTree = "<group>";
@@ -243,6 +248,19 @@
 				4CA8A5B72F66FA3300928BBF /* TLWNotificationView.m */,
 			);
 			path = TL_Notification;
+			sourceTree = "<group>";
+		};
+		4CA8BB0A2F6E8B0100928BBF /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				4CA8BB012F6E8A0100928BBF /* TLWNetworkManager.h */,
+				4CA8BB022F6E8A0100928BBF /* TLWNetworkManager.m */,
+				4CA8BB042F6E8A0200928BBF /* TLWAuthAPI.h */,
+				4CA8BB052F6E8A0200928BBF /* TLWAuthAPI.m */,
+				4CA8BB072F6E8A0300928BBF /* TLWUserAPI.h */,
+				4CA8BB082F6E8A0300928BBF /* TLWUserAPI.m */,
+			);
+			path = Network;
 			sourceTree = "<group>";
 		};
 		98C8BED53E946BBF5FCE10BE /* Pods */ = {
@@ -468,6 +486,8 @@
 				4CA8A5932F66F9E100928BBF /* TLWMessageCell.m in Sources */,
 				4CA894FF2F64577500928BBF /* TLWCameraManager.m in Sources */,
 				4CA8BB032F6E8A0100928BBF /* TLWNetworkManager.m in Sources */,
+				4CA8BB062F6E8A0200928BBF /* TLWAuthAPI.m in Sources */,
+				4CA8BB092F6E8A0300928BBF /* TLWUserAPI.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

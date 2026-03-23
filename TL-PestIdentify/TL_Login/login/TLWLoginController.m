@@ -9,7 +9,8 @@
 #import "TLWLoginView.h"
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
-#import "TLWNetworkManager.h"
+#import "TLWAuthAPI.h"
+#import "TLWGuideController.h"
 
 @interface TLWLoginController ()
 
@@ -29,6 +30,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    self.navigationController.navigationBarHidden = YES;
 
     self.agreedToTerms = NO;
 
@@ -74,9 +76,7 @@
 
     self.loginView.sendCodeButton.enabled = NO;
 
-    [[TLWNetworkManager shared] POST:@"/api/auth/send-code"
-                          parameters:@{@"phone": phone}
-                             success:^(id data) {
+    [TLWAuthAPI sendCodeWithPhone:phone success:^(id data) {
         [self startCountdown];
     } failure:^(NSString *message) {
         self.loginView.sendCodeButton.enabled = YES;
@@ -111,15 +111,10 @@
         return;
     }
 
-    [[TLWNetworkManager shared] POST:@"/api/auth/login-by-sms"
-                          parameters:@{@"phone": phone, @"code": code}
-                             success:^(id data) {
-        TLWNetworkManager *nm = [TLWNetworkManager shared];
-        nm.token        = data[@"token"];
-        nm.refreshToken = data[@"refreshToken"];
-        nm.userId       = [data[@"userId"] integerValue];
-        nm.username     = data[@"username"];
-        [self handleSkip];
+    [TLWAuthAPI loginBySmsWithPhone:phone code:code success:^(id data) {
+        TLWGuideController *guideVC = [[TLWGuideController alloc] init];
+        guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
+        [self presentViewController:guideVC animated:YES completion:nil];
     } failure:^(NSString *message) {
         [self showAlertWithMessage:message];
     }];
@@ -148,8 +143,7 @@
 }
 
 - (void)handleLocalPhoneLogin {
-    NSLog(@"本机号码一键登录");
-    // TODO: 接入运营商一键登录 SDK
+    [self.navigationController popViewControllerAnimated:YES];
 }
 
 - (void)dismissKeyboard {

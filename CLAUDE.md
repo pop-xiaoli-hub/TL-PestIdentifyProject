@@ -68,6 +68,13 @@ All PNG assets live in `TL-PestIdentify/TLWLogin/病虫害App/`.
 | SDWebImage | ~5.0 | Async image loading |
 | LookinServer | 1.2.8 | UI inspector (Debug only) |
 
+## Backend
+
+- **后端代码仓库**: https://github.com/lukecc00/AgroAiServer (master 分支)
+- **服务端 IP**: 115.191.67.35
+- **部署方式**: Docker
+- **查看后端更新**: `gh api 'repos/lukecc00/AgroAiServer/commits?sha=master&per_page=20' --jq '.[] | "\(.commit.author.date) | \(.commit.author.name) | \(.commit.message)"'`
+
 ## Current Branch State
 
 - Branch `feature-login`: Login module (`TLWLogin/`) is newly added and not yet integrated into the Xcode project file. The `TWLLoginViewController` and `TWLLoginView` files exist on disk but need to be added to the `.xcodeproj` to compile.

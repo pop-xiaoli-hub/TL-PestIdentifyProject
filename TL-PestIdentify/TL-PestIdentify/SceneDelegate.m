@@ -6,7 +6,7 @@
 //
 
 #import "SceneDelegate.h"
-#import "TLWLoginController.h"
+#import "TLWPasswordLoginController.h"
 
 @interface SceneDelegate ()
 
@@ -19,8 +19,10 @@
   UIWindowScene *windowScene = (UIWindowScene *)scene;
   self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
 
-  TLWLoginController *loginVC = [[TLWLoginController alloc] init];
-  self.window.rootViewController = loginVC;
+  TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
+  UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+  nav.navigationBarHidden = YES;
+  self.window.rootViewController = nav;
   [self.window makeKeyAndVisible];
 }
 

@@ -98,6 +98,7 @@ static NSString * const kUsernameKey   = @"TLW_username";
 - (void)handleResponse:(id)responseObject
                success:(TLWNetworkSuccess)success
                failure:(TLWNetworkFailure)failure {
+    NSLog(@"[TLWNetwork] 响应: %@", responseObject);
     if (![responseObject isKindOfClass:[NSDictionary class]]) {
         if (success) success(responseObject);
         return;
@@ -105,14 +106,17 @@ static NSString * const kUsernameKey   = @"TLW_username";
     NSDictionary *dict = (NSDictionary *)responseObject;
     NSInteger code = [dict[@"code"] integerValue];
     if (code == 200) {
+        NSLog(@"[TLWNetwork] 成功, data: %@", dict[@"data"]);
         if (success) success(dict[@"data"]);
     } else {
         NSString *msg = dict[@"message"] ?: @"请求失败";
+        NSLog(@"[TLWNetwork] 失败, code: %ld, message: %@", (long)code, msg);
         if (failure) failure(msg);
     }
 }
 
 - (void)handleError:(NSError *)error failure:(TLWNetworkFailure)failure {
+    NSLog(@"[TLWNetwork] 请求错误: %@", error);
     if (!failure) return;
     // 尝试从服务端返回的 JSON 中提取 message
     NSData *errorData = error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey];

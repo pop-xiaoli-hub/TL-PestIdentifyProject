@@ -5,7 +5,7 @@
 
 #import "TLWCameraManager.h"
 
-    //  分别用于拍照回调、相册选图回调和一个其他
+//  分别用于拍照回调、相册选图回调和一个其他
 @interface TLWCameraManager () <AVCapturePhotoCaptureDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 @property (nonatomic, weak)   UIViewController *hostVC;
 @property (nonatomic, strong) AVCaptureSession *session;
