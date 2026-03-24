@@ -9,7 +9,13 @@
 #import "TLWLoginView.h"
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
-#import "TLWAuthAPI.h"
+#import "TLWSDKManager.h"
+#import <AgriPestClient/AGApiService.h>
+#import <AgriPestClient/AGSendSmsRequest.h>
+#import <AgriPestClient/AGSmsLoginRequest.h>
+#import <AgriPestClient/AGResultAuthResponse.h>
+#import <AgriPestClient/AGResultVoid.h>
+#import <AgriPestClient/AGAuthResponse.h>
 #import "TLWGuideController.h"
 
 @interface TLWLoginController ()
@@ -76,11 +82,21 @@
 
     self.loginView.sendCodeButton.enabled = NO;
 
-    [TLWAuthAPI sendCodeWithPhone:phone success:^(id data) {
+    AGSendSmsRequest *req = [[AGSendSmsRequest alloc] init];
+    req.phone = phone;
+
+    [[TLWSDKManager shared].api sendSmsCodeWithSendSmsRequest:req completionHandler:^(AGResultVoid *output, NSError *error) {
+        if (error) {
+            self.loginView.sendCodeButton.enabled = YES;
+            [self showAlertWithMessage:error.localizedDescription];
+            return;
+        }
+        if (output.code.integerValue != 200) {
+            self.loginView.sendCodeButton.enabled = YES;
+            [self showAlertWithMessage:output.message ?: @"发送失败"];
+            return;
+        }
         [self startCountdown];
-    } failure:^(NSString *message) {
-        self.loginView.sendCodeButton.enabled = YES;
-        [self showAlertWithMessage:message];
     }];
 }
 
@@ -111,12 +127,23 @@
         return;
     }
 
-    [TLWAuthAPI loginBySmsWithPhone:phone code:code success:^(id data) {
+    AGSmsLoginRequest *req = [[AGSmsLoginRequest alloc] init];
+    req.phone = phone;
+    req.code  = code;
+
+    [[TLWSDKManager shared].api loginBySmsWithSmsLoginRequest:req completionHandler:^(AGResultAuthResponse *output, NSError *error) {
+        if (error) {
+            [self showAlertWithMessage:error.localizedDescription];
+            return;
+        }
+        if (output.code.integerValue != 200) {
+            [self showAlertWithMessage:output.message ?: @"登录失败"];
+            return;
+        }
+        [[TLWSDKManager shared] saveAuthResponse:output.data];
         TLWGuideController *guideVC = [[TLWGuideController alloc] init];
         guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
         [self presentViewController:guideVC animated:YES completion:nil];
-    } failure:^(NSString *message) {
-        [self showAlertWithMessage:message];
     }];
 }
 

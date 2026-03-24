@@ -7,7 +7,11 @@
 #import "TLWPasswordLoginView.h"
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
-#import "TLWAuthAPI.h"
+#import "TLWSDKManager.h"
+#import <AgriPestClient/AGApiService.h>
+#import <AgriPestClient/AGLoginRequest.h>
+#import <AgriPestClient/AGResultAuthResponse.h>
+#import <AgriPestClient/AGAuthResponse.h>
 #import "TLWLoginController.h"
 #import "TLWGuideController.h"
 
@@ -81,12 +85,23 @@
         return;
     }
 
-    [TLWAuthAPI loginWithUsernameOrPhone:account password:password success:^(id data) {
+    AGLoginRequest *req = [[AGLoginRequest alloc] init];
+    req.usernameOrPhone = account;
+    req.password = password;
+
+    [[TLWSDKManager shared].api loginWithLoginRequest:req completionHandler:^(AGResultAuthResponse *output, NSError *error) {
+        if (error) {
+            [self showAlertWithMessage:error.localizedDescription];
+            return;
+        }
+        if (output.code.integerValue != 200) {
+            [self showAlertWithMessage:output.message ?: @"登录失败"];
+            return;
+        }
+        [[TLWSDKManager shared] saveAuthResponse:output.data];
         TLWGuideController *guideVC = [[TLWGuideController alloc] init];
         guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
         [self presentViewController:guideVC animated:YES completion:nil];
-    } failure:^(NSString *message) {
-        [self showAlertWithMessage:message];
     }];
 }
 

@@ -19,9 +19,7 @@
 		4CA8A5BC2F66FA3300928BBF /* TLWNotificationController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A5B32F66FA3300928BBF /* TLWNotificationController.m */; };
 		4CA8AAA72F67B30D00928BBF /* Speech.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CA8AAA52F67B30100928BBF /* Speech.framework */; };
 		4CA8AAAC2F67B32A00928BBF /* TWLSpeechManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8AAAB2F67B32A00928BBF /* TWLSpeechManager.m */; };
-		4CA8BB032F6E8A0100928BBF /* TLWNetworkManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8BB022F6E8A0100928BBF /* TLWNetworkManager.m */; };
-		4CA8BB062F6E8A0200928BBF /* TLWAuthAPI.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8BB052F6E8A0200928BBF /* TLWAuthAPI.m */; };
-		4CA8BB092F6E8A0300928BBF /* TLWUserAPI.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8BB082F6E8A0300928BBF /* TLWUserAPI.m */; };
+		4CA8BB0D2F81000100928BBF /* TLWSDKManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8BB0C2F81000100928BBF /* TLWSDKManager.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,12 +65,8 @@
 		4CA8AAA52F67B30100928BBF /* Speech.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Speech.framework; path = System/Library/Frameworks/Speech.framework; sourceTree = SDKROOT; };
 		4CA8AAAA2F67B32A00928BBF /* TWLSpeechManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TWLSpeechManager.h; sourceTree = "<group>"; };
 		4CA8AAAB2F67B32A00928BBF /* TWLSpeechManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TWLSpeechManager.m; sourceTree = "<group>"; };
-		4CA8BB012F6E8A0100928BBF /* TLWNetworkManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWNetworkManager.h; sourceTree = "<group>"; };
-		4CA8BB022F6E8A0100928BBF /* TLWNetworkManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWNetworkManager.m; sourceTree = "<group>"; };
-		4CA8BB042F6E8A0200928BBF /* TLWAuthAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWAuthAPI.h; sourceTree = "<group>"; };
-		4CA8BB052F6E8A0200928BBF /* TLWAuthAPI.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWAuthAPI.m; sourceTree = "<group>"; };
-		4CA8BB072F6E8A0300928BBF /* TLWUserAPI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWUserAPI.h; sourceTree = "<group>"; };
-		4CA8BB082F6E8A0300928BBF /* TLWUserAPI.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWUserAPI.m; sourceTree = "<group>"; };
+		4CA8BB0B2F81000100928BBF /* TLWSDKManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWSDKManager.h; sourceTree = "<group>"; };
+		4CA8BB0C2F81000100928BBF /* TLWSDKManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWSDKManager.m; sourceTree = "<group>"; };
 		8457BB115BD60440BB3E020F /* Pods-TL-PestIdentify.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TL-PestIdentify.debug.xcconfig"; path = "Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify.debug.xcconfig"; sourceTree = "<group>"; };
 		A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-TL-PestIdentify.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -98,51 +92,71 @@
 		};
 		0DAAA8F42F59C0BB00F327DC /* TL-PestIdentifyTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "TL-PestIdentifyTests";
 			sourceTree = "<group>";
 		};
 		0DAAA8FE2F59C0BB00F327DC /* TL-PestIdentifyUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "TL-PestIdentifyUITests";
 			sourceTree = "<group>";
 		};
 		0DB0A9202F5FF6D3009E2E41 /* TL_HomePage */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TL_HomePage;
 			sourceTree = "<group>";
 		};
 		0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TL_PhotoIdentify;
 			sourceTree = "<group>";
 		};
 		0DCE63482F63EEAD00965017 /* TL_Community */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TL_Community;
 			sourceTree = "<group>";
 		};
 		0DE04CC92F68235300856C11 /* TL_Publish */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TL_Publish;
 			sourceTree = "<group>";
 		};
 		4C9B4E8D2F5F040700016E29 /* TL_Login */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TL_Login;
 			sourceTree = "<group>";
 		};
 		4CA891122F63A7A900928BBF /* TL_Record */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TL_Record;
 			sourceTree = "<group>";
 		};
 		4CA894EF2F63FDF700928BBF /* TL_AiAssisstant */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TL_AiAssisstant;
 			sourceTree = "<group>";
 		};
 		7D5BEC0BE2664D74B5CF37A0 /* TL_My */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = TL_My;
 			sourceTree = "<group>";
 		};
@@ -253,12 +267,8 @@
 		4CA8BB0A2F6E8B0100928BBF /* Network */ = {
 			isa = PBXGroup;
 			children = (
-				4CA8BB012F6E8A0100928BBF /* TLWNetworkManager.h */,
-				4CA8BB022F6E8A0100928BBF /* TLWNetworkManager.m */,
-				4CA8BB042F6E8A0200928BBF /* TLWAuthAPI.h */,
-				4CA8BB052F6E8A0200928BBF /* TLWAuthAPI.m */,
-				4CA8BB072F6E8A0300928BBF /* TLWUserAPI.h */,
-				4CA8BB082F6E8A0300928BBF /* TLWUserAPI.m */,
+				4CA8BB0B2F81000100928BBF /* TLWSDKManager.h */,
+				4CA8BB0C2F81000100928BBF /* TLWSDKManager.m */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -455,13 +465,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -485,9 +491,7 @@
 				4CA8A5922F66F9E100928BBF /* TLWMessageController.m in Sources */,
 				4CA8A5932F66F9E100928BBF /* TLWMessageCell.m in Sources */,
 				4CA894FF2F64577500928BBF /* TLWCameraManager.m in Sources */,
-				4CA8BB032F6E8A0100928BBF /* TLWNetworkManager.m in Sources */,
-				4CA8BB062F6E8A0200928BBF /* TLWAuthAPI.m in Sources */,
-				4CA8BB092F6E8A0300928BBF /* TLWUserAPI.m in Sources */,
+				4CA8BB0D2F81000100928BBF /* TLWSDKManager.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
