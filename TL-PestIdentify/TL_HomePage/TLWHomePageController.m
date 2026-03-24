@@ -13,6 +13,7 @@
 #import "TLWRecordController.h"
 #import "TLWAIAssistantController.h"
 #import "TLWWarningModel.h"
+#import "TLWSDKManager.h"
 #import <Masonry.h>
 
 @interface TLWHomePageController () <UITableViewDelegate, UITableViewDataSource>
@@ -24,10 +25,12 @@
 
 @implementation TLWHomePageController
 
+
 - (void)viewDidLoad {
   [super viewDidLoad];
   [self tl_setHomePageBackView];
   [self tl_setupHomePageView];
+  [self.homePageView configureWithUserName:[TLWSDKManager shared].username];
 }
 
 - (void)tl_setHomePageBackView {

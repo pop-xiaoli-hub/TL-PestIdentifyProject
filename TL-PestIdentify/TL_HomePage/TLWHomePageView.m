@@ -139,7 +139,6 @@
 
 - (void)tl_setUserNameLabel {
   UILabel* label = self.userNameLabel;
-  label.text = @"小飞飞";
   label.backgroundColor = [UIColor clearColor];
   label.textColor = [UIColor whiteColor];
   label.font = [UIFont systemFontOfSize:37 weight:UIFontWeightHeavy];
@@ -150,6 +149,10 @@
       make.height.mas_equalTo(40);
       make.top.equalTo(self.helloLabel);
   }];
+}
+
+- (void)configureWithUserName:(NSString* )name {
+  self.userNameLabel.text = [name copy];
 }
 
 - (void)tl_setHelloLabel {
