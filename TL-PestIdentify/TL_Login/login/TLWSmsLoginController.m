@@ -10,12 +10,6 @@
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
 #import "TLWSDKManager.h"
-#import <AgriPestClient/AGApiService.h>
-#import <AgriPestClient/AGSendSmsRequest.h>
-#import <AgriPestClient/AGSmsLoginRequest.h>
-#import <AgriPestClient/AGResultAuthResponse.h>
-#import <AgriPestClient/AGResultVoid.h>
-#import <AgriPestClient/AGAuthResponse.h>
 #import "TLWGuideController.h"
 
 @interface TLWSmsLoginController ()

@@ -4,9 +4,6 @@
 //
 
 #import "TLWSDKManager.h"
-#import <AgriPestClient/AGApiService.h>
-#import <AgriPestClient/AGDefaultConfiguration.h>
-#import <AgriPestClient/AGAuthResponse.h>
 
 static NSString * const kTokenKey    = @"TLW_access_token";
 static NSString * const kRefreshKey  = @"TLW_refresh_token";

@@ -5,8 +5,23 @@
 
 #import <Foundation/Foundation.h>
 
-@class AGApiService;
-@class AGAuthResponse;
+// SDK 头文件统一引入
+#import <AgriPestClient/AGApiService.h>
+#import <AgriPestClient/AGDefaultConfiguration.h>
+#import <AgriPestClient/AGAuthResponse.h>
+#import <AgriPestClient/AGLoginRequest.h>
+#import <AgriPestClient/AGSmsLoginRequest.h>
+#import <AgriPestClient/AGSendSmsRequest.h>
+#import <AgriPestClient/AGRegisterRequest.h>
+#import <AgriPestClient/AGRefreshTokenRequest.h>
+#import <AgriPestClient/AGProfileUpdateRequest.h>
+#import <AgriPestClient/AGChangePhoneRequest.h>
+#import <AgriPestClient/AGUserProfileDto.h>
+#import <AgriPestClient/AGResultAuthResponse.h>
+#import <AgriPestClient/AGResultUserProfileDto.h>
+#import <AgriPestClient/AGResultVoid.h>
+#import <AgriPestClient/AGResultString.h>
+#import <AgriPestClient/AGResultListString.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
