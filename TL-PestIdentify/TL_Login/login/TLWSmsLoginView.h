@@ -1,5 +1,5 @@
 //
-//  TLWLoginView.h
+//  TLWSmsLoginView.h
 //  TL-PestIdentify
 //
 //  Created by 吴桐 on 2026/3/12.
@@ -9,7 +9,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TLWLoginView : UIView
+@interface TLWSmsLoginView : UIView
 
 @property (nonatomic, strong, readonly) UITextField *phoneField;
 @property (nonatomic, strong, readonly) UIButton *sendCodeButton;

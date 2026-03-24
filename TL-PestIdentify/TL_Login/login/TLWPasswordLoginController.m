@@ -12,7 +12,7 @@
 #import <AgriPestClient/AGLoginRequest.h>
 #import <AgriPestClient/AGResultAuthResponse.h>
 #import <AgriPestClient/AGAuthResponse.h>
-#import "TLWLoginController.h"
+#import "TLWSmsLoginController.h"
 #import "TLWGuideController.h"
 
 @interface TLWPasswordLoginController ()
@@ -111,7 +111,7 @@
 }
 
 - (void)handleSwitchToSms {
-    TLWLoginController *smsVC = [[TLWLoginController alloc] init];
+    TLWSmsLoginController *smsVC = [[TLWSmsLoginController alloc] init];
     [self.navigationController pushViewController:smsVC animated:YES];
 }
 

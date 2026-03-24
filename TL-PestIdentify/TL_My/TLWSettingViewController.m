@@ -66,7 +66,7 @@
         // TODO: 清除登录态（删除 NSUserDefaults 中的 token、userId 等），跳转登录页
         //   [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"token"];
         //   UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
-        //   window.rootViewController = [[TLWLoginController alloc] init];
+        //   window.rootViewController = [[TLWSmsLoginController alloc] init];
     }]];
     [self presentViewController:alert animated:YES completion:nil];
 }

@@ -1,12 +1,12 @@
 //
-//  TLWLoginController.m
+//  TLWSmsLoginController.m
 //  TL-PestIdentify
 //
 //  Created by 吴桐 on 2026/3/12.
 //
 
-#import "TLWLoginController.h"
-#import "TLWLoginView.h"
+#import "TLWSmsLoginController.h"
+#import "TLWSmsLoginView.h"
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
 #import "TLWSDKManager.h"
@@ -18,19 +18,19 @@
 #import <AgriPestClient/AGAuthResponse.h>
 #import "TLWGuideController.h"
 
-@interface TLWLoginController ()
+@interface TLWSmsLoginController ()
 
-@property (nonatomic, strong) TLWLoginView *loginView;
+@property (nonatomic, strong) TLWSmsLoginView *loginView;
 @property (nonatomic, assign) BOOL agreedToTerms;
 @property (nonatomic, strong) NSTimer *countdownTimer;
 @property (nonatomic, assign) NSInteger countdown;
 
 @end
 
-@implementation TLWLoginController
+@implementation TLWSmsLoginController
 
 - (void)loadView {
-    self.loginView = [[TLWLoginView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    self.loginView = [[TLWSmsLoginView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.view = self.loginView;
 }
 
