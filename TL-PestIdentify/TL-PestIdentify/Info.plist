@@ -4,16 +4,8 @@
 <dict>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>115.191.67.35</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-			</dict>
-		</dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
 	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

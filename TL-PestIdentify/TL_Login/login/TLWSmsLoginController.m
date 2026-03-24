@@ -1,30 +1,31 @@
 //
-//  TLWLoginController.m
+//  TLWSmsLoginController.m
 //  TL-PestIdentify
 //
 //  Created by 吴桐 on 2026/3/12.
 //
 
-#import "TLWLoginController.h"
-#import "TLWLoginView.h"
+#import "TLWSmsLoginController.h"
+#import "TLWSmsLoginView.h"
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
-#import "TLWAuthAPI.h"
+#import "TLWSDKManager.h"
 #import "TLWGuideController.h"
+#import "TLWPreferenceController.h"
 
-@interface TLWLoginController ()
+@interface TLWSmsLoginController ()
 
-@property (nonatomic, strong) TLWLoginView *loginView;
+@property (nonatomic, strong) TLWSmsLoginView *loginView;
 @property (nonatomic, assign) BOOL agreedToTerms;
 @property (nonatomic, strong) NSTimer *countdownTimer;
 @property (nonatomic, assign) NSInteger countdown;
 
 @end
 
-@implementation TLWLoginController
+@implementation TLWSmsLoginController
 
 - (void)loadView {
-    self.loginView = [[TLWLoginView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    self.loginView = [[TLWSmsLoginView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.view = self.loginView;
 }
 
@@ -73,14 +74,21 @@
         [self showAlertWithMessage:@"请输入正确的手机号"];
         return;
     }
-
     self.loginView.sendCodeButton.enabled = NO;
-
-    [TLWAuthAPI sendCodeWithPhone:phone success:^(id data) {
+    AGSendSmsRequest *req = [[AGSendSmsRequest alloc] init];
+    req.phone = phone;
+    [[TLWSDKManager shared].api sendSmsCodeWithSendSmsRequest:req completionHandler:^(AGResultVoid *output, NSError *error) {
+        if (error) {
+            self.loginView.sendCodeButton.enabled = YES;
+            [self showAlertWithMessage:error.localizedDescription];
+            return;
+        }
+        if (output.code.integerValue != 200) {
+            self.loginView.sendCodeButton.enabled = YES;
+            [self showAlertWithMessage:output.message ?: @"发送失败"];
+            return;
+        }
         [self startCountdown];
-    } failure:^(NSString *message) {
-        self.loginView.sendCodeButton.enabled = YES;
-        [self showAlertWithMessage:message];
     }];
 }
 
@@ -105,18 +113,24 @@
 - (void)handleLogin {
     NSString *phone = self.loginView.phoneField.text;
     NSString *code  = self.loginView.codeField.text;
-
     if (phone.length == 0 || code.length == 0) {
         [self showAlertWithMessage:@"请输入手机号和验证码"];
         return;
     }
-
-    [TLWAuthAPI loginBySmsWithPhone:phone code:code success:^(id data) {
-        TLWGuideController *guideVC = [[TLWGuideController alloc] init];
-        guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
-        [self presentViewController:guideVC animated:YES completion:nil];
-    } failure:^(NSString *message) {
-        [self showAlertWithMessage:message];
+    AGSmsLoginRequest *req = [[AGSmsLoginRequest alloc] init];
+    req.phone = phone;
+    req.code  = code;
+    [[TLWSDKManager shared].api loginBySmsWithSmsLoginRequest:req completionHandler:^(AGResultAuthResponse *output, NSError *error) {
+        if (error) {
+            [self showAlertWithMessage:error.localizedDescription];
+            return;
+        }
+        if (output.code.integerValue != 200) {
+            [self showAlertWithMessage:output.message ?: @"登录失败"];
+            return;
+        }
+        [[TLWSDKManager shared] saveAuthResponse:output.data];
+        [self navigateAfterLogin];
     }];
 }
 
@@ -148,6 +162,41 @@
 
 - (void)dismissKeyboard {
     [self.view endEditing:YES];
+}
+
+#pragma mark - 登录后导航
+
+- (void)navigateAfterLogin {
+    BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
+
+    [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL hasCrops = (output.data.followedCrops.length > 0);
+
+            if (hasElderSetting && hasCrops) {
+                [self goToMain];
+            } else if (hasElderSetting && !hasCrops) {
+                TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
+                prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                [self presentViewController:prefVC animated:YES completion:nil];
+            } else {
+                TLWGuideController *guideVC = [[TLWGuideController alloc] init];
+                guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                [self presentViewController:guideVC animated:YES completion:nil];
+            }
+        });
+    }];
+}
+
+- (void)goToMain {
+    TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
+    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    window.rootViewController = tabBar;
+    [UIView transitionWithView:window
+                      duration:0.35
+                       options:UIViewAnimationOptionTransitionCrossDissolve
+                    animations:nil
+                    completion:nil];
 }
 
 #pragma mark - Helpers

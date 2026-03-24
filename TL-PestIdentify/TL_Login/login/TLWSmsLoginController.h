@@ -1,5 +1,5 @@
 //
-//  TLWLoginController.h
+//  TLWSmsLoginController.h
 //  TL-PestIdentify
 //
 //  Created by 吴桐 on 2026/3/12.
@@ -9,7 +9,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TLWLoginController : UIViewController
+@interface TLWSmsLoginController : UIViewController
 
 @end
 
