@@ -11,6 +11,7 @@
 #import "TLWMainTabBarController.h"
 #import "TLWSDKManager.h"
 #import "TLWGuideController.h"
+#import "TLWPreferenceController.h"
 
 @interface TLWSmsLoginController ()
 
@@ -73,12 +74,9 @@
         [self showAlertWithMessage:@"请输入正确的手机号"];
         return;
     }
-
     self.loginView.sendCodeButton.enabled = NO;
-
     AGSendSmsRequest *req = [[AGSendSmsRequest alloc] init];
     req.phone = phone;
-
     [[TLWSDKManager shared].api sendSmsCodeWithSendSmsRequest:req completionHandler:^(AGResultVoid *output, NSError *error) {
         if (error) {
             self.loginView.sendCodeButton.enabled = YES;
@@ -115,16 +113,13 @@
 - (void)handleLogin {
     NSString *phone = self.loginView.phoneField.text;
     NSString *code  = self.loginView.codeField.text;
-
     if (phone.length == 0 || code.length == 0) {
         [self showAlertWithMessage:@"请输入手机号和验证码"];
         return;
     }
-
     AGSmsLoginRequest *req = [[AGSmsLoginRequest alloc] init];
     req.phone = phone;
     req.code  = code;
-
     [[TLWSDKManager shared].api loginBySmsWithSmsLoginRequest:req completionHandler:^(AGResultAuthResponse *output, NSError *error) {
         if (error) {
             [self showAlertWithMessage:error.localizedDescription];
@@ -135,9 +130,7 @@
             return;
         }
         [[TLWSDKManager shared] saveAuthResponse:output.data];
-        TLWGuideController *guideVC = [[TLWGuideController alloc] init];
-        guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
-        [self presentViewController:guideVC animated:YES completion:nil];
+        [self navigateAfterLogin];
     }];
 }
 
@@ -169,6 +162,41 @@
 
 - (void)dismissKeyboard {
     [self.view endEditing:YES];
+}
+
+#pragma mark - 登录后导航
+
+- (void)navigateAfterLogin {
+    BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
+
+    [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL hasCrops = (output.data.followedCrops.length > 0);
+
+            if (hasElderSetting && hasCrops) {
+                [self goToMain];
+            } else if (hasElderSetting && !hasCrops) {
+                TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
+                prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                [self presentViewController:prefVC animated:YES completion:nil];
+            } else {
+                TLWGuideController *guideVC = [[TLWGuideController alloc] init];
+                guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                [self presentViewController:guideVC animated:YES completion:nil];
+            }
+        });
+    }];
+}
+
+- (void)goToMain {
+    TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
+    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    window.rootViewController = tabBar;
+    [UIView transitionWithView:window
+                      duration:0.35
+                       options:UIViewAnimationOptionTransitionCrossDissolve
+                    animations:nil
+                    completion:nil];
 }
 
 #pragma mark - Helpers

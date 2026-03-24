@@ -36,6 +36,8 @@ static NSString * const kUsernameKey = @"TLW_username";
         _userId   = [ud integerForKey:kUserIdKey];
         _username = [ud stringForKey:kUsernameKey];
 
+
+        //  api服务入口，所有接口都从这里走
         _api = [[AGApiService alloc] init];
     }
     return self;
@@ -49,9 +51,8 @@ static NSString * const kUsernameKey = @"TLW_username";
 
 - (void)saveAuthResponse:(AGAuthResponse *)auth {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-
+    // 设置SDK的token
     [AGDefaultConfiguration sharedConfig].accessToken = auth.token;
-
     [ud setObject:auth.token        forKey:kTokenKey];
     [ud setObject:auth.refreshToken forKey:kRefreshKey];
     [ud setInteger:auth.userId.integerValue forKey:kUserIdKey];

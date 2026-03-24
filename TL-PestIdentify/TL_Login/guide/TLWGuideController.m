@@ -73,6 +73,10 @@ typedef NS_ENUM(NSInteger, TLWGuideOption) {
     BOOL needElderMode = (self.selectedOption == TLWGuideOptionNeed);
     NSLog(@"用户选择适老化模式: %@", needElderMode ? @"是" : @"否");
 
+    // 保存适老化设置到本地
+    [[NSUserDefaults standardUserDefaults] setBool:needElderMode forKey:@"TLW_elder_mode"];
+    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"TLW_elder_mode_set"];
+
     TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
     prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
     [self presentViewController:prefVC animated:YES completion:nil];

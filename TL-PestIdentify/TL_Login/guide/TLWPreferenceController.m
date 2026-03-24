@@ -8,196 +8,12 @@
 #import "TLWPreferenceController.h"
 #import "TLWPreferenceView.h"
 #import "TLWMainTabBarController.h"
+#import "TLWSDKManager.h"
+#import "TLWCropCell.h"
+#import "TLWCustomInputCell.h"
+#import "TLWAddCropCell.h"
+#import "TLWCropSectionHeaderView.h"
 #import <Masonry/Masonry.h>
-
-// ─────────────────────────────────────────────
-#pragma mark - TLWCropCell
-// ─────────────────────────────────────────────
-
-@interface TLWCropCell : UICollectionViewCell
-@property (nonatomic, strong) UILabel *nameLabel;
-@property (nonatomic, strong) CAGradientLayer *selectedGradient;
-@end
-
-@implementation TLWCropCell
-
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (!self) return nil;
-
-    self.layer.cornerRadius = 13;
-    self.clipsToBounds = YES;
-
-    // Normal background — cropRectangle frosted glass image
-    UIImageView *bgView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cropRectangle"]];
-    bgView.contentMode = UIViewContentModeScaleToFill;
-    bgView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    bgView.frame = self.contentView.bounds;
-    [self.contentView addSubview:bgView];
-
-    // Selected: green gradient overlay
-    _selectedGradient = [CAGradientLayer layer];
-    _selectedGradient.colors = @[
-        (__bridge id)[UIColor colorWithRed:0.0 green:1.0 blue:0.588 alpha:1.0].CGColor,
-        (__bridge id)[UIColor colorWithRed:0.0 green:0.812 blue:0.773 alpha:1.0].CGColor,
-    ];
-    _selectedGradient.startPoint = CGPointMake(0.05, 0.1);
-    _selectedGradient.endPoint   = CGPointMake(1.0,  0.9);
-    _selectedGradient.cornerRadius = 13;
-    _selectedGradient.hidden = YES;
-    [self.contentView.layer addSublayer:_selectedGradient];
-
-    // Name label
-    _nameLabel = [[UILabel alloc] init];
-    _nameLabel.font          = [UIFont systemFontOfSize:20];
-    _nameLabel.textColor     = [UIColor colorWithRed:0.176 green:0.176 blue:0.176 alpha:1.0];
-    _nameLabel.textAlignment = NSTextAlignmentCenter;
-    [self.contentView addSubview:_nameLabel];
-    _nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [NSLayoutConstraint activateConstraints:@[
-        [_nameLabel.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
-        [_nameLabel.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
-    ]];
-
-    return self;
-}
-
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    _selectedGradient.frame = self.contentView.bounds;
-}
-
-- (void)setSelected:(BOOL)selected {
-    [super setSelected:selected];
-    _selectedGradient.hidden = !selected;
-    _nameLabel.textColor = selected
-        ? UIColor.whiteColor
-        : [UIColor colorWithRed:0.176 green:0.176 blue:0.176 alpha:1.0];
-    _nameLabel.font = selected
-        ? [UIFont systemFontOfSize:20 weight:UIFontWeightBold]
-        : [UIFont systemFontOfSize:20];
-}
-
-@end
-
-// ─────────────────────────────────────────────
-#pragma mark - TLWCustomInputCell
-// ─────────────────────────────────────────────
-
-@interface TLWCustomInputCell : UICollectionViewCell
-@property (nonatomic, strong) UITextField *textField;
-@end
-
-@implementation TLWCustomInputCell
-
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (!self) return nil;
-
-    self.layer.cornerRadius = 13;
-    self.clipsToBounds = YES;
-
-    UIImageView *bgView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cropRectangle"]];
-    bgView.contentMode = UIViewContentModeScaleToFill;
-    bgView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    bgView.frame = self.contentView.bounds;
-    [self.contentView addSubview:bgView];
-
-    _textField = [[UITextField alloc] init];
-    _textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入" attributes:@{
-        NSForegroundColorAttributeName: [UIColor colorWithRed:0.569 green:0.569 blue:0.569 alpha:1.0],
-        NSFontAttributeName:            [UIFont systemFontOfSize:20],
-    }];
-    _textField.textColor     = [UIColor colorWithRed:0.176 green:0.176 blue:0.176 alpha:1.0];
-    _textField.font          = [UIFont systemFontOfSize:20];
-    _textField.textAlignment = NSTextAlignmentCenter;
-    _textField.borderStyle   = UITextBorderStyleNone;
-    _textField.backgroundColor = UIColor.clearColor;
-    _textField.returnKeyType = UIReturnKeyDone;
-    [self.contentView addSubview:_textField];
-    _textField.translatesAutoresizingMaskIntoConstraints = NO;
-    [NSLayoutConstraint activateConstraints:@[
-        [_textField.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
-        [_textField.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
-        [_textField.leftAnchor  constraintEqualToAnchor:self.contentView.leftAnchor  constant:8],
-        [_textField.rightAnchor constraintEqualToAnchor:self.contentView.rightAnchor constant:-8],
-    ]];
-
-    return self;
-}
-
-@end
-
-// ─────────────────────────────────────────────
-#pragma mark - TLWAddCropCell  ("+" button)
-// ─────────────────────────────────────────────
-
-@interface TLWAddCropCell : UICollectionViewCell
-@end
-
-@implementation TLWAddCropCell
-
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (!self) return nil;
-
-    self.layer.cornerRadius = 13;
-    self.clipsToBounds = YES;
-
-    UIImageView *bgView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cropRectangle"]];
-    bgView.contentMode = UIViewContentModeScaleToFill;
-    bgView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    bgView.frame = self.contentView.bounds;
-    [self.contentView addSubview:bgView];
-
-    UIImageView *addIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconAdd"]];
-    addIcon.contentMode = UIViewContentModeScaleAspectFit;
-    [self.contentView addSubview:addIcon];
-    addIcon.translatesAutoresizingMaskIntoConstraints = NO;
-    [NSLayoutConstraint activateConstraints:@[
-        [addIcon.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
-        [addIcon.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
-        [addIcon.widthAnchor  constraintEqualToConstant:28],
-        [addIcon.heightAnchor constraintEqualToConstant:28],
-    ]];
-
-    return self;
-}
-
-@end
-
-// ─────────────────────────────────────────────
-#pragma mark - TLWCropSectionHeaderView
-// ─────────────────────────────────────────────
-
-@interface TLWCropSectionHeaderView : UICollectionReusableView
-@property (nonatomic, strong) UILabel *titleLabel;
-@end
-
-@implementation TLWCropSectionHeaderView
-
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (!self) return nil;
-
-    _titleLabel = [[UILabel alloc] init];
-    _titleLabel.font      = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
-    _titleLabel.textColor = [UIColor colorWithRed:0.176 green:0.176 blue:0.176 alpha:0.8];
-    [self addSubview:_titleLabel];
-    _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [NSLayoutConstraint activateConstraints:@[
-        [_titleLabel.leftAnchor constraintEqualToAnchor:self.leftAnchor constant:0],
-        [_titleLabel.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-4],
-    ]];
-
-    return self;
-}
-
-@end
-
-// ─────────────────────────────────────────────
-#pragma mark - TLWPreferenceController
-// ─────────────────────────────────────────────
 
 static NSString * const kCropCellID   = @"CropCell";
 static NSString * const kInputCellID  = @"InputCell";
@@ -442,8 +258,25 @@ referenceSizeForHeaderInSection:(NSInteger)section {
 
 - (void)handleConfirm {
     NSLog(@"用户选择的农作物: %@", _selectedPlantNames);
+
+    // 上传偏好到后端
+    NSString *crops = [[_selectedPlantNames allObjects] componentsJoinedByString:@","];
+    AGProfileUpdateRequest *req = [[AGProfileUpdateRequest alloc] init];
+    req.followedCrops = crops;
+
+    [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+        if (error) {
+            NSLog(@"偏好保存失败: %@", error.localizedDescription);
+        }
+        // 无论成功失败都进主页
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self navigateToMain];
+        });
+    }];
+}
+
+- (void)navigateToMain {
     TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
-    tabBar.modalPresentationStyle = UIModalPresentationFullScreen;
     UIWindow *window = self.view.window;
     window.rootViewController = tabBar;
     [UIView transitionWithView:window

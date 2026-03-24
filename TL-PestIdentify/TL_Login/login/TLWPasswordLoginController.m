@@ -10,6 +10,7 @@
 #import "TLWSDKManager.h"
 #import "TLWSmsLoginController.h"
 #import "TLWGuideController.h"
+#import "TLWPreferenceController.h"
 
 @interface TLWPasswordLoginController ()
 
@@ -75,29 +76,24 @@
 - (void)handleLogin {
     NSString *account  = self.passwordLoginView.accountField.text;
     NSString *password = self.passwordLoginView.passwordField.text;
-
     if (account.length == 0 || password.length == 0) {
         [self showAlertWithMessage:@"请输入账号和密码"];
         return;
     }
-
     AGLoginRequest *req = [[AGLoginRequest alloc] init];
     req.usernameOrPhone = account;
     req.password = password;
-
     [[TLWSDKManager shared].api loginWithLoginRequest:req completionHandler:^(AGResultAuthResponse *output, NSError *error) {
         if (error) {
             [self showAlertWithMessage:error.localizedDescription];
             return;
         }
         if (output.code.integerValue != 200) {
-            [self showAlertWithMessage:output.message ?: @"登录失败"];
+            [self showAlertWithMessage: output.message ?: @"登录失败"];
             return;
         }
         [[TLWSDKManager shared] saveAuthResponse:output.data];
-        TLWGuideController *guideVC = [[TLWGuideController alloc] init];
-        guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
-        [self presentViewController:guideVC animated:YES completion:nil];
+        [self navigateAfterLogin];
     }];
 }
 
@@ -138,6 +134,45 @@
 
 - (void)dismissKeyboard {
     [self.view endEditing:YES];
+}
+
+#pragma mark - 登录后导航
+
+- (void)navigateAfterLogin {
+    BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
+
+    // 请求用户资料，检查是否已设置偏好
+    [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL hasCrops = (output.data.followedCrops.length > 0);
+
+            if (hasElderSetting && hasCrops) {
+                // 都设置过 → 直接进主页
+                [self goToMain];
+            } else if (hasElderSetting && !hasCrops) {
+                // 有适老化，缺偏好 → 跳到偏好页
+                TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
+                prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                [self presentViewController:prefVC animated:YES completion:nil];
+            } else {
+                // 缺适老化 → 走完整流程
+                TLWGuideController *guideVC = [[TLWGuideController alloc] init];
+                guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                [self presentViewController:guideVC animated:YES completion:nil];
+            }
+        });
+    }];
+}
+
+- (void)goToMain {
+    TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
+    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    window.rootViewController = tabBar;
+    [UIView transitionWithView:window
+                      duration:0.35
+                       options:UIViewAnimationOptionTransitionCrossDissolve
+                    animations:nil
+                    completion:nil];
 }
 
 #pragma mark - Helpers
