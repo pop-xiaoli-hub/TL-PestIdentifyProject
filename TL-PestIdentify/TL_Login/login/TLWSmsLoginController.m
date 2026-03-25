@@ -169,22 +169,20 @@
 - (void)navigateAfterLogin {
     BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
 
-    [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            BOOL hasCrops = (output.data.followedCrops.count > 0);
+    [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+        BOOL hasCrops = (profile.followedCrops.count > 0);
 
-            if (hasElderSetting && hasCrops) {
-                [self goToMain];
-            } else if (hasElderSetting && !hasCrops) {
-                TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
-                prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
-                [self presentViewController:prefVC animated:YES completion:nil];
-            } else {
-                TLWGuideController *guideVC = [[TLWGuideController alloc] init];
-                guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
-                [self presentViewController:guideVC animated:YES completion:nil];
-            }
-        });
+        if (hasElderSetting && hasCrops) {
+            [self goToMain];
+        } else if (hasElderSetting && !hasCrops) {
+            TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
+            prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self presentViewController:prefVC animated:YES completion:nil];
+        } else {
+            TLWGuideController *guideVC = [[TLWGuideController alloc] init];
+            guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self presentViewController:guideVC animated:YES completion:nil];
+        }
     }];
 }
 

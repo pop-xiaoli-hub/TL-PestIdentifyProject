@@ -18,6 +18,7 @@
 #import <SDWebImage/SDWebImage.h>
 
 extern NSString * const TLWAvatarDidUpdateNotification;
+extern NSString * const TLWProfileDidUpdateNotification;
 
 @interface TLWHomePageController () <UITableViewDelegate, UITableViewDataSource>
 
@@ -33,7 +34,11 @@ extern NSString * const TLWAvatarDidUpdateNotification;
   [super viewDidLoad];
   [self tl_setHomePageBackView];
   [self tl_setupHomePageView];
-  [self fetchUserProfile];
+  [self applyProfile];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(onProfileUpdated)
+                                               name:TLWProfileDidUpdateNotification
+                                             object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(onAvatarUpdated:)
                                                name:TLWAvatarDidUpdateNotification
@@ -44,16 +49,17 @@ extern NSString * const TLWAvatarDidUpdateNotification;
   [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (void)fetchUserProfile {
-  [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-      NSString *name = output.data.fullName ?: output.data.username ?: [TLWSDKManager shared].username;
-      [self.homePageView configureWithUserName:name];
-      if (output.data.avatarUrl.length > 0) {
-        [self.homePageView.userAvatarImageView sd_setImageWithURL:[NSURL URLWithString:output.data.avatarUrl]];
-      }
-    });
-  }];
+- (void)onProfileUpdated {
+  [self applyProfile];
+}
+
+- (void)applyProfile {
+  AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
+  NSString *name = profile.fullName ?: profile.username ?: [TLWSDKManager shared].username;
+  [self.homePageView configureWithUserName:name];
+  if (profile.avatarUrl.length > 0) {
+    [self.homePageView.userAvatarImageView sd_setImageWithURL:[NSURL URLWithString:profile.avatarUrl]];
+  }
 }
 
 - (void)onAvatarUpdated:(NSNotification *)noti {

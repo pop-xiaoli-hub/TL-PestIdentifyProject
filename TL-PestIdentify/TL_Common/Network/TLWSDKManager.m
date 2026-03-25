@@ -5,10 +5,16 @@
 
 #import "TLWSDKManager.h"
 
+NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotification";
+
 static NSString * const kTokenKey    = @"TLW_access_token";
 static NSString * const kRefreshKey  = @"TLW_refresh_token";
 static NSString * const kUserIdKey   = @"TLW_user_id";
 static NSString * const kUsernameKey = @"TLW_username";
+
+@interface TLWSDKManager ()
+@property (nonatomic, strong, readwrite) AGUserProfileDto *cachedProfile;
+@end
 
 @implementation TLWSDKManager
 
@@ -35,8 +41,6 @@ static NSString * const kUsernameKey = @"TLW_username";
         }
         _userId   = [ud integerForKey:kUserIdKey];
         _username = [ud stringForKey:kUsernameKey];
-
-
         //  api服务入口，所有接口都从这里走
         _api = [[AGApiService alloc] init];
     }
@@ -66,6 +70,18 @@ static NSString * const kUsernameKey = @"TLW_username";
     return [[NSUserDefaults standardUserDefaults] stringForKey:kRefreshKey];
 }
 
+- (void)fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion {
+    [_api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+        if (!error && output.code.integerValue == 200) {
+            self.cachedProfile = output.data;
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[NSNotificationCenter defaultCenter] postNotificationName:TLWProfileDidUpdateNotification object:nil];
+            if (completion) completion(self.cachedProfile);
+        });
+    }];
+}
+
 - (void)logout {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     [AGDefaultConfiguration sharedConfig].accessToken = nil;
@@ -77,6 +93,7 @@ static NSString * const kUsernameKey = @"TLW_username";
 
     _userId   = 0;
     _username = nil;
+    _cachedProfile = nil;
 }
 
 @end

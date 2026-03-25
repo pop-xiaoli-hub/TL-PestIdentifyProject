@@ -13,6 +13,7 @@
 #import <SDWebImage/SDWebImage.h>
 
 NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotification";
+extern NSString * const TLWProfileDidUpdateNotification;
 
 @interface TLWEditProfileController () <TLWEditNicknameDelegate, TLWAvatarCropDelegate>
 @property (nonatomic, strong) TLWEditProfileView *myView;
@@ -29,6 +30,35 @@ NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotificati
         make.edges.equalTo(self.view);
     }];
     [self setupActions];
+    [self loadAvatar];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onProfileUpdated)
+                                                 name:TLWProfileDidUpdateNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onAvatarUpdated:)
+                                                 name:TLWAvatarDidUpdateNotification
+                                               object:nil];
+}
+
+- (void)loadAvatar {
+    AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
+    if (profile.avatarUrl.length > 0) {
+        [_myView.avatarImageView sd_setImageWithURL:[NSURL URLWithString:profile.avatarUrl]];
+    }
+}
+
+- (void)onAvatarUpdated:(NSNotification *)noti {
+    UIImage *avatar = noti.userInfo[@"avatar"];
+    if (avatar) _myView.avatarImageView.image = avatar;
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)onProfileUpdated {
+    [self applyProfile];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -36,7 +66,7 @@ NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotificati
     [self.navigationController setNavigationBarHidden:YES animated:animated];
     self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
     self.navigationController.interactivePopGestureRecognizer.delegate = nil;
-    [self fetchUserProfile];
+    [self applyProfile];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -46,23 +76,13 @@ NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotificati
 
 #pragma mark - Setup
 
-- (void)fetchUserProfile {
-    [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (error || output.code.integerValue != 200) {
-                NSLog(@"获取用户资料失败: %@", error.localizedDescription ?: output.message);
-                return;
-            }
-            AGUserProfileDto *profile = output.data;
-            self->_nickname = profile.fullName ?: profile.username ?: @"";
-            self->_myView.nicknameValueLabel.text = self->_nickname.length > 0 ? self->_nickname : @"未设置";
-            self->_myView.phoneValueLabel.text    = profile.phone ?: @"未绑定";
-            self->_myView.cropValueLabel.text     = profile.followedCrops.count > 0 ? [profile.followedCrops componentsJoinedByString:@"、"] : @"未设置";
-            if (profile.avatarUrl.length > 0) {
-                [self->_myView.avatarImageView sd_setImageWithURL:[NSURL URLWithString:profile.avatarUrl]];
-            }
-        });
-    }];
+- (void)applyProfile {
+    AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
+    if (!profile) return;
+    _nickname = profile.fullName ?: profile.username ?: @"";
+    _myView.nicknameValueLabel.text = _nickname.length > 0 ? _nickname : @"未设置";
+    _myView.phoneValueLabel.text    = profile.phone ?: @"未绑定";
+    _myView.cropValueLabel.text     = profile.followedCrops.count > 0 ? [profile.followedCrops componentsJoinedByString:@"、"] : @"未设置";
 }
 
 - (void)setupActions {
@@ -92,12 +112,10 @@ NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotificati
 #pragma mark - TLWAvatarCropDelegate
 
 - (void)avatarCropController:(TLWAvatarCropController *)vc didConfirmImage:(UIImage *)image {
-    // 立刻更新所有页面的头像，让用户感觉是即时的
-    _myView.avatarImageView.image = image;
-    [[NSNotificationCenter defaultCenter]
-        postNotificationName:TLWAvatarDidUpdateNotification
-                      object:nil
-                    userInfo:@{@"avatar": image}];
+    // 乐观更新：立刻通知所有页面用本地图片刷新头像
+    [[NSNotificationCenter defaultCenter] postNotificationName:TLWAvatarDidUpdateNotification
+                                                        object:nil
+                                                      userInfo:@{@"avatar": image}];
     [self.navigationController popToViewController:self animated:YES];
 
     // 后台静默上传，失败才提示
@@ -112,12 +130,19 @@ NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotificati
             dispatch_async(dispatch_get_main_queue(), ^{ [self showToast:@"头像同步失败，请重试"]; });
             return;
         }
+        // 上传成功，直接改缓存 + 发通知
         AGProfileUpdateRequest *req = [[AGProfileUpdateRequest alloc] init];
         req.avatarUrl = output.data;
         [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *res, NSError *err) {
-            if (err || res.code.integerValue != 200) {
-                dispatch_async(dispatch_get_main_queue(), ^{ [self showToast:@"头像同步失败，请重试"]; });
-            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (err || res.code.integerValue != 200) {
+                    [self showToast:@"头像同步失败，请重试"];
+                } else {
+                    // 静默更新缓存，不发通知，避免闪烁
+                    [TLWSDKManager shared].cachedProfile.avatarUrl = output.data;
+                    [self showToast:@"修改成功"];
+                }
+            });
         }];
     }];
 }

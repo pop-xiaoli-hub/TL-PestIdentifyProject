@@ -8,6 +8,8 @@
 #import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 
+extern NSString * const TLWProfileDidUpdateNotification;
+
 @interface TLWEditNicknameController ()
 @property (nonatomic, strong) TLWEditNicknameView *myView;
 @property (nonatomic, copy)   NSString            *currentNickname;
@@ -18,7 +20,7 @@
 - (instancetype)initWithCurrentNickname:(NSString *)nickname {
     self = [super init];
     if (self) {
-        _currentNickname          = nickname;
+        _currentNickname = nickname;
         self.hidesBottomBarWhenPushed = YES;
     }
     return self;
@@ -71,6 +73,9 @@
                 NSLog(@"修改昵称失败: %@", error.localizedDescription ?: output.message);
                 return;
             }
+            // 直接改缓存，立刻通知所有页面
+            [TLWSDKManager shared].cachedProfile.fullName = newName;
+            [[NSNotificationCenter defaultCenter] postNotificationName:TLWProfileDidUpdateNotification object:nil];
             [self.delegate editNicknameController:self didSaveNickname:newName];
             [self.navigationController popViewControllerAnimated:YES];
         });
