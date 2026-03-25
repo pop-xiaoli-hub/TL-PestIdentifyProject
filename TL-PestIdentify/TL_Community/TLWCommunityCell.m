@@ -5,6 +5,7 @@
 
 #import "TLWCommunityCell.h"
 #import "TLWCommunityPost.h"
+#import <SDWebImage/UIImageView+WebCache.h>
 #import <Masonry/Masonry.h>
 
 @interface TLWCommunityCell ()
@@ -21,12 +22,12 @@
 @implementation TLWCommunityCell
 
 - (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (self) {
-      [self setUpCellBackView];
-      [self setupSubviews];
-    }
-    return self;
+  self = [super initWithFrame:frame];
+  if (self) {
+    [self setUpCellBackView];
+    [self setupSubviews];
+  }
+  return self;
 }
 
 - (void)setUpCellBackView {
@@ -48,110 +49,123 @@
     make.edges.equalTo(self.contentView);
   }];
   [glassLayer mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.edges.equalTo(contentView);
+    make.edges.equalTo(contentView);
   }];
 }
 
 - (void)prepareForReuse {
-    [super prepareForReuse];
-    self.photoView.image = nil;
-    self.titleLabel.text = nil;
-    self.userLabel.text = nil;
-    self.likeLabel.text = nil;
+  [super prepareForReuse];
+  self.photoView.image = nil;
+  self.titleLabel.text = nil;
+  self.userLabel.text = nil;
+  self.likeLabel.text = nil;
 }
 
 - (void)setupSubviews {
-    // 让内容视图透明一些，突出毛玻璃与背景的对比
-    self.backgroundColor = [UIColor clearColor];
-    self.contentView.backgroundColor = [UIColor clearColor];
-    self.contentView.layer.cornerRadius = 14.0;
-    self.contentView.layer.masksToBounds = YES;
+  // 让内容视图透明一些，突出毛玻璃与背景的对比
+  self.backgroundColor = [UIColor clearColor];
+  self.contentView.backgroundColor = [UIColor clearColor];
+  self.contentView.layer.cornerRadius = 14.0;
+  self.contentView.layer.masksToBounds = YES;
 
-    // 给 cell 增加轻微阴影，让玻璃板从背景中“浮”起来
-    self.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.35].CGColor;
-    self.layer.shadowOpacity = 1.0;
-    self.layer.shadowOffset = CGSizeMake(0, 8);
-    self.layer.shadowRadius = 12.0;
-    self.layer.masksToBounds = NO;
+  // 给 cell 增加轻微阴影，让玻璃板从背景中“浮”起来
+  self.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.35].CGColor;
+  self.layer.shadowOpacity = 1.0;
+  self.layer.shadowOffset = CGSizeMake(0, 8);
+  self.layer.shadowRadius = 12.0;
+  self.layer.masksToBounds = NO;
 
-    self.photoView = [[UIImageView alloc] init];
-    self.photoView.contentMode = UIViewContentModeScaleAspectFill;
-    self.photoView.clipsToBounds = YES;
+  self.photoView = [[UIImageView alloc] init];
+  self.photoView.contentMode = UIViewContentModeScaleAspectFill;
+  self.photoView.clipsToBounds = YES;
 
-    self.titleLabel = [[UILabel alloc] init];
-    self.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
-    self.titleLabel.textColor = [UIColor blackColor];
-    self.titleLabel.numberOfLines = 2;
+  self.titleLabel = [[UILabel alloc] init];
+  self.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+  self.titleLabel.textColor = [UIColor blackColor];
+  self.titleLabel.numberOfLines = 2;
 
-    self.avatarView = [[UIImageView alloc] init];
-    self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
-    self.avatarView.clipsToBounds = YES;
-    self.avatarView.layer.cornerRadius = 10.0;
-    self.avatarView.image = [UIImage imageNamed:@"hp_avator.png"];
+  self.avatarView = [[UIImageView alloc] init];
+  self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+  self.avatarView.clipsToBounds = YES;
+  self.avatarView.layer.cornerRadius = 10.0;
+  self.avatarView.image = [UIImage imageNamed:@"hp_avator.png"];
 
-    self.userLabel = [[UILabel alloc] init];
-    self.userLabel.font = [UIFont systemFontOfSize:11];
-    self.userLabel.textColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+  self.userLabel = [[UILabel alloc] init];
+  self.userLabel.font = [UIFont systemFontOfSize:11];
+  self.userLabel.textColor = [UIColor colorWithWhite:0.2 alpha:1.0];
 
-    self.likeIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cm_like"]];
-    self.likeIconView.contentMode = UIViewContentModeScaleAspectFit;
+  self.likeIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cm_like"]];
+  self.likeIconView.contentMode = UIViewContentModeScaleAspectFit;
 
-    self.likeLabel = [[UILabel alloc] init];
-    self.likeLabel.font = [UIFont systemFontOfSize:11];
-    self.likeLabel.textColor = [UIColor colorWithWhite:0.4 alpha:1.0];
+  self.likeLabel = [[UILabel alloc] init];
+  self.likeLabel.font = [UIFont systemFontOfSize:11];
+  self.likeLabel.textColor = [UIColor colorWithWhite:0.4 alpha:1.0];
 
-    [self.contentView addSubview:self.photoView];
-    [self.contentView addSubview:self.titleLabel];
-    [self.contentView addSubview:self.avatarView];
-    [self.contentView addSubview:self.userLabel];
-    [self.contentView addSubview:self.likeIconView];
-    [self.contentView addSubview:self.likeLabel];
+  [self.contentView addSubview:self.photoView];
+  [self.contentView addSubview:self.titleLabel];
+  [self.contentView addSubview:self.avatarView];
+  [self.contentView addSubview:self.userLabel];
+  [self.contentView addSubview:self.likeIconView];
+  [self.contentView addSubview:self.likeLabel];
 
-    [self.photoView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.left.right.equalTo(self.contentView);
-        //make.height.greaterThanOrEqualTo(@80);
-      make.height.equalTo(self.contentView.mas_height).multipliedBy(0.7);
-    }];
+  [self.photoView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.left.right.equalTo(self.contentView);
+    //make.height.greaterThanOrEqualTo(@80);
+    make.height.equalTo(self.contentView.mas_height).multipliedBy(0.7);
+  }];
 
-    [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.photoView.mas_bottom).offset(6);
-        make.left.equalTo(self.contentView).offset(8);
-        make.right.equalTo(self.contentView).offset(-8);
-    }];
+  [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.photoView.mas_bottom).offset(6);
+    make.left.equalTo(self.contentView).offset(8);
+    make.right.equalTo(self.contentView).offset(-8);
+  }];
 
-    [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.contentView).offset(8);
-        make.bottom.equalTo(self.contentView).offset(-6);
-        make.width.height.mas_equalTo(20);
-    }];
+  [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.contentView).offset(8);
+    make.bottom.equalTo(self.contentView).offset(-6);
+    make.width.height.mas_equalTo(20);
+  }];
 
-    [self.userLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.avatarView.mas_right).offset(6);
-        make.centerY.equalTo(self.avatarView);
-    }];
+  [self.userLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.avatarView.mas_right).offset(6);
+    make.centerY.equalTo(self.avatarView);
+  }];
 
-    [self.likeIconView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.equalTo(self.contentView).offset(-8);
-        make.centerY.equalTo(self.avatarView);
-        make.width.height.mas_equalTo(14);
-    }];
+  [self.likeIconView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(self.contentView).offset(-8);
+    make.centerY.equalTo(self.avatarView);
+    make.width.height.mas_equalTo(14);
+  }];
 
-    [self.likeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.equalTo(self.likeIconView.mas_left).offset(-4);
-        make.centerY.equalTo(self.avatarView);
-    }];
+  [self.likeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(self.likeIconView.mas_left).offset(-4);
+    make.centerY.equalTo(self.avatarView);
+  }];
 }
 
 - (void)configureWithPost:(TLWCommunityPost *)post {
-    if (post.imageName.length > 0) {
-        self.photoView.image = [UIImage imageNamed:post.imageName];
+  id first = (post.images.count > 0) ? post.images.firstObject : nil;
+  if (!first || first == [NSNull null]) {
+    self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
+  } else if ([first isKindOfClass:[UIImage class]]) {
+    UIImage *img = (UIImage *)first;
+    self.photoView.image = img ?: [UIImage imageNamed:@"cm_placeholder"];
+  } else if ([first isKindOfClass:[NSString class]]) {
+    NSString *urlStr = (NSString *)first;
+    if (urlStr.length == 0) {
+      self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
     } else {
-        self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
+      NSURL *url = [NSURL URLWithString:urlStr];
+      // 仅加载展示，不参与瀑布流高度计算
+      [self.photoView sd_setImageWithURL:url placeholderImage:[UIImage imageNamed:@"cm_placeholder"]];
     }
+  } else {
+    self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
+  }
 
-    self.titleLabel.text = post.title;
-    self.userLabel.text = post.userName;
-    self.likeLabel.text = [NSString stringWithFormat:@"%ld", (long)post.likeCount];
+  self.titleLabel.text = post.title.length > 0 ? post.title : post.content;
+  self.userLabel.text = post.authorName;
+  self.likeLabel.text = [NSString stringWithFormat:@"%ld", (long)post.likeCount];
 }
 
 @end
