@@ -13,7 +13,11 @@
 #import "TLWRecordController.h"
 #import "TLWAIAssistantController.h"
 #import "TLWWarningModel.h"
+#import "TLWSDKManager.h"
 #import <Masonry.h>
+#import <SDWebImage/SDWebImage.h>
+
+extern NSString * const TLWAvatarDidUpdateNotification;
 
 @interface TLWHomePageController () <UITableViewDelegate, UITableViewDataSource>
 
@@ -24,10 +28,37 @@
 
 @implementation TLWHomePageController
 
+
 - (void)viewDidLoad {
   [super viewDidLoad];
   [self tl_setHomePageBackView];
   [self tl_setupHomePageView];
+  [self fetchUserProfile];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(onAvatarUpdated:)
+                                               name:TLWAvatarDidUpdateNotification
+                                             object:nil];
+}
+
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)fetchUserProfile {
+  [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      NSString *name = output.data.fullName ?: output.data.username ?: [TLWSDKManager shared].username;
+      [self.homePageView configureWithUserName:name];
+      if (output.data.avatarUrl.length > 0) {
+        [self.homePageView.userAvatarImageView sd_setImageWithURL:[NSURL URLWithString:output.data.avatarUrl]];
+      }
+    });
+  }];
+}
+
+- (void)onAvatarUpdated:(NSNotification *)noti {
+  UIImage *avatar = noti.userInfo[@"avatar"];
+  if (avatar) self.homePageView.userAvatarImageView.image = avatar;
 }
 
 - (void)tl_setHomePageBackView {

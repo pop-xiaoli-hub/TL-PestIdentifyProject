@@ -114,6 +114,8 @@
 - (void)tl_setUserAvatorImageView {
   UIImageView* imageView = self.userAvatarImageView;
   imageView.image = [[UIImage imageNamed:@"hp_avator.png"]imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  imageView.layer.cornerRadius = 35;
+  imageView.clipsToBounds = YES;
   [self.headerContainer addSubview:imageView];
   [imageView mas_makeConstraints:^(MASConstraintMaker *make) {
       make.right.equalTo(self.headerContainer).offset(-20);
@@ -139,7 +141,6 @@
 
 - (void)tl_setUserNameLabel {
   UILabel* label = self.userNameLabel;
-  label.text = @"小飞飞";
   label.backgroundColor = [UIColor clearColor];
   label.textColor = [UIColor whiteColor];
   label.font = [UIFont systemFontOfSize:37 weight:UIFontWeightHeavy];
@@ -150,6 +151,10 @@
       make.height.mas_equalTo(40);
       make.top.equalTo(self.helloLabel);
   }];
+}
+
+- (void)configureWithUserName:(NSString* )name {
+  self.userNameLabel.text = [name copy];
 }
 
 - (void)tl_setHelloLabel {

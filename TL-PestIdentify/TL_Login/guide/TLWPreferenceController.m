@@ -258,11 +258,9 @@ referenceSizeForHeaderInSection:(NSInteger)section {
 
 - (void)handleConfirm {
     NSLog(@"用户选择的农作物: %@", _selectedPlantNames);
-
     // 上传偏好到后端
-    NSString *crops = [[_selectedPlantNames allObjects] componentsJoinedByString:@","];
     AGProfileUpdateRequest *req = [[AGProfileUpdateRequest alloc] init];
-    req.followedCrops = crops;
+    req.followedCrops = [_selectedPlantNames allObjects];
 
     [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *output, NSError *error) {
         if (error) {

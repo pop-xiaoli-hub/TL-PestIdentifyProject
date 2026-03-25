@@ -5,6 +5,8 @@
 
 #import "TLWSettingViewController.h"
 #import "TLWSettingView.h"
+#import "TLWSDKManager.h"
+#import "TLWSmsLoginController.h"
 #import <Masonry/Masonry.h>
 
 @interface TLWSettingViewController ()
@@ -63,10 +65,15 @@
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-        // TODO: 清除登录态（删除 NSUserDefaults 中的 token、userId 等），跳转登录页
-        //   [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"token"];
-        //   UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
-        //   window.rootViewController = [[TLWSmsLoginController alloc] init];
+        [[TLWSDKManager shared] logout];
+        UIWindow *window = self.view.window;
+        TLWSmsLoginController *loginVC = [[TLWSmsLoginController alloc] init];
+        window.rootViewController = loginVC;
+        [UIView transitionWithView:window
+                          duration:0.35
+                           options:UIViewAnimationOptionTransitionCrossDissolve
+                        animations:nil
+                        completion:nil];
     }]];
     [self presentViewController:alert animated:YES completion:nil];
 }

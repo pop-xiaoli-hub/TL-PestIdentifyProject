@@ -140,12 +140,10 @@
 
 - (void)navigateAfterLogin {
     BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
-
     // 请求用户资料，检查是否已设置偏好
     [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
-          BOOL hasCrops = (output.data.followedCrops.count > 0);
-
+            BOOL hasCrops = (output.data.followedCrops.count > 0);
             if (hasElderSetting && hasCrops) {
                 // 都设置过 → 直接进主页
                 [self goToMain];
