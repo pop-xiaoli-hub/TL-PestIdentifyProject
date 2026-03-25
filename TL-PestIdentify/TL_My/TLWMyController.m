@@ -7,7 +7,9 @@
 #import "TLWMyView.h"
 #import "TLWEditProfileController.h"
 #import "TLWSettingViewController.h"
+#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 
 extern NSString * const TLWAvatarDidUpdateNotification;
 
@@ -25,7 +27,6 @@ extern NSString * const TLWAvatarDidUpdateNotification;
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
-    [self setupMockData];
     [self setupActions];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(onAvatarUpdated:)
@@ -33,14 +34,36 @@ extern NSString * const TLWAvatarDidUpdateNotification;
                                                object:nil];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self fetchUserProfile];
+}
+
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (void)setupMockData {
-    _myView.userNameLabel.text   = @"用户2759";
-    _myView.favCountLabel.text   = @"8";
-    _myView.recordCountLabel.text = @"16";
+- (void)fetchUserProfile {
+    [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error || output.code.integerValue != 200) {
+                NSLog(@"获取用户资料失败: %@", error.localizedDescription ?: output.message);
+                return;
+            }
+            AGUserProfileDto *profile = output.data;
+            NSString *displayName = profile.fullName ?: profile.username ?: @"未设置昵称";
+            self->_myView.userNameLabel.text = displayName;
+            self->_myView.postNameLabel.text = displayName;
+            if (profile.avatarUrl.length > 0) {
+                NSURL *avatarURL = [NSURL URLWithString:profile.avatarUrl];
+                [self->_myView.avatarImageView sd_setImageWithURL:avatarURL];
+                [self->_myView.postAvatarImageView sd_setImageWithURL:avatarURL];
+            }
+            // 收藏数、记录数后端暂无接口，先保留默认值
+            self->_myView.favCountLabel.text    = @"0";
+            self->_myView.recordCountLabel.text = @"0";
+        });
+    }];
 }
 
 - (void)setupActions {
@@ -70,7 +93,10 @@ extern NSString * const TLWAvatarDidUpdateNotification;
 
 - (void)onAvatarUpdated:(NSNotification *)noti {
     UIImage *avatar = noti.userInfo[@"avatar"];
-    if (avatar) _myView.avatarImageView.image = avatar;
+    if (avatar) {
+        _myView.avatarImageView.image = avatar;
+        _myView.postAvatarImageView.image = avatar;
+    }
 }
 
 @end
