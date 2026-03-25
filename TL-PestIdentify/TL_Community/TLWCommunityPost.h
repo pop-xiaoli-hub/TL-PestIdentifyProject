@@ -11,15 +11,22 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWCommunityPost : NSObject
-
-/// 帖子主图（本地占位图名称或映射的网络 URL 标识）
-@property (nonatomic, copy) NSString *imageName;
+@property(nonatomic) NSNumber* _id;
+@property(nonatomic) NSString* content;
+@property(nonatomic) NSArray* images;
+/* 标签列表 [optional]
+ */
+@property(nonatomic) NSArray<NSString*>* tags;
+/* 作者用户名 [optional]
+  */
+ @property(nonatomic) NSString* authorName;
+ /* 作者头像 [optional]
+  */
+ @property(nonatomic) NSString* authorAvatar;
 /// 文本标题，如“菜心被蚜虫像蜂窝煤”
 @property (nonatomic, copy) NSString *title;
-/// 用户昵称
-@property (nonatomic, copy) NSString *userName;
 /// 点赞数量
-@property (nonatomic, assign) NSInteger likeCount;
+@property (nonatomic, assign) NSNumber* likeCount;
 /// 图片纵横比（高度 / 宽度），用于计算瀑布流高度
 @property (nonatomic, assign) CGFloat imageAspectRatio;
 
@@ -36,8 +43,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// }]
 + (instancetype)postWithDictionary:(NSDictionary *)dict;
 
-/// 当前页面的本地 Mock 数据，接口接入前先用本地数据驱动 UI
-+ (NSArray<TLWCommunityPost *> *)mockPosts;
 
 @end
 

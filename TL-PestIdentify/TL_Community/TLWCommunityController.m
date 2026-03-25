@@ -17,7 +17,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 @interface TLWCommunityController () <UICollectionViewDataSource, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate >
 
 @property (nonatomic, strong) TLWCommunityView *myView;
-@property (nonatomic, strong) NSArray<TLWCommunityPost *> *posts;
+@property (nonatomic, strong) NSMutableArray *posts;
 
 @end
 
@@ -44,7 +44,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   [self.myView bringSubviewToFront:self.myView.publishButton];
   self.myView.searchTextField.delegate = self;
   [self.myView.voiceButton addTarget:self action:@selector(tl_voiceButtonTapped) forControlEvents:UIControlEventTouchUpInside];
-  [self tl_fetchCommunityFeed];
+  self.posts = [NSMutableArray array];
 }
 
 
@@ -82,7 +82,8 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 /// }]
 - (void)tl_fetchCommunityFeed {
   // 接口未接入前，先用本地 Mock 数据驱动 UI
-  self.posts = [TLWCommunityPost mockPosts];
+ // self.posts = [TLWCommunityPost mockPosts];
+  self.posts = [NSMutableArray array];
   [self.myView.collectionView reloadData];
 }
 
@@ -95,6 +96,15 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
   TLWCommunityCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:kCommunityCellID forIndexPath:indexPath];
   TLWCommunityPost *post = self.posts[indexPath.item];
+  // 本地发布帖子的高度不要再依赖真实宽高比计算，统一使用固定比例
+//  if (post.imageAspectRatio <= 0.0) {
+//    post.imageAspectRatio = 0.65;
+//  }
+  if (indexPath.row == 0) {
+    post.imageAspectRatio = 0.60;
+  } else {
+    post.imageAspectRatio = 0.75;
+  }
   [cell configureWithPost:post];
   return cell;
 }
@@ -124,6 +134,20 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 - (void)tl_publishButtonTapped {
   TLWPublishController *vc = [[TLWPublishController alloc] init];
   vc.modalPresentationStyle = UIModalPresentationFullScreen;
+  __weak typeof(self) weakSelf = self;
+  // 本地发布直接把 TLWCommunityPost 存入瀑布流数据源
+  vc.clickPublish = ^(TLWCommunityPost * _Nonnull post) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    // 本地发布帖子的高度固定，不做真实宽高比计算
+    if (post.imageAspectRatio <= 0.0) {
+      post.imageAspectRatio = 0.65;
+    }
+    [strongSelf.posts addObject:post];
+    [strongSelf.myView.collectionView reloadData];
+  };
   [self presentViewController:vc animated:YES completion:nil];
 }
 

@@ -9,8 +9,8 @@
 #import <Masonry/Masonry.h>
 #import <PhotosUI/PhotosUI.h>
 #import <AgriPestClient/AgriPestClient.h>
-#import "TLWPostModel.h"
-
+#import "TLWCommunityPost.h"
+#import "TLWSDKManager.h"
 @interface TLWPublishController ()<UIGestureRecognizerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, PHPickerViewControllerDelegate>
 
 @property (nonatomic, strong) TLWPublishView *myView;
@@ -308,14 +308,26 @@
   });
 }
 
+#pragma mark-点击发布
 /// 确认发布按钮
 /// TODO: 收集作物类型、文字内容、图片数组等信息，执行发布接口；根据结果提示成功 / 失败
 - (void)tl_confirmPublishTapped {
   
-  TLWPostModel* model = [[TLWPostModel alloc] init];
+  TLWCommunityPost* model = [[TLWCommunityPost alloc] init];
+  TLWSDKManager* manager = [TLWSDKManager shared];
   model.content = [self.myView.contentTextView.text copy];
   model.images = [NSArray arrayWithArray:self.selectedImages];
-//  model.authorId = AGApiService 
+  // 本地发布不做真实宽高比计算，统一固定瀑布流比例，避免高度跳动/过长
+  model.authorName = [manager.username copy];
+  if (self.clickPublish) {
+    self.clickPublish(model);
+    NSLog(@"本地发布成功");
+  }
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:@"发布成功" preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+    [self dismissViewControllerAnimated:YES completion:nil];
+  }]];
+  [self presentViewController:alert animated:YES completion:nil];
 }
 
 

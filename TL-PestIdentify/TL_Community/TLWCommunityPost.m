@@ -24,10 +24,9 @@
 
 + (instancetype)postWithDictionary:(NSDictionary *)dict {
     TLWCommunityPost *post = [[TLWCommunityPost alloc] init];
-    post.imageName = dict[@"imageUrl"] ?: @"";
     post.title = dict[@"title"] ?: @"";
-    post.userName = dict[@"userName"] ?: @"";
-    post.likeCount = [dict[@"likeCount"] integerValue];
+    post.authorName = dict[@"userName"] ?: @"";
+    post.likeCount = @(0);
 
     NSNumber *ratioNumber = dict[@"imageAspectRatio"];
     if (ratioNumber) {
@@ -42,43 +41,7 @@
     return post;
 }
 
-+ (NSArray<TLWCommunityPost *> *)mockPosts {
-    NSMutableArray<TLWCommunityPost *> *array = [NSMutableArray array];
 
-    NSArray *titles = @[
-        @"菜心被蚜虫像蜂窝煤",
-        @"叶片出现小黄点是不是病害？",
-        @"番茄叶片卷曲发黄怎么办",
-        @"柑橘叶片黑斑疑似炭疽病",
-        @"辣椒叶子发黑干枯求助",
-        @"白菜叶子被咬得千疮百孔"
-    ];
-
-    NSArray *users = @[
-        @"王建军",
-        @"用户2759",
-        @"用户0867",
-        @"用户498",
-        @"用户0798",
-        @"用户1203"
-    ];
-
-    NSArray<NSNumber *> *likes = @[@23, @16, @42, @89, @56, @35];
-    NSArray<NSNumber *> *ratios = @[@0.8, @1.2, @0.95, @1.3, @0.9, @1.05];
-  //NSArray<NSNumber *> *ratios = @[@0.8, @0.8, @0.8, @0.8, @0.8, @0.8];
-
-    for (NSInteger i = 0; i < titles.count; i++) {
-        TLWCommunityPost *post = [[TLWCommunityPost alloc] init];
-        post.imageName = @"hp_eg1.jpg"; // 占位图，后续可换成网络图片
-        post.title = titles[i];
-        post.userName = users[i];
-        post.likeCount = likes[i].integerValue;
-        post.imageAspectRatio = ratios[i].floatValue;
-        [array addObject:post];
-    }
-
-    return array.copy;
-}
 
 @end
 
