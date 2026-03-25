@@ -140,25 +140,20 @@
 
 - (void)navigateAfterLogin {
     BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
-    // 请求用户资料，检查是否已设置偏好
-    [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            BOOL hasCrops = (output.data.followedCrops.count > 0);
-            if (hasElderSetting && hasCrops) {
-                // 都设置过 → 直接进主页
-                [self goToMain];
-            } else if (hasElderSetting && !hasCrops) {
-                // 有适老化，缺偏好 → 跳到偏好页
-                TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
-                prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
-                [self presentViewController:prefVC animated:YES completion:nil];
-            } else {
-                // 缺适老化 → 走完整流程
-                TLWGuideController *guideVC = [[TLWGuideController alloc] init];
-                guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
-                [self presentViewController:guideVC animated:YES completion:nil];
-            }
-        });
+    // 请求用户资料并缓存，检查是否已设置偏好
+    [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+        BOOL hasCrops = (profile.followedCrops.count > 0);
+        if (hasElderSetting && hasCrops) {
+            [self goToMain];
+        } else if (hasElderSetting && !hasCrops) {
+            TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
+            prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self presentViewController:prefVC animated:YES completion:nil];
+        } else {
+            TLWGuideController *guideVC = [[TLWGuideController alloc] init];
+            guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self presentViewController:guideVC animated:YES completion:nil];
+        }
     }];
 }
 
