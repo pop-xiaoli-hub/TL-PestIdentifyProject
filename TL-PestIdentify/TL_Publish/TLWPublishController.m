@@ -310,24 +310,88 @@
 
 #pragma mark-点击发布
 /// 确认发布按钮
-/// TODO: 收集作物类型、文字内容、图片数组等信息，执行发布接口；根据结果提示成功 / 失败
 - (void)tl_confirmPublishTapped {
-  
-  TLWCommunityPost* model = [[TLWCommunityPost alloc] init];
-  TLWSDKManager* manager = [TLWSDKManager shared];
-  model.content = [self.myView.contentTextView.text copy];
-  model.images = [NSArray arrayWithArray:self.selectedImages];
-  // 本地发布不做真实宽高比计算，统一固定瀑布流比例，避免高度跳动/过长
-  model.authorName = [manager.username copy];
-  if (self.clickPublish) {
-    self.clickPublish(model);
-    NSLog(@"本地发布成功");
+  NSString *content = [self.myView.contentTextView.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  // 校验：内容和图片至少有一项
+  if (content.length == 0 && self.selectedImages.count == 0) {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示" message:@"请输入内容或添加图片" preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+    return;
   }
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:@"发布成功" preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-    [self dismissViewControllerAnimated:YES completion:nil];
-  }]];
-  [self presentViewController:alert animated:YES completion:nil];
+
+  NSLog(@"[Publish] ====== 开始发布 ======");
+  NSLog(@"[Publish] 内容长度: %lu, 图片数量: %lu, 作物标签: %@",
+        (unsigned long)content.length,
+        (unsigned long)self.selectedImages.count,
+        self.selectedCrops);
+
+  // 显示 loading
+  [self.myView tl_createBlurLoadingView];
+
+  __weak typeof(self) weakSelf = self;
+  TLWSDKManager *manager = [TLWSDKManager shared];
+
+  // Step 1: 上传图片（无图片则直接跳到 Step 2）
+  NSLog(@"[Publish] Step1: 开始上传 %lu 张图片...", (unsigned long)self.selectedImages.count);
+  [manager uploadImages:self.selectedImages prefix:@"post" completion:^(NSArray<NSString *> *urls, NSError *error) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+
+    if (error) {
+      NSLog(@"[Publish] Step1 失败: %@", error.localizedDescription);
+      [strongSelf.myView tl_dismissBlurLoadingView];
+      UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"上传图片失败" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+      [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+      [strongSelf presentViewController:alert animated:YES completion:nil];
+      return;
+    }
+
+    // Step 2: 构建帖子请求，调用创建接口
+    AGPostCreateRequest *request = [[AGPostCreateRequest alloc] init];
+    request.title = content.length > 20 ? [content substringToIndex:20] : content;
+    request.content = content;
+    request.images = urls ?: @[];
+    request.tags = [strongSelf.selectedCrops copy] ?: @[];
+
+    NSLog(@"[Publish] Step1 完成，URLs: %@", urls);
+    NSLog(@"[Publish] Step2: 创建帖子 title=%@, images=%lu, tags=%@",
+          request.title, (unsigned long)request.images.count, request.tags);
+    [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *createError) {
+      NSLog(@"[Publish] Step2 结果 code=%@, msg=%@, error=%@", output.code, output.message, createError);
+      dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf2 = weakSelf;
+        if (!strongSelf2) return;
+
+        [strongSelf2.myView tl_dismissBlurLoadingView];
+
+        if (createError || !output || output.code.integerValue != 200) {
+          NSString *msg = createError.localizedDescription ?: output.message ?: @"发布失败，请重试";
+          UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"发布失败" message:msg preferredStyle:UIAlertControllerStyleAlert];
+          [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+          [strongSelf2 presentViewController:alert animated:YES completion:nil];
+          return;
+        }
+
+        NSLog(@"[Publish] ====== 发布成功 ======");
+        // 发布成功，回调给社区页面刷新列表
+        if (strongSelf2.clickPublish) {
+          TLWCommunityPost *model = [[TLWCommunityPost alloc] init];
+          model.content = content;
+          model.images = urls ?: @[];
+          model.tags = [strongSelf2.selectedCrops copy];
+          model.authorName = [manager.username copy];
+          strongSelf2.clickPublish(model);
+        }
+
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:@"发布成功" preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+          [strongSelf2 dismissViewControllerAnimated:YES completion:nil];
+        }]];
+        [strongSelf2 presentViewController:alert animated:YES completion:nil];
+      });
+    }];
+  }];
 }
 
 
