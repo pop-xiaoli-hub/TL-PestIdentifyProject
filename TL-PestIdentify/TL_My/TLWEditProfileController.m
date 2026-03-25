@@ -8,7 +8,9 @@
 #import "TLWEditNicknameController.h"
 #import "TLWAvatarCropController.h"
 #import "TLWPhotoPickerController.h"
+#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 
 NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotification";
 
@@ -26,7 +28,6 @@ NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotificati
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
-    [self setupMockData];
     [self setupActions];
 }
 
@@ -35,6 +36,7 @@ NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotificati
     [self.navigationController setNavigationBarHidden:YES animated:animated];
     self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
     self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+    [self fetchUserProfile];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -44,13 +46,23 @@ NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotificati
 
 #pragma mark - Setup
 
-- (void)setupMockData {
-    // TODO: 替换为真实接口 GET /user/profile
-    _nickname = @"王建军";
-    _myView.nicknameValueLabel.text = _nickname;
-    _myView.phoneValueLabel.text    = @"18888888888";
-    _myView.cropValueLabel.text     = @"水稻";
-    _myView.avatarImageView.image   = [UIImage imageNamed:@"avatar"];
+- (void)fetchUserProfile {
+    [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error || output.code.integerValue != 200) {
+                NSLog(@"获取用户资料失败: %@", error.localizedDescription ?: output.message);
+                return;
+            }
+            AGUserProfileDto *profile = output.data;
+            self->_nickname = profile.fullName ?: profile.username ?: @"";
+            self->_myView.nicknameValueLabel.text = self->_nickname.length > 0 ? self->_nickname : @"未设置";
+            self->_myView.phoneValueLabel.text    = profile.phone ?: @"未绑定";
+            self->_myView.cropValueLabel.text     = profile.followedCrops.count > 0 ? [profile.followedCrops componentsJoinedByString:@"、"] : @"未设置";
+            if (profile.avatarUrl.length > 0) {
+                [self->_myView.avatarImageView sd_setImageWithURL:[NSURL URLWithString:profile.avatarUrl]];
+            }
+        });
+    }];
 }
 
 - (void)setupActions {
@@ -80,14 +92,34 @@ NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotificati
 #pragma mark - TLWAvatarCropDelegate
 
 - (void)avatarCropController:(TLWAvatarCropController *)vc didConfirmImage:(UIImage *)image {
+    // 立刻更新所有页面的头像，让用户感觉是即时的
     _myView.avatarImageView.image = image;
     [[NSNotificationCenter defaultCenter]
         postNotificationName:TLWAvatarDidUpdateNotification
                       object:nil
                     userInfo:@{@"avatar": image}];
-    [self showToast:@"头像已更新"];
-    // 同时把 Picker 和 Crop 两个页面都弹出，回到编辑资料页
     [self.navigationController popToViewController:self animated:YES];
+
+    // 后台静默上传，失败才提示
+    NSData *imageData = UIImageJPEGRepresentation(image, 0.8);
+    NSString *tmpPath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"avatar_upload.jpg"];
+    [imageData writeToFile:tmpPath atomically:YES];
+    NSURL *fileURL = [NSURL fileURLWithPath:tmpPath];
+
+    [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:^(AGResultString *output, NSError *error) {
+        if (error || output.code.integerValue != 200) {
+            NSLog(@"头像上传失败: %@", error.localizedDescription ?: output.message);
+            dispatch_async(dispatch_get_main_queue(), ^{ [self showToast:@"头像同步失败，请重试"]; });
+            return;
+        }
+        AGProfileUpdateRequest *req = [[AGProfileUpdateRequest alloc] init];
+        req.avatarUrl = output.data;
+        [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *res, NSError *err) {
+            if (err || res.code.integerValue != 200) {
+                dispatch_async(dispatch_get_main_queue(), ^{ [self showToast:@"头像同步失败，请重试"]; });
+            }
+        }];
+    }];
 }
 
 - (void)onNicknameTap {

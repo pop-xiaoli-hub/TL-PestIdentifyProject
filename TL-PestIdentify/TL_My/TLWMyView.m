@@ -15,6 +15,8 @@
 @property (nonatomic, strong, readwrite) UIButton    *editProfileButton;
 @property (nonatomic, strong, readwrite) UIButton    *settingButton;
 @property (nonatomic, strong, readwrite) UIButton    *shareButton;
+@property (nonatomic, strong, readwrite) UIImageView *postAvatarImageView;
+@property (nonatomic, strong, readwrite) UILabel     *_postNameLabelLabel;
 
 @end
 
@@ -219,24 +221,23 @@
 - (UIView *)buildPostItem {
     UIView *item = [UIView new];
 
-    UIImageView *userAvatar = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
-    userAvatar.contentMode      = UIViewContentModeScaleAspectFill;
-    userAvatar.clipsToBounds    = YES;
-    userAvatar.layer.cornerRadius = 20;
-    [item addSubview:userAvatar];
-    [userAvatar mas_makeConstraints:^(MASConstraintMaker *make) {
+    _postAvatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
+    _postAvatarImageView.contentMode      = UIViewContentModeScaleAspectFill;
+    _postAvatarImageView.clipsToBounds    = YES;
+    _postAvatarImageView.layer.cornerRadius = 20;
+    [item addSubview:_postAvatarImageView];
+    [_postAvatarImageView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.left.equalTo(item);
         make.width.height.mas_equalTo(40);
     }];
 
-    UILabel *postName = [UILabel new];
-    postName.text      = @"用户2759";
-    postName.font      = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    postName.textColor = [UIColor colorWithRed:0.13 green:0.13 blue:0.13 alpha:1.0];
-    [item addSubview:postName];
-    [postName mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(userAvatar).offset(2);
-        make.left.equalTo(userAvatar.mas_right).offset(10);
+    _postNameLabel = [UILabel new];
+    _postNameLabel.font      = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    _postNameLabel.textColor = [UIColor colorWithRed:0.13 green:0.13 blue:0.13 alpha:1.0];
+    [item addSubview:_postNameLabel];
+    [_postNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_postAvatarImageView).offset(2);
+        make.left.equalTo(_postAvatarImageView.mas_right).offset(10);
     }];
 
     UILabel *cropLabel = [UILabel new];
@@ -245,8 +246,8 @@
     cropLabel.textColor = [UIColor colorWithRed:0.60 green:0.60 blue:0.60 alpha:1.0];
     [item addSubview:cropLabel];
     [cropLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(postName.mas_bottom).offset(2);
-        make.left.equalTo(postName);
+        make.top.equalTo(_postNameLabel.mas_bottom).offset(2);
+        make.left.equalTo(_postNameLabel);
     }];
 
     UIImageView *img1 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
@@ -255,7 +256,7 @@
     img1.layer.cornerRadius = 8;
     [item addSubview:img1];
     [img1 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(userAvatar.mas_bottom).offset(14);
+        make.top.equalTo(_postAvatarImageView.mas_bottom).offset(14);
         make.left.equalTo(item);
         make.right.equalTo(item.mas_centerX).offset(-4);
         make.height.mas_equalTo(148);

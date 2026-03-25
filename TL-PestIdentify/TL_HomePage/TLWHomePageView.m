@@ -114,6 +114,8 @@
 - (void)tl_setUserAvatorImageView {
   UIImageView* imageView = self.userAvatarImageView;
   imageView.image = [[UIImage imageNamed:@"hp_avator.png"]imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  imageView.layer.cornerRadius = 35;
+  imageView.clipsToBounds = YES;
   [self.headerContainer addSubview:imageView];
   [imageView mas_makeConstraints:^(MASConstraintMaker *make) {
       make.right.equalTo(self.headerContainer).offset(-20);

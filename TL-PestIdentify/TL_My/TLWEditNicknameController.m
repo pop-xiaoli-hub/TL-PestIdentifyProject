@@ -5,6 +5,7 @@
 
 #import "TLWEditNicknameController.h"
 #import "TLWEditNicknameView.h"
+#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 
 @interface TLWEditNicknameController ()
@@ -62,9 +63,18 @@
                          NSCharacterSet.whitespaceCharacterSet];
     if (newName.length == 0) return;
 
-    // TODO: 调用 POST /user/nickname 更新昵称，成功后回调
-    [self.delegate editNicknameController:self didSaveNickname:newName];
-    [self.navigationController popViewControllerAnimated:YES];
+    AGProfileUpdateRequest *req = [[AGProfileUpdateRequest alloc] init];
+    req.fullName = newName;
+    [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error || output.code.integerValue != 200) {
+                NSLog(@"修改昵称失败: %@", error.localizedDescription ?: output.message);
+                return;
+            }
+            [self.delegate editNicknameController:self didSaveNickname:newName];
+            [self.navigationController popViewControllerAnimated:YES];
+        });
+    }];
 }
 
 @end

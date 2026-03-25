@@ -16,6 +16,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIButton    *editProfileButton;
 @property (nonatomic, strong, readonly) UIButton    *settingButton;
 @property (nonatomic, strong, readonly) UIButton    *shareButton;
+@property (nonatomic, strong, readonly) UIImageView *postAvatarImageView;
+@property (nonatomic, strong, readonly) UILabel     *postNameLabel;
 
 @end
 
