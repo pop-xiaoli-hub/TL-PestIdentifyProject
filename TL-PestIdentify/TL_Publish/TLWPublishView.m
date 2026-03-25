@@ -282,5 +282,50 @@ static CGFloat const kCardCornerRadius = 14.0;
   });
 }
 
+- (void)tl_createBlurLoadingView {
+  // 1. 毛玻璃效果
+  UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterial];
+  UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+  blurView.frame = self.bounds;
+
+  // 2. 半透明遮罩（让层次更明显）
+  UIView *dimView = [[UIView alloc] initWithFrame:blurView.bounds];
+  dimView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.2];
+  [blurView.contentView addSubview:dimView];
+
+  // 3. 中间容器（圆角卡片）
+  UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 120, 120)];
+  container.center = blurView.center;
+  container.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.6];
+  container.layer.cornerRadius = 16;
+  container.clipsToBounds = YES;
+
+  // 4. loading
+  UIActivityIndicatorView *indicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
+  indicator.center = CGPointMake(container.bounds.size.width/2, container.bounds.size.height/2 - 10);
+  indicator.color = [UIColor whiteColor];
+  [indicator startAnimating];
+
+  // 5. 文字（可选）
+  UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(0, container.bounds.size.height - 40, container.bounds.size.width, 20)];
+  label.text = @"Loading...";
+  label.textColor = [UIColor whiteColor];
+  label.font = [UIFont systemFontOfSize:14];
+  label.textAlignment = NSTextAlignmentCenter;
+
+  // 6. 组装
+  [container addSubview:indicator];
+  [container addSubview:label];
+  [blurView.contentView addSubview:container];
+  blurView.userInteractionEnabled = YES;
+  self.loadingView = blurView;
+  self.loadingView.tag = 999;
+  [self addSubview:self.loadingView];
+}
+
+- (void)tl_dismissBlurLoadingView {
+  [self.loadingView removeFromSuperview];
+}
+
 @end
 

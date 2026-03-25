@@ -171,7 +171,7 @@
 
     [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            BOOL hasCrops = (output.data.followedCrops.length > 0);
+          BOOL hasCrops = (output.data.followedCrops.count > 0);
 
             if (hasElderSetting && hasCrops) {
                 [self goToMain];
