@@ -5,11 +5,13 @@
 
 #import "TLWPublishController.h"
 #import "TLWPublishView.h"
-#import "TLWImagePickerController.h"
 #import "TLWCropPickerController.h"
 #import <Masonry/Masonry.h>
+#import <PhotosUI/PhotosUI.h>
+#import <AgriPestClient/AgriPestClient.h>
+#import "TLWPostModel.h"
 
-@interface TLWPublishController ()<UIGestureRecognizerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
+@interface TLWPublishController ()<UIGestureRecognizerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, PHPickerViewControllerDelegate>
 
 @property (nonatomic, strong) TLWPublishView *myView;
 @property (nonatomic, strong, nullable) id draftObject;
@@ -236,30 +238,95 @@
 }
 
 - (void)tl_addImageTapped {
-  // 仿照 TLWPreferenceController，新开中间选择页，暂时只透传/回传图片数组
-  TLWImagePickerController *vc = [[TLWImagePickerController alloc] init];
-  vc.initialImages = self.selectedImages;
-  __weak typeof(self) weakSelf = self;
-  vc.completionHandler = ^(NSArray *selectedImages) {
-    __strong typeof(weakSelf) strongSelf = weakSelf;
-    if (!strongSelf) return;
-    [strongSelf.selectedImages removeAllObjects];
-    for (id obj in selectedImages) {
-      if ([obj isKindOfClass:[UIImage class]]) {
-        [strongSelf.selectedImages addObject:obj];
-      }
+  NSInteger remainCount = MAX(0, 8 - self.selectedImages.count);
+  if (remainCount <= 0) {
+    return;
+  }
+
+  if (@available(iOS 14.0, *)) {
+    PHPickerConfiguration *configuration = [[PHPickerConfiguration alloc] init];
+    configuration.selectionLimit = remainCount;
+    configuration.filter = [PHPickerFilter imagesFilter];
+    PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:configuration];
+    picker.delegate = self;
+    picker.modalPresentationStyle = UIModalPresentationFullScreen;
+    [self presentViewController:picker animated:YES completion:nil];
+    return;
+  }
+
+  if (![UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypePhotoLibrary]) {
+    return;
+  }
+  UIImagePickerController *picker = [[UIImagePickerController alloc] init];
+  picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+  picker.delegate = self;
+  picker.modalPresentationStyle = UIModalPresentationFullScreen;
+  [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results API_AVAILABLE(ios(14.0)) {
+  [picker dismissViewControllerAnimated:YES completion:nil];
+  if (results.count == 0) {
+    return;
+  }
+
+  NSInteger remainCount = MAX(0, 8 - self.selectedImages.count);
+  if (remainCount <= 0) {
+    return;
+  }
+
+  dispatch_group_t group = dispatch_group_create();
+  NSMutableArray<UIImage *> *newImages = [NSMutableArray array];
+
+  for (PHPickerResult *result in results) {
+    if (newImages.count >= remainCount) {
+      break;
     }
-    [strongSelf.myView.imagesCollectionView reloadData];
-  };
-  vc.modalPresentationStyle = UIModalPresentationFullScreen;
-  [self presentViewController:vc animated:YES completion:nil];
+    NSItemProvider *provider = result.itemProvider;
+    if (![provider canLoadObjectOfClass:[UIImage class]]) {
+      continue;
+    }
+    dispatch_group_enter(group);
+    [provider loadObjectOfClass:[UIImage class] completionHandler:^(id<NSItemProviderReading> _Nullable object, NSError * _Nullable error) {
+      if (!error && [object isKindOfClass:[UIImage class]]) {
+        @synchronized (newImages) {
+          if (newImages.count < remainCount) {
+            [newImages addObject:(UIImage *)object];
+          }
+        }
+      }
+      dispatch_group_leave(group);
+    }];
+  }
+
+  dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+    if (newImages.count == 0) {
+      return;
+    }
+    [self.selectedImages addObjectsFromArray:newImages];
+    [self.myView.imagesCollectionView reloadData];
+  });
 }
 
 /// 确认发布按钮
 /// TODO: 收集作物类型、文字内容、图片数组等信息，执行发布接口；根据结果提示成功 / 失败
 - (void)tl_confirmPublishTapped {
-  // 预留方法体，待后续接入业务逻辑
+  
+  TLWPostModel* model = [[TLWPostModel alloc] init];
+  model.content = [self.myView.contentTextView.text copy];
+  model.images = [NSArray arrayWithArray:self.selectedImages];
+//  model.authorId = AGApiService 
 }
+
+
+
+
 
 @end
 
+/*
+
+ -(NSURLSessionTask*) uploadFilesWithFiles: (NSArray<NSURL*>*) files
+     prefix: (NSString*) prefix
+     completionHandler: (void (^)(AGResultListString* output, NSError* error)) handler;
+ */
