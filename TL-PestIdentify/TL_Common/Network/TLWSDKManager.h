@@ -4,6 +4,7 @@
 //
 
 #import <Foundation/Foundation.h>
+#import <UIKit/UIImage.h>
 
 // SDK 头文件统一引入
 #import <AgriPestClient/AGApiService.h>
@@ -56,6 +57,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 获取本地保存的 refreshToken
 - (nullable NSString *)refreshToken;
+
+/// 上传多张图片，返回服务器 URL 数组
+- (nullable NSURLSessionTask *)uploadImages:(NSArray<UIImage *> *)images
+                                     prefix:(NSString *)prefix
+                                 completion:(void(^)(NSArray<NSString *> * _Nullable urls, NSError * _Nullable error))completion;
 
 @end
 

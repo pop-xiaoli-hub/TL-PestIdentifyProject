@@ -5,6 +5,9 @@
 
 #import "TLWSDKManager.h"
 #import <UIKit/UIKit.h>
+
+NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotification";
+
 static NSString * const kTokenKey    = @"TLW_access_token";
 static NSString * const kRefreshKey  = @"TLW_refresh_token";
 static NSString * const kUserIdKey   = @"TLW_user_id";
@@ -129,7 +132,7 @@ static NSString * const kUsernameKey = @"TLW_username";
       return nil;
     }
   }
-  //调用接口上传图片本地图片，拿到远端url
+  //调用 SDK 接口上传图片，拿到远端 url
   return [[TLWSDKManager shared].api uploadFilesWithFiles:fileURLS prefix:prefix completionHandler:^(AGResultListString *output, NSError *error) {
     dispatch_async(dispatch_get_main_queue(), ^{
       //删除临时文件
@@ -137,6 +140,7 @@ static NSString * const kUsernameKey = @"TLW_username";
         [[NSFileManager defaultManager] removeItemAtPath:temp error:nil];
       }
       if (error) {
+        NSLog(@"[Upload] 上传失败: %@", error.localizedDescription);
         if (completion) {
           completion(nil, error);
           return;
