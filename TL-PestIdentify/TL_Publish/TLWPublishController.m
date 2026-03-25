@@ -320,6 +320,12 @@
     return;
   }
 
+  NSLog(@"[Publish] ====== 开始发布 ======");
+  NSLog(@"[Publish] 内容长度: %lu, 图片数量: %lu, 作物标签: %@",
+        (unsigned long)content.length,
+        (unsigned long)self.selectedImages.count,
+        self.selectedCrops);
+
   // 显示 loading
   [self.myView tl_createBlurLoadingView];
 
@@ -327,11 +333,13 @@
   TLWSDKManager *manager = [TLWSDKManager shared];
 
   // Step 1: 上传图片（无图片则直接跳到 Step 2）
+  NSLog(@"[Publish] Step1: 开始上传 %lu 张图片...", (unsigned long)self.selectedImages.count);
   [manager uploadImages:self.selectedImages prefix:@"post" completion:^(NSArray<NSString *> *urls, NSError *error) {
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf) return;
 
     if (error) {
+      NSLog(@"[Publish] Step1 失败: %@", error.localizedDescription);
       [strongSelf.myView tl_dismissBlurLoadingView];
       UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"上传图片失败" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
       [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
@@ -346,9 +354,11 @@
     request.images = urls ?: @[];
     request.tags = [strongSelf.selectedCrops copy] ?: @[];
 
-    NSLog(@"[Publish] 上传图片完成，URLs: %@", urls);
+    NSLog(@"[Publish] Step1 完成，URLs: %@", urls);
+    NSLog(@"[Publish] Step2: 创建帖子 title=%@, images=%lu, tags=%@",
+          request.title, (unsigned long)request.images.count, request.tags);
     [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *createError) {
-      NSLog(@"[Publish] 创建帖子结果 code=%@, msg=%@, error=%@", output.code, output.message, createError);
+      NSLog(@"[Publish] Step2 结果 code=%@, msg=%@, error=%@", output.code, output.message, createError);
       dispatch_async(dispatch_get_main_queue(), ^{
         __strong typeof(weakSelf) strongSelf2 = weakSelf;
         if (!strongSelf2) return;
@@ -363,6 +373,7 @@
           return;
         }
 
+        NSLog(@"[Publish] ====== 发布成功 ======");
         // 发布成功，回调给社区页面刷新列表
         if (strongSelf2.clickPublish) {
           TLWCommunityPost *model = [[TLWCommunityPost alloc] init];
