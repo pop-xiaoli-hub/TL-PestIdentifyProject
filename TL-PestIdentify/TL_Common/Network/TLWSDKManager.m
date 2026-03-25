@@ -10,6 +10,10 @@ static NSString * const kRefreshKey  = @"TLW_refresh_token";
 static NSString * const kUserIdKey   = @"TLW_user_id";
 static NSString * const kUsernameKey = @"TLW_username";
 
+@interface TLWSDKManager ()
+@property (nonatomic, strong, readwrite) AGUserProfileDto *cachedProfile;
+@end
+
 @implementation TLWSDKManager
 
 + (instancetype)shared {
@@ -22,25 +26,23 @@ static NSString * const kUsernameKey = @"TLW_username";
 }
 
 - (instancetype)init {
-  self = [super init];
-  if (self) {
-    // 配置 SDK
-    AGDefaultConfiguration *config = [AGDefaultConfiguration sharedConfig];
-    config.host = @"http://115.191.67.35:8080";
-    // 从本地恢复登录态
-    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    NSString *token = [ud stringForKey:kTokenKey];
-    if (token.length > 0) {
-      config.accessToken = token;
+    self = [super init];
+    if (self) {
+        // 配置 SDK
+        AGDefaultConfiguration *config = [AGDefaultConfiguration sharedConfig];
+        config.host = @"http://115.191.67.35:8080";
+        // 从本地恢复登录态
+        NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+        NSString *token = [ud stringForKey:kTokenKey];
+        if (token.length > 0) {
+            config.accessToken = token;
+        }
+        _userId   = [ud integerForKey:kUserIdKey];
+        _username = [ud stringForKey:kUsernameKey];
+        //  api服务入口，所有接口都从这里走
+        _api = [[AGApiService alloc] init];
     }
-    _userId   = [ud integerForKey:kUserIdKey];
-    _username = [ud stringForKey:kUsernameKey];
-
-
-    //  api服务入口，所有接口都从这里走
-    _api = [[AGApiService alloc] init];
-  }
-  return self;
+    return self;
 }
 
 #pragma mark - Public
@@ -64,6 +66,18 @@ static NSString * const kUsernameKey = @"TLW_username";
 
 - (nullable NSString *)refreshToken {
   return [[NSUserDefaults standardUserDefaults] stringForKey:kRefreshKey];
+}
+
+- (void)fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion {
+    [_api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+        if (!error && output.code.integerValue == 200) {
+            self.cachedProfile = output.data;
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[NSNotificationCenter defaultCenter] postNotificationName:TLWProfileDidUpdateNotification object:nil];
+            if (completion) completion(self.cachedProfile);
+        });
+    }];
 }
 
 - (void)logout {

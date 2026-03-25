@@ -23,12 +23,14 @@
 #import <AgriPestClient/AGResultString.h>
 #import <AgriPestClient/AGResultListString.h>
 
+/// 用户资料变更通知（改昵称、改头像、改偏好等更新缓存后发出）
+extern NSString * const TLWProfileDidUpdateNotification;
+
 NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWSDKManager : NSObject
 
 + (instancetype)shared;
-
 /// SDK API 服务
 @property (nonatomic, strong, readonly) AGApiService *api;
 
@@ -37,11 +39,17 @@ NS_ASSUME_NONNULL_BEGIN
 /// 当前用户名
 @property (nonatomic, copy, nullable) NSString *username;
 
+/// 缓存的用户资料（登录后拉取一次，修改后刷新）
+@property (nonatomic, strong, nullable, readonly) AGUserProfileDto *cachedProfile;
+
 /// 是否已登录
 - (BOOL)isLoggedIn;
 
 /// 保存登录成功后的认证信息（Token + 用户信息持久化到 NSUserDefaults）
 - (void)saveAuthResponse:(AGAuthResponse *)auth;
+
+/// 拉取用户资料并缓存，完成后发送 TLWProfileDidUpdateNotification
+- (void)fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion;
 
 /// 退出登录，清除所有本地凭证
 - (void)logout;

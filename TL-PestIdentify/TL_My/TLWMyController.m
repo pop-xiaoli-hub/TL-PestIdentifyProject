@@ -12,6 +12,7 @@
 #import <SDWebImage/SDWebImage.h>
 
 extern NSString * const TLWAvatarDidUpdateNotification;
+extern NSString * const TLWProfileDidUpdateNotification;
 
 @interface TLWMyController ()
 
@@ -29,41 +30,37 @@ extern NSString * const TLWAvatarDidUpdateNotification;
     }];
     [self setupActions];
     [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(onProfileUpdated)
+                                                 name:TLWProfileDidUpdateNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(onAvatarUpdated:)
                                                  name:TLWAvatarDidUpdateNotification
                                                object:nil];
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    [self fetchUserProfile];
+    [self applyProfile];
 }
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-- (void)fetchUserProfile {
-    [[TLWSDKManager shared].api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (error || output.code.integerValue != 200) {
-                NSLog(@"获取用户资料失败: %@", error.localizedDescription ?: output.message);
-                return;
-            }
-            AGUserProfileDto *profile = output.data;
-            NSString *displayName = profile.fullName ?: profile.username ?: @"未设置昵称";
-            self->_myView.userNameLabel.text = displayName;
-            self->_myView.postNameLabel.text = displayName;
-            if (profile.avatarUrl.length > 0) {
-                NSURL *avatarURL = [NSURL URLWithString:profile.avatarUrl];
-                [self->_myView.avatarImageView sd_setImageWithURL:avatarURL];
-                [self->_myView.postAvatarImageView sd_setImageWithURL:avatarURL];
-            }
-            // 收藏数、记录数后端暂无接口，先保留默认值
-            self->_myView.favCountLabel.text    = @"0";
-            self->_myView.recordCountLabel.text = @"0";
-        });
-    }];
+- (void)onProfileUpdated {
+    [self applyProfile];
+}
+
+- (void)applyProfile {
+    AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
+    if (!profile) return;
+    NSString *displayName = profile.fullName ?: profile.username ?: @"未设置昵称";
+    _myView.userNameLabel.text = displayName;
+    _myView.postNameLabel.text = displayName;
+    if (profile.avatarUrl.length > 0) {
+        NSURL *avatarURL = [NSURL URLWithString:profile.avatarUrl];
+        [_myView.avatarImageView sd_setImageWithURL:avatarURL];
+        [_myView.postAvatarImageView sd_setImageWithURL:avatarURL];
+    }
+    _myView.favCountLabel.text    = @"0";
+    _myView.recordCountLabel.text = @"0";
 }
 
 - (void)setupActions {

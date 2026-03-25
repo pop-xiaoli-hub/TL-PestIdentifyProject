@@ -266,10 +266,10 @@ referenceSizeForHeaderInSection:(NSInteger)section {
         if (error) {
             NSLog(@"偏好保存失败: %@", error.localizedDescription);
         }
-        // 无论成功失败都进主页
-        dispatch_async(dispatch_get_main_queue(), ^{
+        // 刷新缓存后进主页
+        [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
             [self navigateToMain];
-        });
+        }];
     }];
 }
 
