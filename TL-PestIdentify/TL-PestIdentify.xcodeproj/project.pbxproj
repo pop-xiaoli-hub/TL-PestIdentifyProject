@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1D0DEAFCB336DAF43EC9E6EE /* libPods-TL-PestIdentify.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */; };
+		4C8CF8FD2F74F9AF00EC6570 /* TLWImagePickerManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C8CF8FC2F74F9AF00EC6570 /* TLWImagePickerManager.m */; };
 		4CA894FF2F64577500928BBF /* TLWCameraManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA894FD2F64577500928BBF /* TLWCameraManager.m */; };
 		4CA8A5902F66F9E100928BBF /* TLWMessageView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A58E2F66F9E100928BBF /* TLWMessageView.m */; };
 		4CA8A5912F66F9E100928BBF /* TLWMessageItem.m in Sources */ = {isa = PBXBuildFile; fileRef = 4CA8A58C2F66F9E100928BBF /* TLWMessageItem.m */; };
@@ -44,6 +45,8 @@
 		0DAAA8D62F59C0B800F327DC /* TL-PestIdentify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TL-PestIdentify.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8F12F59C0BB00F327DC /* TL-PestIdentifyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8FB2F59C0BB00F327DC /* TL-PestIdentifyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C8CF8FB2F74F9AF00EC6570 /* TLWImagePickerManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWImagePickerManager.h; sourceTree = "<group>"; };
+		4C8CF8FC2F74F9AF00EC6570 /* TLWImagePickerManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWImagePickerManager.m; sourceTree = "<group>"; };
 		4CA894FC2F64577500928BBF /* TLWCameraManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWCameraManager.h; sourceTree = "<group>"; };
 		4CA894FD2F64577500928BBF /* TLWCameraManager.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWCameraManager.m; sourceTree = "<group>"; };
 		4CA8A5872F66F9E100928BBF /* TLWMessageCell.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWMessageCell.h; sourceTree = "<group>"; };
@@ -230,6 +233,8 @@
 				4CA894FD2F64577500928BBF /* TLWCameraManager.m */,
 				4CA8AAAA2F67B32A00928BBF /* TWLSpeechManager.h */,
 				4CA8AAAB2F67B32A00928BBF /* TWLSpeechManager.m */,
+				4C8CF8FB2F74F9AF00EC6570 /* TLWImagePickerManager.h */,
+				4C8CF8FC2F74F9AF00EC6570 /* TLWImagePickerManager.m */,
 			);
 			path = TL_Common;
 			sourceTree = "<group>";
@@ -482,6 +487,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4CA8AAAC2F67B32A00928BBF /* TWLSpeechManager.m in Sources */,
+				4C8CF8FD2F74F9AF00EC6570 /* TLWImagePickerManager.m in Sources */,
 				4CA8A5902F66F9E100928BBF /* TLWMessageView.m in Sources */,
 				4CA8A5912F66F9E100928BBF /* TLWMessageItem.m in Sources */,
 				4CA8A5B92F66FA3300928BBF /* TLWNotificationCell.m in Sources */,

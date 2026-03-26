@@ -45,8 +45,6 @@ static CGFloat   const kCellGap       = 1.0;
 
 @end
 
-#pragma mark - Controller
-
 @interface TLWPhotoPickerController () <UICollectionViewDataSource, UICollectionViewDelegate>
 
 @property (nonatomic, strong) UICollectionView          *collectionView;
@@ -144,7 +142,7 @@ static CGFloat   const kCellGap       = 1.0;
     _layout.minimumInteritemSpacing = kCellGap;
     _layout.minimumLineSpacing      = kCellGap;
     _layout.sectionInset            = UIEdgeInsetsZero;
-    _layout.itemSize                = CGSizeMake(1, 1); // 占位，viewDidLayoutSubviews 更新
+    _layout.itemSize                = CGSizeMake(1, 1);
 
     _collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero
                                          collectionViewLayout:_layout];
@@ -248,9 +246,13 @@ didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
         if (isDegraded) return;
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            TLWAvatarCropController *cropVC = [[TLWAvatarCropController alloc] initWithImage:result];
-            cropVC.delegate = self.cropDelegate;
-            [self.navigationController pushViewController:cropVC animated:YES];
+            if (self.onSelectImage) {
+                self.onSelectImage(result);
+            } else {
+                TLWAvatarCropController *cropVC = [[TLWAvatarCropController alloc] initWithImage:result];
+                cropVC.delegate = self.cropDelegate;
+                [self.navigationController pushViewController:cropVC animated:YES];
+            }
         });
     }];
 }

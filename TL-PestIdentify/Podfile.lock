@@ -14,7 +14,7 @@ PODS:
   - AFNetworking/Serialization (3.2.1)
   - AFNetworking/UIKit (3.2.1):
     - AFNetworking/NSURLSession
-  - AgriPestClient (1.0.68):
+  - AgriPestClient (1.0.88):
     - AFNetworking (~> 3)
     - ISO8601 (~> 0.6)
     - JSONModel (~> 1.2)
@@ -33,7 +33,7 @@ PODS:
   - YYModel (1.0.4)
 
 DEPENDENCIES:
-  - AgriPestClient (from `https://github.com/lukecc00/AgriPest-IOS-SDK.git`, tag `v1.0.68`)
+  - AgriPestClient (from `https://github.com/Biscoffee/AgriPest-IOS-SDK.git`, branch `main`)
   - LookinServer
   - Masonry
   - SDWebImage (~> 5.0)
@@ -54,17 +54,17 @@ SPEC REPOS:
 
 EXTERNAL SOURCES:
   AgriPestClient:
-    :git: https://github.com/lukecc00/AgriPest-IOS-SDK.git
-    :tag: v1.0.68
+    :branch: main
+    :git: https://github.com/Biscoffee/AgriPest-IOS-SDK.git
 
 CHECKOUT OPTIONS:
   AgriPestClient:
-    :git: https://github.com/lukecc00/AgriPest-IOS-SDK.git
-    :tag: v1.0.68
+    :commit: cb9c9aff97e7f37aae795d35904310ba046a64d6
+    :git: https://github.com/Biscoffee/AgriPest-IOS-SDK.git
 
 SPEC CHECKSUMS:
   AFNetworking: cb604b1c2bded0871f5f61f5d53653739e841d6b
-  AgriPestClient: cd5c51c049a2437898b820d179b025f118695612
+  AgriPestClient: 24538e5d4f54057b315bd56f3e9b6c91481cc93c
   ISO8601: d3ea3ba9b752820cf92c6b47a9ee327e9f0e13fc
   JSONModel: 02ab723958366a3fd27da57ea2af2113658762e9
   LookinServer: 1b2b61c6402ae29fa22182d48f5cd067b4e99e80
@@ -74,6 +74,6 @@ SPEC CHECKSUMS:
   WCDBOptimizedSQLCipher: 871994f7f620302fdf87a2729c099a1efa2223da
   YYModel: 2a7fdd96aaa4b86a824e26d0c517de8928c04b30
 
-PODFILE CHECKSUM: f64f8df63d3bd75d77ef8292b83c51759d8fedfa
+PODFILE CHECKSUM: fd7524421d18a9935ccd68ac8c57a04afb86d1ca
 
 COCOAPODS: 1.16.2
