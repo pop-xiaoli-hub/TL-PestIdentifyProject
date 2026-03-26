@@ -10,6 +10,7 @@
 #import "TLWCommunityWaterfallLayout.h"
 #import "TLWVoiceInputViewController.h"
 #import "TLWPublishController.h"
+#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
@@ -18,14 +19,15 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
 @property (nonatomic, strong) TLWCommunityView *myView;
 @property (nonatomic, strong) NSMutableArray *posts;
+@property (nonatomic, assign) BOOL tl_isFetchingFeed;
 
 @end
 
 @implementation TLWCommunityController
 
+
 - (void)viewDidLoad {
   [super viewDidLoad];
-
   self.view.backgroundColor = [UIColor clearColor];
   [self.view addSubview:self.myView];
   [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -45,6 +47,13 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   self.myView.searchTextField.delegate = self;
   [self.myView.voiceButton addTarget:self action:@selector(tl_voiceButtonTapped) forControlEvents:UIControlEventTouchUpInside];
   self.posts = [NSMutableArray array];
+  self.tl_isFetchingFeed = NO;
+  [self tl_fetchCommunityFeed];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+  [super viewDidAppear:animated];
+
 }
 
 
@@ -73,18 +82,102 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 #pragma mark - Data
 
 /// TODO: 接口接入后替换内部实现，保持方法签名不变，方便全局调用
-/// 预期接口返回格式：
-/// [{
-///   "imageUrl": "https://...",
-///   "title": "菜心被蚜虫像蜂窝煤",
-///   "userName": "用户2759",
-///   "likeCount": 16
-/// }]
 - (void)tl_fetchCommunityFeed {
-  // 接口未接入前，先用本地 Mock 数据驱动 UI
- // self.posts = [TLWCommunityPost mockPosts];
+  if (self.tl_isFetchingFeed) {
+    return;
+  }
+  self.tl_isFetchingFeed = YES;
+
+  // 先清空，让用户立刻看到刷新反馈
   self.posts = [NSMutableArray array];
-  [self.myView.collectionView reloadData];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.myView.collectionView reloadData];
+  });
+
+  TLWSDKManager *sdk = [TLWSDKManager shared];
+  NSInteger pageSize = 20; // 一次拉取多少条
+  NSInteger maxPages = 50; // 安全兜底：避免 hasNext 异常导致无限请求
+
+  NSMutableArray<TLWCommunityPost *> *accumulator = [NSMutableArray array];
+  __weak typeof(self) weakSelf = self;
+
+  __block void (^fetchPageBlock)(NSInteger pageIndex);
+  fetchPageBlock = ^(NSInteger pageIndex) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+
+    [sdk getAllPostsWithTag:nil
+                           q:nil
+                         page:@(pageIndex)
+                         size:@(pageSize)
+            completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
+      __strong typeof(weakSelf) s = weakSelf;
+      if (!s) return;
+
+      if (error || !output || !output.data.list) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          s.tl_isFetchingFeed = NO;
+          // 合并本地发布的 item，避免分页完成时覆盖掉刚发布的帖子
+          NSMutableArray<TLWCommunityPost *> *merged = [accumulator mutableCopy];
+          for (TLWCommunityPost *localPost in s.posts) {
+            if (![accumulator containsObject:localPost]) {
+              [merged addObject:localPost];
+            }
+          }
+          s.posts = merged;
+          [s.myView.collectionView reloadData];
+        });
+        return;
+      }
+
+      for (AGPostResponseDto *dto in output.data.list) {
+        TLWCommunityPost *post = [TLWCommunityPost new];
+        post._id = dto._id;
+        post.title = dto.title ?: @"";
+        post.content = dto.content ?: @"";
+        post.images = dto.images ?: @[];
+        post.tags = dto.tags ?: @[];
+        post.authorName = dto.authorName ?: @"";
+        post.authorAvatar = dto.authorAvatar ?: @"";
+        post.likeCount = @0;
+        // imageAspectRatio 由瀑布流代理方法按行规则统一设置
+        [accumulator addObject:post];
+      }
+
+      // 逐页渲染，减少“空白等待”感
+      dispatch_async(dispatch_get_main_queue(), ^{
+        // 合并本地发布的 item，避免分页刷新覆盖掉刚发布的帖子
+        NSMutableArray<TLWCommunityPost *> *merged = [accumulator mutableCopy];
+        for (TLWCommunityPost *localPost in s.posts) {
+          if (![accumulator containsObject:localPost]) {
+            [merged addObject:localPost];
+          }
+        }
+        s.posts = merged;
+        [s.myView.collectionView reloadData];
+      });
+
+      BOOL hasNext = output.data.hasNext.boolValue;
+      if (hasNext && pageIndex + 1 < maxPages) {
+        fetchPageBlock(pageIndex + 1);
+      } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          s.tl_isFetchingFeed = NO;
+          // 合并本地发布的 item，避免最终结果覆盖掉刚发布的帖子
+          NSMutableArray<TLWCommunityPost *> *merged = [accumulator mutableCopy];
+          for (TLWCommunityPost *localPost in s.posts) {
+            if (![accumulator containsObject:localPost]) {
+              [merged addObject:localPost];
+            }
+          }
+          s.posts = merged;
+          [s.myView.collectionView reloadData];
+        });
+      }
+    }];
+  };
+
+  fetchPageBlock(0);
 }
 
 #pragma mark - UICollectionViewDataSource
@@ -113,6 +206,12 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
 - (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout heightForItemAtIndexPath:(NSIndexPath *)indexPath itemWidth:(CGFloat)width {
   TLWCommunityPost *post = self.posts[indexPath.item];
+  // 瀑布流高度计算使用的纵横比规则应与 cell 展示保持一致
+  if (indexPath.row == 0) {
+    post.imageAspectRatio = 0.60;
+  } else {
+    post.imageAspectRatio = 0.75;
+  }
   return [post cellHeightForWidth:width];
 }
 
@@ -146,7 +245,20 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
       post.imageAspectRatio = 0.65;
     }
     [strongSelf.posts addObject:post];
-    [strongSelf.myView.collectionView reloadData];
+
+    NSInteger newIndex = strongSelf.posts.count - 1;
+    NSIndexPath *indexPath = [NSIndexPath indexPathForItem:newIndex inSection:0];
+
+    // 如果正在分页拉取，分页回调会触发 reloadData；为避免数据源/插入操作冲突，此处兜底全量刷新
+    if (strongSelf.tl_isFetchingFeed) {
+      [strongSelf.myView.collectionView reloadData];
+      return;
+    }
+
+    // 只插入新增的 1 个 item，而不是整体 reloadData
+    [strongSelf.myView.collectionView performBatchUpdates:^{
+      [strongSelf.myView.collectionView insertItemsAtIndexPaths:@[indexPath]];
+    } completion:nil];
   };
   [self presentViewController:vc animated:YES completion:nil];
 }

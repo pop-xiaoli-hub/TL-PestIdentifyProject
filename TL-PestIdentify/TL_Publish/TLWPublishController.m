@@ -346,10 +346,16 @@
       request.content = [content copy];
       request.images = urls ?: @[];
       request.tags = [strongSelf.selectedCrops copy] ?: @[];
+      NSLog(@"图片url已获取");
     [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
+              if (error || !output || output.code.integerValue != 200) {
+                [strongSelf tl_showTopToast:@"帖子发送失败"];
+                NSLog(@"帖子发布失败");
+                return;
+              }
               NSLog(@"帖子发布成功");
-              [self tl_showTopToast:@"帖子发布成功"];
+              [strongSelf tl_showTopToast:@"帖子发布成功"];
             });
     }];
   }];
@@ -406,7 +412,7 @@
   toast.textAlignment = NSTextAlignmentCenter;
   toast.backgroundColor = UIColor.whiteColor;
   toast.layer.cornerRadius = 19;
-  toast.layer.masksToBounds = NO;
+  toast.layer.masksToBounds = YES;
   toast.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
   toast.layer.shadowOpacity = 1;
   toast.layer.shadowRadius = 6;

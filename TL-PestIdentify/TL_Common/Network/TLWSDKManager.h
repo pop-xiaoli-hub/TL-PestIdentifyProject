@@ -23,6 +23,9 @@
 #import <AgriPestClient/AGResultVoid.h>
 #import <AgriPestClient/AGResultString.h>
 #import <AgriPestClient/AGResultListString.h>
+#import <AgriPestClient/AGResultPageResultPostResponseDto.h>
+#import <AgriPestClient/AGPostResponseDto.h>
+#import <AgriPestClient/AGResultPageResultCommentResponseDto.h>
 
 /// 用户资料变更通知（改昵称、改头像、改偏好等更新缓存后发出）
 extern NSString * const TLWProfileDidUpdateNotification;
@@ -62,6 +65,20 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable NSURLSessionTask *)uploadImages:(NSArray<UIImage *> *)images
                                      prefix:(NSString *)prefix
                                  completion:(void(^)(NSArray<NSString *> * _Nullable urls, NSError * _Nullable error))completion;
+
+/// 获取所有帖子列表（分页）
+- (NSURLSessionTask *)getAllPostsWithTag:(nullable NSString *)tag
+                                       q:(nullable NSString *)q
+                                     page:(NSNumber *)page
+                                     size:(NSNumber *)size
+                        completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error)) handler;
+
+/// 获取帖子评论列表（分页）
+/// - 与你提供的方法签名保持一致
+- (NSURLSessionTask *)getCommentsWithId:(NSNumber *) _id
+                                    page:(NSNumber *)page
+                                    size:(NSNumber *)size
+                        completionHandler:(void (^)(AGResultPageResultCommentResponseDto * output, NSError * error)) handler;
 
 @end
 
