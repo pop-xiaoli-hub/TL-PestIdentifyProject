@@ -309,91 +309,130 @@
 }
 
 #pragma mark-点击发布
-/// 确认发布按钮
 - (void)tl_confirmPublishTapped {
-  NSString *content = [self.myView.contentTextView.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-  // 校验：内容和图片至少有一项
-  if (content.length == 0 && self.selectedImages.count == 0) {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"提示" message:@"请输入内容或添加图片" preferredStyle:UIAlertControllerStyleAlert];
+  NSString* content = [self.myView.contentTextView.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  if (!content.length && !self.selectedImages.count) {
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"提示" message:@"请输入完整信息" preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
     return;
   }
 
-  NSLog(@"[Publish] ====== 开始发布 ======");
-  NSLog(@"[Publish] 内容长度: %lu, 图片数量: %lu, 作物标签: %@",
-        (unsigned long)content.length,
-        (unsigned long)self.selectedImages.count,
-        self.selectedCrops);
-
-  // 显示 loading
-  [self.myView tl_createBlurLoadingView];
-
+  TLWCommunityPost* post = [[TLWCommunityPost alloc] init];
+  TLWSDKManager* manager = [TLWSDKManager shared];
+  AGUserProfileDto* userData = manager.cachedProfile;
+  post.images = [NSArray arrayWithArray:self.selectedImages];
+  post.authorName = [userData.username copy];
+  post.content = [content copy];
+  post.authorAvatar = [userData.avatarUrl copy];
   __weak typeof(self) weakSelf = self;
-  TLWSDKManager *manager = [TLWSDKManager shared];
+  if (self.clickPublish) {
+    weakSelf.clickPublish(post);
+  }
 
-  // Step 1: 上传图片（无图片则直接跳到 Step 2）
-  NSLog(@"[Publish] Step1: 开始上传 %lu 张图片...", (unsigned long)self.selectedImages.count);
-  [manager uploadImages:self.selectedImages prefix:@"post" completion:^(NSArray<NSString *> *urls, NSError *error) {
-    __strong typeof(weakSelf) strongSelf = weakSelf;
-    if (!strongSelf) return;
-
-    if (error) {
-      NSLog(@"[Publish] Step1 失败: %@", error.localizedDescription);
-      [strongSelf.myView tl_dismissBlurLoadingView];
-      UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"上传图片失败" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
-      [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-      [strongSelf presentViewController:alert animated:YES completion:nil];
-      return;
-    }
-
-    // Step 2: 构建帖子请求，调用创建接口
-    AGPostCreateRequest *request = [[AGPostCreateRequest alloc] init];
-    request.title = content.length > 20 ? [content substringToIndex:20] : content;
-    request.content = content;
-    request.images = urls ?: @[];
-    request.tags = [strongSelf.selectedCrops copy] ?: @[];
-
-    NSLog(@"[Publish] Step1 完成，URLs: %@", urls);
-    NSLog(@"[Publish] Step2: 创建帖子 title=%@, images=%lu, tags=%@",
-          request.title, (unsigned long)request.images.count, request.tags);
-    [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *createError) {
-      NSLog(@"[Publish] Step2 结果 code=%@, msg=%@, error=%@", output.code, output.message, createError);
-      dispatch_async(dispatch_get_main_queue(), ^{
-        __strong typeof(weakSelf) strongSelf2 = weakSelf;
-        if (!strongSelf2) return;
-
-        [strongSelf2.myView tl_dismissBlurLoadingView];
-
-        if (createError || !output || output.code.integerValue != 200) {
-          NSString *msg = createError.localizedDescription ?: output.message ?: @"发布失败，请重试";
-          UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"发布失败" message:msg preferredStyle:UIAlertControllerStyleAlert];
-          [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-          [strongSelf2 presentViewController:alert animated:YES completion:nil];
-          return;
-        }
-
-        NSLog(@"[Publish] ====== 发布成功 ======");
-        // 发布成功，回调给社区页面刷新列表
-        if (strongSelf2.clickPublish) {
-          TLWCommunityPost *model = [[TLWCommunityPost alloc] init];
-          model.content = content;
-          model.images = urls ?: @[];
-          model.tags = [strongSelf2.selectedCrops copy];
-          model.authorName = [manager.username copy];
-          strongSelf2.clickPublish(model);
-        }
-
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:@"发布成功" preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-          [strongSelf2 dismissViewControllerAnimated:YES completion:nil];
-        }]];
-        [strongSelf2 presentViewController:alert animated:YES completion:nil];
-      });
+  [manager uploadImages:self.selectedImages prefix:@"post" completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable error) {
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+      if (error) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"上传图片失败" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+        [strongSelf presentViewController:alert animated:YES completion:nil];
+        return;
+      }
+      AGPostCreateRequest* request = [[AGPostCreateRequest alloc] init];
+      request.title = content.length > 15 ? [content substringToIndex:15] : content;
+      request.content = [content copy];
+      request.images = urls ?: @[];
+      request.tags = [strongSelf.selectedCrops copy] ?: @[];
+    [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+              NSLog(@"帖子发布成功");
+              [self tl_showTopToast:@"帖子发布成功"];
+            });
     }];
   }];
+
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:@"发布成功" preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+    [self dismissViewControllerAnimated:YES completion:nil];
+  }]];
+  [self presentViewController:alert animated:YES completion:nil];
 }
 
+- (void)updatePostToService:(AGPostCreateRequest* )request {
+
+}
+
+- (void)tl_showTopToast:(NSString *)text {
+  if (text.length == 0) return;
+
+  // 挂到“全局 window”，保证在任何页面都能看到
+  UIWindow *hostWindow = nil;
+  if (@available(iOS 13.0, *)) {
+    // 仅使用前台激活的 Scene，避免取到后台/其他窗口的 keyWindow
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+      if (scene.activationState != UISceneActivationStateForegroundActive) continue;
+      if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+      UIWindowScene *windowScene = (UIWindowScene *)scene;
+
+      // 优先取 key window（当前场景正在接收事件的窗口）
+      for (UIWindow *w in windowScene.windows) {
+        if (w.isKeyWindow) {
+          hostWindow = w;
+          break;
+        }
+      }
+      if (!hostWindow) {
+        hostWindow = windowScene.windows.firstObject;
+      }
+      if (hostWindow) break;
+    }
+  } else {
+    // iOS 12 及以下：直接用当前控制器关联的 window 即可（避免使用废弃的 UIApplication.windows）
+    hostWindow = self.view.window;
+  }
+  if (!hostWindow) return;
+
+  UIView *old = [hostWindow viewWithTag:1107];
+  if (old) [old removeFromSuperview];
+
+  UILabel *toast = [UILabel new];
+  toast.tag = 1107;
+  toast.text = text;
+  toast.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+  toast.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
+  toast.textAlignment = NSTextAlignmentCenter;
+  toast.backgroundColor = UIColor.whiteColor;
+  toast.layer.cornerRadius = 19;
+  toast.layer.masksToBounds = NO;
+  toast.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
+  toast.layer.shadowOpacity = 1;
+  toast.layer.shadowRadius = 6;
+  toast.layer.shadowOffset = CGSizeMake(0, 2);
+  [hostWindow addSubview:toast];
+
+  [toast mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(hostWindow.mas_safeAreaLayoutGuideTop).offset(10);
+    make.centerX.equalTo(hostWindow);
+    make.width.mas_equalTo(190);
+    make.height.mas_equalTo(38);
+  }];
+
+  toast.alpha = 0;
+  [UIView animateWithDuration:0.25 animations:^{
+    toast.alpha = 1;
+  } completion:^(BOOL finished) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      [UIView animateWithDuration:0.25 animations:^{
+        toast.alpha = 0;
+      } completion:^(BOOL done) {
+        [toast removeFromSuperview];
+      }];
+    });
+  }];
+}
 
 
 
