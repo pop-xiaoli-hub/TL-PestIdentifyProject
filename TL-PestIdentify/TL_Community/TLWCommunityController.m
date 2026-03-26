@@ -49,6 +49,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   self.posts = [NSMutableArray array];
   self.tl_isFetchingFeed = NO;
   [self tl_fetchCommunityFeed];
+  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -276,6 +277,123 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   [self.myView tl_hideSearchOverlay];
   return YES;
 }
+
+- (void)tl_updatePost:(NSNotification* )notification {
+  __weak typeof(self) weakSelf = self;
+  TLWSDKManager* manager = [TLWSDKManager shared];
+  NSDictionary* dict = notification.userInfo;
+  NSString* content = dict[@"content"];
+  [manager uploadImages:dict[@"images"] prefix:@"post" completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable error) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    NSLog(@"1");
+      if (!strongSelf) {
+        NSLog(@"2");
+        return;
+      }
+      if (error) {
+        NSLog(@"3");
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"上传图片失败" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+        [strongSelf presentViewController:alert animated:YES completion:nil];
+        return;
+      }
+    NSLog(@"4");
+      AGPostCreateRequest* request = [[AGPostCreateRequest alloc] init];
+      request.title = content.length > 15 ? [content substringToIndex:15] : content;
+      request.content = [content copy];
+      request.images = urls ?: @[];
+      request.tags = [dict[@"crops"] copy] ?: @[];
+      NSLog(@"图片url已获取");
+    NSLog(@"strongSelf: %@", strongSelf);
+    [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+              NSLog(@"5");
+              if (output.code.integerValue != 200) {
+                NSLog(@"6");
+                [strongSelf tl_showTopToast:@"帖子发送失败"];
+                NSLog(@"帖子发布失败");
+                return;
+              }
+              NSLog(@"7");
+              NSLog(@"帖子发布成功");
+              NSLog(@"strongSelf:%@", strongSelf);
+              [strongSelf tl_showTopToast:@"帖子发布成功"];
+            });
+    }];
+  }];
+  NSLog(@"8");
+}
+
+
+- (void)tl_showTopToast:(NSString *)text {
+  if (text.length == 0) return;
+
+  // 挂到“全局 window”，保证在任何页面都能看到
+  UIWindow *hostWindow = nil;
+  if (@available(iOS 13.0, *)) {
+    // 仅使用前台激活的 Scene，避免取到后台/其他窗口的 keyWindow
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+      if (scene.activationState != UISceneActivationStateForegroundActive) continue;
+      if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+      UIWindowScene *windowScene = (UIWindowScene *)scene;
+
+      // 优先取 key window（当前场景正在接收事件的窗口）
+      for (UIWindow *w in windowScene.windows) {
+        if (w.isKeyWindow) {
+          hostWindow = w;
+          break;
+        }
+      }
+      if (!hostWindow) {
+        hostWindow = windowScene.windows.firstObject;
+      }
+      if (hostWindow) break;
+    }
+  } else {
+    // iOS 12 及以下：直接用当前控制器关联的 window 即可（避免使用废弃的 UIApplication.windows）
+    hostWindow = self.view.window;
+  }
+  if (!hostWindow) return;
+
+  UIView *old = [hostWindow viewWithTag:1107];
+  if (old) [old removeFromSuperview];
+
+  UILabel *toast = [UILabel new];
+  toast.tag = 1107;
+  toast.text = text;
+  toast.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+  toast.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
+  toast.textAlignment = NSTextAlignmentCenter;
+  toast.backgroundColor = UIColor.whiteColor;
+  toast.layer.cornerRadius = 19;
+  toast.layer.masksToBounds = YES;
+  toast.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
+  toast.layer.shadowOpacity = 1;
+  toast.layer.shadowRadius = 6;
+  toast.layer.shadowOffset = CGSizeMake(0, 2);
+  [hostWindow addSubview:toast];
+
+  [toast mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(hostWindow.mas_safeAreaLayoutGuideTop).offset(10);
+    make.centerX.equalTo(hostWindow);
+    make.width.mas_equalTo(190);
+    make.height.mas_equalTo(38);
+  }];
+
+  toast.alpha = 0;
+  [UIView animateWithDuration:0.25 animations:^{
+    toast.alpha = 1;
+  } completion:^(BOOL finished) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      [UIView animateWithDuration:0.25 animations:^{
+        toast.alpha = 0;
+      } completion:^(BOOL done) {
+        [toast removeFromSuperview];
+      }];
+    });
+  }];
+}
+
 
 
 @end
