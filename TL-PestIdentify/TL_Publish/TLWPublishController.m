@@ -324,6 +324,7 @@
   post.images = [NSArray arrayWithArray:self.selectedImages];
   post.authorName = [userData.username copy];
   post.content = [content copy];
+  post.title = content.length > 15 ? [content substringToIndex:15] : [content copy];
   post.authorAvatar = [userData.avatarUrl copy];
 
   if (self.clickPublish) {

@@ -26,6 +26,8 @@
 #import <AgriPestClient/AGResultPageResultPostResponseDto.h>
 #import <AgriPestClient/AGPostResponseDto.h>
 #import <AgriPestClient/AGResultPageResultCommentResponseDto.h>
+#import <AgriPestClient/AGCommentRequest.h>
+#import <AgriPestClient/AGResultCommentResponseDto.h>
 
 /// 用户资料变更通知（改昵称、改头像、改偏好等更新缓存后发出）
 extern NSString * const TLWProfileDidUpdateNotification;
@@ -79,6 +81,11 @@ NS_ASSUME_NONNULL_BEGIN
                                     page:(NSNumber *)page
                                     size:(NSNumber *)size
                         completionHandler:(void (^)(AGResultPageResultCommentResponseDto * output, NSError * error)) handler;
+
+/// 发表评论
+- (NSURLSessionTask *)addCommentWithId:(NSNumber *)_id
+                               content:(NSString *)content
+                     completionHandler:(void (^)(AGResultCommentResponseDto * output, NSError * error))handler;
 
 @end
 

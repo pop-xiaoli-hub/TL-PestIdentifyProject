@@ -4,6 +4,7 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <AgriPestClient/AGCommentResponseDto.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -16,7 +17,7 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface TLWCommentCell : UITableViewCell
-- (void)configureWithComment:(TLWCommentModel *)comment;
+- (void)configureWithComment:(AGCommentResponseDto *)comment;
 @end
 
 NS_ASSUME_NONNULL_END

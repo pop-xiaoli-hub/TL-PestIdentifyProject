@@ -190,7 +190,7 @@
   [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar] placeholderImage:[UIImage imageNamed:@"cm_placehilder"]];
   self.titleLabel.text = post.title.length > 0 ? post.title : post.content;
   self.userLabel.text = post.authorName;
-  self.likeLabel.text = [NSString stringWithFormat:@"%ld", (long)post.likeCount];
+  self.likeLabel.text = [NSString stringWithFormat:@"%@", post.likeCount];
 }
 
 @end
