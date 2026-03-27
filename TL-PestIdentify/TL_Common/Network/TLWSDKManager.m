@@ -168,7 +168,7 @@ static NSString * const kUsernameKey = @"TLW_username";
                                      page:(NSNumber *)page
                                      size:(NSNumber *)size
                         completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error))handler {
-  return [self.api getAllPostsWithTag:(NSString *)tag
+  return [self.api getPostsWithTag:(NSString *)tag
                                  q:(NSString *)q
                              page:page
                              size:size

@@ -117,7 +117,12 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
       __strong typeof(weakSelf) s = weakSelf;
       if (!s) return;
 
+      NSLog(@"[Community] page=%ld error=%@ code=%@ message=%@ listCount=%lu",
+            (long)pageIndex, error, output.code, output.message,
+            (unsigned long)output.data.list.count);
+
       if (error || !output || !output.data.list) {
+        NSLog(@"[Community] 拉取失败: error=%@, output=%@", error, output);
         dispatch_async(dispatch_get_main_queue(), ^{
           s.tl_isFetchingFeed = NO;
           // 合并本地发布的 item，避免分页完成时覆盖掉刚发布的帖子
