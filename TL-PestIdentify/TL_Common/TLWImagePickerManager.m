@@ -98,25 +98,27 @@ static const void *kImagePickerManagerKey = &kImagePickerManagerKey;
     }
 }
 
-#pragma mark - 多选相册（PHPicker）
+#pragma mark - 多选相册（自定义 PhotoPicker）
 
 - (void)openMultiAlbumFrom:(UIViewController *)vc {
-    if (@available(iOS 14.0, *)) {
-        PHPickerConfiguration *config = [[PHPickerConfiguration alloc] init];
-        config.selectionLimit = self.maxCount;
-        config.filter = [PHPickerFilter imagesFilter];
-        PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:config];
-        picker.delegate = (id<PHPickerViewControllerDelegate>)self;
-        picker.modalPresentationStyle = UIModalPresentationFullScreen;
-        [vc presentViewController:picker animated:YES completion:nil];
-        return;
+    TLWPhotoPickerController *picker = [[TLWPhotoPickerController alloc] init];
+    picker.maxCount = self.maxCount;
+    __weak typeof(self) weakSelf = self;
+    picker.onSelectImages = ^(NSArray<UIImage *> *images) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        if ([strongSelf.delegate respondsToSelector:@selector(imagePicker:didSelectImages:)]) {
+            [strongSelf.delegate imagePicker:strongSelf didSelectImages:images];
+        }
+        [strongSelf releaseSelf];
+    };
+    if (vc.navigationController) {
+        [vc.navigationController pushViewController:picker animated:YES];
+    } else {
+        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:picker];
+        nav.modalPresentationStyle = UIModalPresentationFullScreen;
+        [vc presentViewController:nav animated:YES completion:nil];
     }
-    // iOS 13 fallback
-    UIImagePickerController *picker = [[UIImagePickerController alloc] init];
-    picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
-    picker.delegate = self;
-    picker.modalPresentationStyle = UIModalPresentationFullScreen;
-    [vc presentViewController:picker animated:YES completion:nil];
 }
 
 #pragma mark - 相机
