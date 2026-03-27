@@ -29,8 +29,8 @@ static CGFloat const kHorizontalPad = 16.0;
 @property (nonatomic, strong) UIScrollView  *tagScrollView;
 @property (nonatomic, strong) UIView        *divider;
 @property (nonatomic, strong) UILabel       *commentSectionLabel;
-@property (nonatomic, strong) UILabel* collectedCount;
-@property (nonatomic, strong) UILabel* likedCOunt;
+@property (nonatomic, strong) UILabel* collectedCountLabel;
+@property (nonatomic, strong) UILabel* likedCountLabel;
 @end
 
 @implementation TLWPostDetailHeaderView
@@ -89,54 +89,82 @@ static CGFloat const kHorizontalPad = 16.0;
   [self addSubview:self.avatarView];
 
   self.nameLabel = [[UILabel alloc] init];
-  self.nameLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+  self.nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
   self.nameLabel.textColor = [UIColor colorWithWhite:0.1 alpha:1.0];
   [self addSubview:self.nameLabel];
 
   self.dateLabel = [[UILabel alloc] init];
-  self.dateLabel.font = [UIFont systemFontOfSize:14];
+  self.dateLabel.font = [UIFont systemFontOfSize:12];
   self.dateLabel.textColor = [UIColor colorWithWhite:0.55 alpha:1.0];
   self.dateLabel.text = @"刚刚";
   [self addSubview:self.dateLabel];
 
-  // 收藏按钮
-  self.collectButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.collectButton setImage:[UIImage imageNamed:@"cp_collected-1.png"] forState:UIControlStateNormal];
-  self.collectButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
-  [self.collectButton addTarget:self action:@selector(collectTapped:) forControlEvents:UIControlEventTouchUpInside];
-  [self addSubview:self.collectButton];
-
-  // 点赞按钮
+  // ---- 点赞组：图标 + 数量 ----
   self.likeButton = [UIButton buttonWithType:UIButtonTypeCustom];
   [self.likeButton setImage:[UIImage imageNamed:@"cp_isLiked-1.png"] forState:UIControlStateNormal];
   self.likeButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   [self.likeButton addTarget:self action:@selector(likeTapped:) forControlEvents:UIControlEventTouchUpInside];
   [self addSubview:self.likeButton];
 
+  self.likedCountLabel = [[UILabel alloc] init];
+  self.likedCountLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+  self.likedCountLabel.text = @"0";
+  self.likedCountLabel.textColor = [UIColor colorWithWhite:0.45 alpha:1.0];
+  self.likedCountLabel.textAlignment = NSTextAlignmentLeft;
+  [self addSubview:self.likedCountLabel];
+
+  // ---- 收藏组：图标 + 数量 ----
+  self.collectButton = [UIButton buttonWithType:UIButtonTypeCustom];
+  [self.collectButton setImage:[UIImage imageNamed:@"cp_collected-1.png"] forState:UIControlStateNormal];
+  self.collectButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
+  [self.collectButton addTarget:self action:@selector(collectTapped:) forControlEvents:UIControlEventTouchUpInside];
+  [self addSubview:self.collectButton];
+
+  self.collectedCountLabel = [[UILabel alloc] init];
+  self.collectedCountLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+  self.collectedCountLabel.text = @"0";
+  self.collectedCountLabel.textColor = [UIColor colorWithWhite:0.45 alpha:1.0];
+  self.collectedCountLabel.textAlignment = NSTextAlignmentLeft;
+  [self addSubview:self.collectedCountLabel];
+
+  // 头像
   [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self).offset(kHorizontalPad);
-    make.top.equalTo(self.bannerScrollView.mas_bottom).offset(16);
+    make.top.equalTo(self.bannerScrollView.mas_bottom).offset(14);
     make.width.height.mas_equalTo(46);
   }];
+  // 用户名
   [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self.avatarView.mas_right).offset(10);
-    make.top.equalTo(self.avatarView).offset(1);
+    make.top.equalTo(self.avatarView).offset(3);
   }];
+  // 时间
   [self.dateLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self.nameLabel);
-    make.top.equalTo(self.nameLabel.mas_bottom).offset(5);
+    make.top.equalTo(self.nameLabel.mas_bottom).offset(4);
   }];
-  // 点赞按钮在最右
-  [self.likeButton mas_makeConstraints:^(MASConstraintMaker *make) {
+
+  // 点赞数字（最右）
+  [self.likedCountLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerY.equalTo(self.avatarView);
     make.right.equalTo(self).offset(-kHorizontalPad);
-    make.width.height.mas_equalTo(30);
   }];
-  // 收藏按钮在点赞左边
+  // 点赞图标
+  [self.likeButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.centerY.equalTo(self.avatarView);
+    make.right.equalTo(self.likedCountLabel.mas_left).offset(-4);
+    make.width.height.mas_equalTo(28);
+  }];
+  // 收藏数字
+  [self.collectedCountLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.centerY.equalTo(self.avatarView);
+    make.right.equalTo(self.likeButton.mas_left).offset(-14);
+  }];
+  // 收藏图标
   [self.collectButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerY.equalTo(self.avatarView);
-    make.right.equalTo(self.likeButton.mas_left).offset(-8);
-    make.width.height.mas_equalTo(30);
+    make.right.equalTo(self.collectedCountLabel.mas_left).offset(-4);
+    make.width.height.mas_equalTo(28);
   }];
 }
 
@@ -212,6 +240,10 @@ static CGFloat const kHorizontalPad = 16.0;
   }
   self.titleLabel.text = post.title.length > 0 ? post.title : @"";
   self.contentLabel.text = post.content.length > 0 ? post.content : @"";
+  // 同步点赞数 / 收藏数（收藏数暂用点赞数占位，后端接入后替换）
+  NSInteger likeCount = post.likeCount ? post.likeCount.integerValue : 0;
+  self.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)likeCount];
+  self.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)likeCount];
   self.images = post.images ?: @[];
   [self reloadBannerImages];
   [self reloadTags:post.tags];
@@ -330,6 +362,14 @@ static CGFloat const kHorizontalPad = 16.0;
   self.isCollected = !self.isCollected;
   NSString *imgName = self.isCollected ? @"cp_collected-2.png" : @"cp_collected-1.png";
   [sender setImage:[UIImage imageNamed:imgName] forState:UIControlStateNormal];
+  // 同步收藏数
+  NSInteger count = [self.collectedCountLabel.text integerValue];
+  count += self.isCollected ? 1 : -1;
+  self.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
+  // 数字颜色：已收藏时高亮
+  self.collectedCountLabel.textColor = self.isCollected
+    ? [UIColor colorWithRed:1.0 green:0.75 blue:0.0 alpha:1.0]
+    : [UIColor colorWithWhite:0.45 alpha:1.0];
   [UIView animateWithDuration:0.12 animations:^{
     sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
   } completion:^(BOOL f) {
@@ -343,6 +383,14 @@ static CGFloat const kHorizontalPad = 16.0;
   self.isLiked = !self.isLiked;
   NSString *imgName = self.isLiked ? @"cp_isLiked-2.png" : @"cp_isLiked-1.png";
   [sender setImage:[UIImage imageNamed:imgName] forState:UIControlStateNormal];
+  // 同步点赞数
+  NSInteger count = [self.likedCountLabel.text integerValue];
+  count += self.isLiked ? 1 : -1;
+  self.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
+  // 数字颜色：已点赞时高亮
+  self.likedCountLabel.textColor = self.isLiked
+    ? [UIColor colorWithRed:1.0 green:0.30 blue:0.30 alpha:1.0]
+    : [UIColor colorWithWhite:0.45 alpha:1.0];
   [UIView animateWithDuration:0.12 animations:^{
     sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
   } completion:^(BOOL f) {

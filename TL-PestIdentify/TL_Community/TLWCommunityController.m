@@ -211,6 +211,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   if (indexPath.item >= self.posts.count) return;
   TLWCommunityPost *post = self.posts[indexPath.item];
   TLWPostDetailController *detailVC = [[TLWPostDetailController alloc] init];
+  NSLog(@"post:%@", post.content);
   detailVC.post = post;
   detailVC.hidesBottomBarWhenPushed = YES;
   [self.navigationController pushViewController:detailVC animated:YES];
@@ -258,10 +259,10 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
     if (post.imageAspectRatio <= 0.0) {
       post.imageAspectRatio = 0.65;
     }
-    [strongSelf.posts addObject:post];
-
-    NSInteger newIndex = strongSelf.posts.count - 1;
-    NSIndexPath *indexPath = [NSIndexPath indexPathForItem:newIndex inSection:0];
+    // 插入到数组最前面，让新帖子显示在最上方
+    [strongSelf.posts insertObject:post atIndex:0];
+    NSLog(@"post.content: %@", post.content);
+    NSIndexPath *indexPath = [NSIndexPath indexPathForItem:0 inSection:0];
 
     // 如果正在分页拉取，分页回调会触发 reloadData；为避免数据源/插入操作冲突，此处兜底全量刷新
     if (strongSelf.tl_isFetchingFeed) {
@@ -269,10 +270,14 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
       return;
     }
 
-    // 只插入新增的 1 个 item，而不是整体 reloadData
+    // 只插入新增的 1 个 item，并滚动到顶部
     [strongSelf.myView.collectionView performBatchUpdates:^{
       [strongSelf.myView.collectionView insertItemsAtIndexPaths:@[indexPath]];
-    } completion:nil];
+    } completion:^(BOOL finished) {
+      [strongSelf.myView.collectionView scrollToItemAtIndexPath:indexPath
+                                              atScrollPosition:UICollectionViewScrollPositionTop
+                                                      animated:YES];
+    }];
   };
   [self presentViewController:vc animated:YES completion:nil];
 }

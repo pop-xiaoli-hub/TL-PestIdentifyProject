@@ -145,8 +145,13 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   self.headerView.translatesAutoresizingMaskIntoConstraints = YES;
   if (self.post) {
     [self.headerView configureWithPost:self.post];
+    // configureWithPost 之后内容确定，重新计算精确高度并刷新 tableHeaderView
+    CGFloat finalH = [TLWPostDetailHeaderView heightForPost:self.post];
+    self.headerView.frame = CGRectMake(0, 0, screenW, finalH);
+    self.tableView.tableHeaderView = self.headerView;
+  } else {
+    self.tableView.tableHeaderView = self.headerView;
   }
-  self.tableView.tableHeaderView = self.headerView;
 }
 
 - (void)buildInputBar {
@@ -156,23 +161,26 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   self.inputBar.layer.shadowOpacity = 1.0;
   self.inputBar.layer.shadowOffset = CGSizeMake(0, -1);
   self.inputBar.layer.shadowRadius = 4.0;
+  self.inputBar.layer.masksToBounds = YES;
+  self.inputBar.layer.cornerRadius = 28;
   [self.view addSubview:self.inputBar];
   [self.inputBar mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.left.right.equalTo(self.view);
-    make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom);
+    make.left.equalTo(self.view.mas_left).offset(10);
+    make.right.equalTo(self.view.mas_right).offset(-10);
+    make.bottom.equalTo(self.view.mas_bottom).offset(-30);
     make.height.mas_equalTo(56);
   }];
 
   // Like button
   self.likeButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.likeButton setImage:[UIImage imageNamed:@"cp_heart.png"] forState:UIControlStateNormal];
+  [self.likeButton setImage:[UIImage imageNamed:@"cp_capture.png"] forState:UIControlStateNormal];
   self.likeButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   [self.likeButton addTarget:self action:@selector(likeTapped) forControlEvents:UIControlEventTouchUpInside];
   [self.inputBar addSubview:self.likeButton];
   [self.likeButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self.inputBar).offset(14);
     make.centerY.equalTo(self.inputBar);
-    make.width.height.mas_equalTo(28);
+    make.width.height.mas_equalTo(32);
   }];
 
   // Comment field
