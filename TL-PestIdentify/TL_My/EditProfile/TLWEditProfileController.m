@@ -7,7 +7,7 @@
 #import "TLWEditProfileView.h"
 #import "TLWEditNicknameController.h"
 #import "TLWAvatarCropController.h"
-#import "TLWPhotoPickerController.h"
+#import "TLWImagePickerManager.h"
 #import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
@@ -15,7 +15,7 @@
 NSString * const TLWAvatarDidUpdateNotification = @"TLWAvatarDidUpdateNotification";
 extern NSString * const TLWProfileDidUpdateNotification;
 
-@interface TLWEditProfileController () <TLWEditNicknameDelegate, TLWAvatarCropDelegate>
+@interface TLWEditProfileController () <TLWEditNicknameDelegate, TLWAvatarCropDelegate, TLWImagePickerDelegate>
 @property (nonatomic, strong) TLWEditProfileView *myView;
 @property (nonatomic, copy)   NSString           *nickname;
 @end
@@ -104,9 +104,17 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)onAvatarTap {
-    TLWPhotoPickerController *picker = [[TLWPhotoPickerController alloc] init];
-    picker.cropDelegate = self;
-    [self.navigationController pushViewController:picker animated:YES];
+    TLWImagePickerManager *picker = [[TLWImagePickerManager alloc] init];
+    picker.delegate = self;
+    [picker openAlbumFrom:self];
+}
+
+#pragma mark - TLWImagePickerDelegate
+
+- (void)imagePicker:(TLWImagePickerManager *)picker didSelectImage:(UIImage *)image {
+    TLWAvatarCropController *cropVC = [[TLWAvatarCropController alloc] initWithImage:image];
+    cropVC.delegate = self;
+    [self.navigationController pushViewController:cropVC animated:YES];
 }
 
 #pragma mark - TLWAvatarCropDelegate
