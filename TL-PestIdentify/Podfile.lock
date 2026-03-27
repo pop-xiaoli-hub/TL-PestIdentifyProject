@@ -27,7 +27,7 @@ PODS:
   - SDWebImage (5.21.5):
     - SDWebImage/Core (= 5.21.5)
   - SDWebImage/Core (5.21.5)
-  - WCDB.objc (2.1.15):
+  - WCDB.objc (2.1.16):
     - WCDBOptimizedSQLCipher (= 1.4.8)
   - WCDBOptimizedSQLCipher (1.4.8)
   - YYModel (1.0.4)
@@ -37,7 +37,7 @@ DEPENDENCIES:
   - LookinServer
   - Masonry
   - SDWebImage (~> 5.0)
-  - WCDB.objc
+  - WCDB.objc (from `https://github.com/Tencent/wcdb.git`, branch `master`)
   - YYModel
 
 SPEC REPOS:
@@ -48,7 +48,6 @@ SPEC REPOS:
     - LookinServer
     - Masonry
     - SDWebImage
-    - WCDB.objc
     - WCDBOptimizedSQLCipher
     - YYModel
 
@@ -56,11 +55,17 @@ EXTERNAL SOURCES:
   AgriPestClient:
     :git: https://github.com/lukecc00/AgriPest-IOS-SDK.git
     :tag: v1.0.92
+  WCDB.objc:
+    :branch: master
+    :git: https://github.com/Tencent/wcdb.git
 
 CHECKOUT OPTIONS:
   AgriPestClient:
     :git: https://github.com/lukecc00/AgriPest-IOS-SDK.git
     :tag: v1.0.92
+  WCDB.objc:
+    :commit: df808591b9f9a9ab42156006819c3550d5af13a3
+    :git: https://github.com/Tencent/wcdb.git
 
 SPEC CHECKSUMS:
   AFNetworking: cb604b1c2bded0871f5f61f5d53653739e841d6b
@@ -70,10 +75,10 @@ SPEC CHECKSUMS:
   LookinServer: 1b2b61c6402ae29fa22182d48f5cd067b4e99e80
   Masonry: 678fab65091a9290e40e2832a55e7ab731aad201
   SDWebImage: e9c98383c7572d713c1a0d7dd2783b10599b9838
-  WCDB.objc: 35650ab6d455a4a865d94d95436b1ddc865479af
+  WCDB.objc: d88dd9184fc7797b10890efadd593b8ce1d062dc
   WCDBOptimizedSQLCipher: 871994f7f620302fdf87a2729c099a1efa2223da
   YYModel: 2a7fdd96aaa4b86a824e26d0c517de8928c04b30
 
-PODFILE CHECKSUM: 9441c024d2f1ee1dcdef5f0c2329cf45b6c34ad5
+PODFILE CHECKSUM: 2e99829c2059d95c57080db6885045ea3e884d0f
 
 COCOAPODS: 1.16.2
