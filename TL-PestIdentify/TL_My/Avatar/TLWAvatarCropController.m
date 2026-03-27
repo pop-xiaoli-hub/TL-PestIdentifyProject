@@ -92,7 +92,7 @@ static CGFloat const kCropBottomHeight = 88.0;
     self.view.backgroundColor = UIColor.blackColor;
 
     // 背景图（和 app 整体风格一致）
-    UIImageView *bgImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_backView.png"]];
+    UIImageView *bgImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"bgGradient"]];
     bgImageView.contentMode = UIViewContentModeScaleAspectFill;
     [self.view addSubview:bgImageView];
     [bgImageView mas_makeConstraints:^(MASConstraintMaker *make) {

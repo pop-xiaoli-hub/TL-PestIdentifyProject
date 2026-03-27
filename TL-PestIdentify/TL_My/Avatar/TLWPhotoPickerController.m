@@ -121,8 +121,13 @@ static CGFloat   const kCellGap       = 1.0;
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.hidesBottomBarWhenPushed = YES;
-    self.view.backgroundColor = UIColor.whiteColor;
-    self.view.layer.contents = (__bridge id)[UIImage imageNamed:@"hp_backView"].CGImage;
+    self.view.backgroundColor = UIColor.clearColor;
+    UIImageView *bgView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"bgGradient"]];
+    bgView.contentMode = UIViewContentModeScaleAspectFill;
+    [self.view addSubview:bgView];
+    [bgView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
 
     if (_maxCount == 0) _maxCount = 1;
     _selectedAssets = [NSMutableArray array];
