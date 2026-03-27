@@ -163,4 +163,23 @@ static NSString * const kUsernameKey = @"TLW_username";
   }];
 }
 
+- (NSURLSessionTask *)getAllPostsWithTag:(nullable NSString *)tag
+                                       q:(nullable NSString *)q
+                                     page:(NSNumber *)page
+                                     size:(NSNumber *)size
+                        completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error))handler {
+  return [self.api getAllPostsWithTag:(NSString *)tag
+                                 q:(NSString *)q
+                             page:page
+                             size:size
+               completionHandler:handler];
+}
+
+- (NSURLSessionTask *)getCommentsWithId:(NSNumber *)_id
+                                    page:(NSNumber *)page
+                                    size:(NSNumber *)size
+                        completionHandler:(void (^)(AGResultPageResultCommentResponseDto * output, NSError * error))handler {
+  return [self.api getCommentsWithId:_id page:page size:size completionHandler:handler];
+}
+
 @end

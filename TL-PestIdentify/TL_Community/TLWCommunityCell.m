@@ -94,7 +94,7 @@
   self.userLabel.font = [UIFont systemFontOfSize:11];
   self.userLabel.textColor = [UIColor colorWithWhite:0.2 alpha:1.0];
 
-  self.likeIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cm_like"]];
+  self.likeIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_heart.png"]];
   self.likeIconView.contentMode = UIViewContentModeScaleAspectFit;
 
   self.likeLabel = [[UILabel alloc] init];
@@ -143,6 +143,31 @@
   }];
 }
 
+//- (void)configureWithPost:(TLWCommunityPost *)post {
+//  id first = (post.images.count > 0) ? post.images.firstObject : nil;
+//  if (!first || first == [NSNull null]) {
+//    self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
+//  } else if ([first isKindOfClass:[UIImage class]]) {
+//    UIImage *img = (UIImage *)first;
+//    self.photoView.image = img ?: [UIImage imageNamed:@"cm_placeholder"];
+//  } else if ([first isKindOfClass:[NSString class]]) {
+//    NSString *urlStr = (NSString *)first;
+//    if (urlStr.length == 0) {
+//      self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
+//    } else {
+//      NSURL *url = [NSURL URLWithString:urlStr];
+//      // 仅加载展示，不参与瀑布流高度计算
+//      [self.photoView sd_setImageWithURL:url placeholderImage:[UIImage imageNamed:@"cm_placeholder"]];
+//    }
+//  } else {
+//    self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
+//  }
+//
+//  self.titleLabel.text = post.title.length > 0 ? post.title : post.content;
+//  self.userLabel.text = post.authorName;
+//  self.likeLabel.text = [NSString stringWithFormat:@"%ld", (long)post.likeCount];
+//}
+
 - (void)configureWithPost:(TLWCommunityPost *)post {
   id first = (post.images.count > 0) ? post.images.firstObject : nil;
   if (!first || first == [NSNull null]) {
@@ -162,7 +187,7 @@
   } else {
     self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
   }
-
+  [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar] placeholderImage:[UIImage imageNamed:@"cm_placehilder"]];
   self.titleLabel.text = post.title.length > 0 ? post.title : post.content;
   self.userLabel.text = post.authorName;
   self.likeLabel.text = [NSString stringWithFormat:@"%ld", (long)post.likeCount];

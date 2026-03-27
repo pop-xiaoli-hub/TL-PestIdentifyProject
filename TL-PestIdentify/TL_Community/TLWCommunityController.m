@@ -10,22 +10,25 @@
 #import "TLWCommunityWaterfallLayout.h"
 #import "TLWVoiceInputViewController.h"
 #import "TLWPublishController.h"
+#import "TLWPostDetailController.h"
+#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
-@interface TLWCommunityController () <UICollectionViewDataSource, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate >
+@interface TLWCommunityController () <UICollectionViewDataSource, UICollectionViewDelegate, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate>
 
 @property (nonatomic, strong) TLWCommunityView *myView;
 @property (nonatomic, strong) NSMutableArray *posts;
+@property (nonatomic, assign) BOOL tl_isFetchingFeed;
 
 @end
 
 @implementation TLWCommunityController
 
+
 - (void)viewDidLoad {
   [super viewDidLoad];
-
   self.view.backgroundColor = [UIColor clearColor];
   [self.view addSubview:self.myView];
   [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -34,6 +37,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
   UICollectionView *collectionView = self.myView.collectionView;
   collectionView.dataSource = self;
+  collectionView.delegate = self;
   TLWCommunityWaterfallLayout *layout = (TLWCommunityWaterfallLayout *)collectionView.collectionViewLayout;
   layout.delegate = self;
   [collectionView registerClass:[TLWCommunityCell class] forCellWithReuseIdentifier:kCommunityCellID];
@@ -45,6 +49,14 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   self.myView.searchTextField.delegate = self;
   [self.myView.voiceButton addTarget:self action:@selector(tl_voiceButtonTapped) forControlEvents:UIControlEventTouchUpInside];
   self.posts = [NSMutableArray array];
+  self.tl_isFetchingFeed = NO;
+  [self tl_fetchCommunityFeed];
+  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+  [super viewDidAppear:animated];
+
 }
 
 
@@ -73,18 +85,102 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 #pragma mark - Data
 
 /// TODO: 接口接入后替换内部实现，保持方法签名不变，方便全局调用
-/// 预期接口返回格式：
-/// [{
-///   "imageUrl": "https://...",
-///   "title": "菜心被蚜虫像蜂窝煤",
-///   "userName": "用户2759",
-///   "likeCount": 16
-/// }]
 - (void)tl_fetchCommunityFeed {
-  // 接口未接入前，先用本地 Mock 数据驱动 UI
- // self.posts = [TLWCommunityPost mockPosts];
+  if (self.tl_isFetchingFeed) {
+    return;
+  }
+  self.tl_isFetchingFeed = YES;
+
+  // 先清空，让用户立刻看到刷新反馈
   self.posts = [NSMutableArray array];
-  [self.myView.collectionView reloadData];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.myView.collectionView reloadData];
+  });
+
+  TLWSDKManager *sdk = [TLWSDKManager shared];
+  NSInteger pageSize = 20; // 一次拉取多少条
+  NSInteger maxPages = 50; // 安全兜底：避免 hasNext 异常导致无限请求
+
+  NSMutableArray<TLWCommunityPost *> *accumulator = [NSMutableArray array];
+  __weak typeof(self) weakSelf = self;
+
+  __block void (^fetchPageBlock)(NSInteger pageIndex);
+  fetchPageBlock = ^(NSInteger pageIndex) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+
+    [sdk getAllPostsWithTag:nil
+                           q:nil
+                         page:@(pageIndex)
+                         size:@(pageSize)
+            completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
+      __strong typeof(weakSelf) s = weakSelf;
+      if (!s) return;
+
+      if (error || !output || !output.data.list) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          s.tl_isFetchingFeed = NO;
+          // 合并本地发布的 item，避免分页完成时覆盖掉刚发布的帖子
+          NSMutableArray<TLWCommunityPost *> *merged = [accumulator mutableCopy];
+          for (TLWCommunityPost *localPost in s.posts) {
+            if (![accumulator containsObject:localPost]) {
+              [merged addObject:localPost];
+            }
+          }
+          s.posts = merged;
+          [s.myView.collectionView reloadData];
+        });
+        return;
+      }
+
+      for (AGPostResponseDto *dto in output.data.list) {
+        TLWCommunityPost *post = [TLWCommunityPost new];
+        post._id = dto._id;
+        post.title = dto.title ?: @"";
+        post.content = dto.content ?: @"";
+        post.images = dto.images ?: @[];
+        post.tags = dto.tags ?: @[];
+        post.authorName = dto.authorName ?: @"";
+        post.authorAvatar = dto.authorAvatar ?: @"";
+        post.likeCount = @0;
+        // imageAspectRatio 由瀑布流代理方法按行规则统一设置
+        [accumulator addObject:post];
+      }
+
+      // 逐页渲染，减少“空白等待”感
+      dispatch_async(dispatch_get_main_queue(), ^{
+        // 合并本地发布的 item，避免分页刷新覆盖掉刚发布的帖子
+        NSMutableArray<TLWCommunityPost *> *merged = [accumulator mutableCopy];
+        for (TLWCommunityPost *localPost in s.posts) {
+          if (![accumulator containsObject:localPost]) {
+            [merged addObject:localPost];
+          }
+        }
+        s.posts = merged;
+        [s.myView.collectionView reloadData];
+      });
+
+      BOOL hasNext = output.data.hasNext.boolValue;
+      if (hasNext && pageIndex + 1 < maxPages) {
+        fetchPageBlock(pageIndex + 1);
+      } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          s.tl_isFetchingFeed = NO;
+          // 合并本地发布的 item，避免最终结果覆盖掉刚发布的帖子
+          NSMutableArray<TLWCommunityPost *> *merged = [accumulator mutableCopy];
+          for (TLWCommunityPost *localPost in s.posts) {
+            if (![accumulator containsObject:localPost]) {
+              [merged addObject:localPost];
+            }
+          }
+          s.posts = merged;
+          [s.myView.collectionView reloadData];
+        });
+      }
+    }];
+  };
+
+  fetchPageBlock(0);
 }
 
 #pragma mark - UICollectionViewDataSource
@@ -109,10 +205,27 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   return cell;
 }
 
+#pragma mark - UICollectionViewDelegate
+
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+  if (indexPath.item >= self.posts.count) return;
+  TLWCommunityPost *post = self.posts[indexPath.item];
+  TLWPostDetailController *detailVC = [[TLWPostDetailController alloc] init];
+  detailVC.post = post;
+  detailVC.hidesBottomBarWhenPushed = YES;
+  [self.navigationController pushViewController:detailVC animated:YES];
+}
+
 #pragma mark - TLWCommunityWaterfallLayoutDelegate
 
 - (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout heightForItemAtIndexPath:(NSIndexPath *)indexPath itemWidth:(CGFloat)width {
   TLWCommunityPost *post = self.posts[indexPath.item];
+  // 瀑布流高度计算使用的纵横比规则应与 cell 展示保持一致
+  if (indexPath.row == 0) {
+    post.imageAspectRatio = 0.60;
+  } else {
+    post.imageAspectRatio = 0.75;
+  }
   return [post cellHeightForWidth:width];
 }
 
@@ -146,7 +259,20 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
       post.imageAspectRatio = 0.65;
     }
     [strongSelf.posts addObject:post];
-    [strongSelf.myView.collectionView reloadData];
+
+    NSInteger newIndex = strongSelf.posts.count - 1;
+    NSIndexPath *indexPath = [NSIndexPath indexPathForItem:newIndex inSection:0];
+
+    // 如果正在分页拉取，分页回调会触发 reloadData；为避免数据源/插入操作冲突，此处兜底全量刷新
+    if (strongSelf.tl_isFetchingFeed) {
+      [strongSelf.myView.collectionView reloadData];
+      return;
+    }
+
+    // 只插入新增的 1 个 item，而不是整体 reloadData
+    [strongSelf.myView.collectionView performBatchUpdates:^{
+      [strongSelf.myView.collectionView insertItemsAtIndexPaths:@[indexPath]];
+    } completion:nil];
   };
   [self presentViewController:vc animated:YES completion:nil];
 }
@@ -164,6 +290,123 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   [self.myView tl_hideSearchOverlay];
   return YES;
 }
+
+- (void)tl_updatePost:(NSNotification* )notification {
+  __weak typeof(self) weakSelf = self;
+  TLWSDKManager* manager = [TLWSDKManager shared];
+  NSDictionary* dict = notification.userInfo;
+  NSString* content = dict[@"content"];
+  [manager uploadImages:dict[@"images"] prefix:@"post" completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable error) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    NSLog(@"1");
+      if (!strongSelf) {
+        NSLog(@"2");
+        return;
+      }
+      if (error) {
+        NSLog(@"3");
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"上传图片失败" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+        [strongSelf presentViewController:alert animated:YES completion:nil];
+        return;
+      }
+    NSLog(@"4");
+      AGPostCreateRequest* request = [[AGPostCreateRequest alloc] init];
+      request.title = content.length > 15 ? [content substringToIndex:15] : content;
+      request.content = [content copy];
+      request.images = urls ?: @[];
+      request.tags = [dict[@"crops"] copy] ?: @[];
+      NSLog(@"图片url已获取");
+    NSLog(@"strongSelf: %@", strongSelf);
+    [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+              NSLog(@"5");
+              if (output.code.integerValue != 200) {
+                NSLog(@"6");
+                [strongSelf tl_showTopToast:@"帖子发送失败"];
+                NSLog(@"帖子发布失败");
+                return;
+              }
+              NSLog(@"7");
+              NSLog(@"帖子发布成功");
+              NSLog(@"strongSelf:%@", strongSelf);
+              [strongSelf tl_showTopToast:@"帖子发布成功"];
+            });
+    }];
+  }];
+  NSLog(@"8");
+}
+
+
+- (void)tl_showTopToast:(NSString *)text {
+  if (text.length == 0) return;
+
+  // 挂到“全局 window”，保证在任何页面都能看到
+  UIWindow *hostWindow = nil;
+  if (@available(iOS 13.0, *)) {
+    // 仅使用前台激活的 Scene，避免取到后台/其他窗口的 keyWindow
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+      if (scene.activationState != UISceneActivationStateForegroundActive) continue;
+      if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+      UIWindowScene *windowScene = (UIWindowScene *)scene;
+
+      // 优先取 key window（当前场景正在接收事件的窗口）
+      for (UIWindow *w in windowScene.windows) {
+        if (w.isKeyWindow) {
+          hostWindow = w;
+          break;
+        }
+      }
+      if (!hostWindow) {
+        hostWindow = windowScene.windows.firstObject;
+      }
+      if (hostWindow) break;
+    }
+  } else {
+    // iOS 12 及以下：直接用当前控制器关联的 window 即可（避免使用废弃的 UIApplication.windows）
+    hostWindow = self.view.window;
+  }
+  if (!hostWindow) return;
+
+  UIView *old = [hostWindow viewWithTag:1107];
+  if (old) [old removeFromSuperview];
+
+  UILabel *toast = [UILabel new];
+  toast.tag = 1107;
+  toast.text = text;
+  toast.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+  toast.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
+  toast.textAlignment = NSTextAlignmentCenter;
+  toast.backgroundColor = UIColor.whiteColor;
+  toast.layer.cornerRadius = 19;
+  toast.layer.masksToBounds = YES;
+  toast.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
+  toast.layer.shadowOpacity = 1;
+  toast.layer.shadowRadius = 6;
+  toast.layer.shadowOffset = CGSizeMake(0, 2);
+  [hostWindow addSubview:toast];
+
+  [toast mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(hostWindow.mas_safeAreaLayoutGuideTop).offset(10);
+    make.centerX.equalTo(hostWindow);
+    make.width.mas_equalTo(190);
+    make.height.mas_equalTo(38);
+  }];
+
+  toast.alpha = 0;
+  [UIView animateWithDuration:0.25 animations:^{
+    toast.alpha = 1;
+  } completion:^(BOOL finished) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      [UIView animateWithDuration:0.25 animations:^{
+        toast.alpha = 0;
+      } completion:^(BOOL done) {
+        [toast removeFromSuperview];
+      }];
+    });
+  }];
+}
+
 
 
 @end
