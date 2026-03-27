@@ -182,4 +182,15 @@ static NSString * const kUsernameKey = @"TLW_username";
   return [self.api getCommentsWithId:_id page:page size:size completionHandler:handler];
 }
 
+- (NSURLSessionTask *)addCommentWithId:(NSNumber *)_id
+                               content:(NSString *)content
+                     completionHandler:(void (^)(AGResultCommentResponseDto * output, NSError * error))handler {
+  AGCommentRequest *req = [[AGCommentRequest alloc] init];
+  req.content = content;
+  return [self.api addCommentWithId:_id commentRequest:req completionHandler:handler];
+}
+
+
+
+
 @end

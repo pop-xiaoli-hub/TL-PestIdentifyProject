@@ -9,6 +9,8 @@
 #import "TLWCommentCell.h"
 #import <Masonry/Masonry.h>
 #import <objc/runtime.h>
+#import <AgriPestClient/AGCommentResponseDto.h>
+#import "TLWSDKManager.h"
 
 static NSString *const kCommentCellID = @"TLWCommentCell";
 
@@ -16,7 +18,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) TLWPostDetailHeaderView *headerView;
-@property (nonatomic, strong) NSMutableArray<TLWCommentModel *> *comments;
+@property (nonatomic, strong) NSMutableArray<AGCommentResponseDto *> *comments;
 
 // Nav bar reference
 @property (nonatomic, strong) UIView *navBarView;
@@ -31,6 +33,12 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 @property (nonatomic, assign) NSInteger likeCount;
 @property (nonatomic, assign) BOOL liked;
 
+// 分页加载
+@property (nonatomic, assign) NSInteger currentPage;
+@property (nonatomic, assign) BOOL isLoadingComments;
+@property (nonatomic, assign) BOOL hasMoreComments;
+@property (nonatomic, strong) UIActivityIndicatorView *footerSpinner;
+
 @end
 
 @implementation TLWPostDetailController
@@ -42,7 +50,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [self buildNavBar];
   [self buildTableView];
   [self buildInputBar];
-  [self buildMockComments];
+  [self loadComments];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillChange:) name:UIKeyboardWillChangeFrameNotification object:nil];
 }
 
@@ -224,26 +232,71 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   }];
 }
 
-- (void)buildMockComments {
+- (void)loadComments {
   self.comments = [NSMutableArray array];
-  NSArray *names    = @[@"农友小李", @"种地达人", @"绿野仙踪", @"稻花飘香", @"植保专家"];
-  NSArray *contents = @[
-    @"我家也遇到过这个问题，用多菌灵喷了两次就好了",
-    @"建议先剪掉病枝，再喷药效果更好！",
-    @"这个病害很常见，注意通风就行",
-    @"感谢分享，学到了很多",
-    @"我觉得还是要找当地农业局咨询一下"
-  ];
-  NSArray *times    = @[@"2分钟前", @"15分钟前", @"1小时前", @"3小时前", @"昨天"];
-  for (NSInteger i = 0; i < 5; i++) {
-    TLWCommentModel *m = [[TLWCommentModel alloc] init];
-    m.username   = names[i];
-    m.content    = contents[i];
-    m.timeString = times[i];
-    m.likeCount  = (i + 1) * 3;
-    [self.comments addObject:m];
-  }
+  self.currentPage = 0;
+  self.hasMoreComments = YES;
+  self.isLoadingComments = NO;
   [self.tableView reloadData];
+  [self fetchCommentsPage:0];
+}
+
+- (void)fetchCommentsPage:(NSInteger)page {
+  if (!self.post._id || self.isLoadingComments || !self.hasMoreComments) return;
+  self.isLoadingComments = YES;
+
+  // 显示底部加载指示器
+  if (page > 0) {
+    [self.footerSpinner startAnimating];
+    self.tableView.tableFooterView = self.footerSpinner;
+  }
+
+  [[TLWSDKManager shared] getCommentsWithId:self.post._id
+                                       page:@(page)
+                                       size:@20
+                          completionHandler:^(AGResultPageResultCommentResponseDto *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      self.isLoadingComments = NO;
+      self.tableView.tableFooterView = nil;
+      [self.footerSpinner stopAnimating];
+
+      if (error || !output || output.code.integerValue != 200) {
+        NSLog(@"[Comments] 获取评论失败: %@", error.localizedDescription ?: output.message);
+        return;
+      }
+
+      NSArray *list = output.data.list;
+      // 判断是否还有更多页
+      self.hasMoreComments = output.data.hasNext.boolValue;
+
+      if (list.count > 0) {
+        if (page == 0) {
+          [self.comments setArray:list];
+          [self.tableView reloadData];
+        } else {
+          NSInteger oldCount = self.comments.count;
+          [self.comments addObjectsFromArray:list];
+          NSMutableArray<NSIndexPath *> *indexPaths = [NSMutableArray array];
+          for (NSInteger i = oldCount; i < self.comments.count; i++) {
+            [indexPaths addObject:[NSIndexPath indexPathForRow:i inSection:0]];
+          }
+          [self.tableView insertRowsAtIndexPaths:indexPaths withRowAnimation:UITableViewRowAnimationNone];
+        }
+        self.currentPage = page;
+      } else if (page == 0) {
+        [self.tableView reloadData];
+      }
+    });
+  }];
+}
+
+- (UIActivityIndicatorView *)footerSpinner {
+  if (!_footerSpinner) {
+    _footerSpinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    _footerSpinner.frame = CGRectMake(0, 0, self.tableView.bounds.size.width, 44);
+    _footerSpinner.color = [UIColor colorWithWhite:0.6 alpha:1.0];
+  }
+  return _footerSpinner;
 }
 
 #pragma mark - UITableViewDataSource
@@ -262,6 +315,16 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
   return UITableViewAutomaticDimension;
+}
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+  CGFloat contentH = scrollView.contentSize.height;
+  CGFloat offsetY  = scrollView.contentOffset.y;
+  CGFloat frameH   = scrollView.bounds.size.height;
+  // 距底部 80pt 时触发加载下一页
+  if (contentH > frameH && offsetY > contentH - frameH - 80) {
+    [self fetchCommentsPage:self.currentPage + 1];
+  }
 }
 
 #pragma mark - UITextFieldDelegate
@@ -300,20 +363,35 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   NSString *text = [self.commentTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
   if (text.length == 0) return;
 
-  TLWCommentModel *m = [[TLWCommentModel alloc] init];
-  m.username   = @"我";
-  m.content    = text;
-  m.timeString = @"刚刚";
-  m.likeCount  = 0;
-  [self.comments insertObject:m atIndex:0];
-  [self.tableView insertRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:0 inSection:0]]
-                        withRowAnimation:UITableViewRowAnimationTop];
-  self.commentTextField.text = @"";
-  [self.commentTextField resignFirstResponder];
-  // Scroll to new comment
-  [self.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]
-                        atScrollPosition:UITableViewScrollPositionTop
-                                animated:YES];
+  // 禁用发送按钮，防止重复提交
+  self.sendButton.enabled = NO;
+  NSNumber *postId = self.post._id;
+  [[TLWSDKManager shared] addCommentWithId:postId content:text completionHandler:^(AGResultCommentResponseDto *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      self.sendButton.enabled = YES;
+      if (error || !output || output.code.integerValue != 200) {
+        NSString *msg = output.message.length > 0 ? output.message : @"评论发送失败，请稍后重试";
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"发送失败" message:msg preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+      }
+      // 使用服务端返回的评论对象插入列表
+      AGCommentResponseDto *newComment = output.data;
+      if (!newComment) {
+        // 服务端未返回 data，本地构造占位
+        newComment = [[AGCommentResponseDto alloc] init];
+        newComment.authorName = [TLWSDKManager shared].username ?: @"我";
+        newComment.content    = text;
+        newComment.createdAt  = [NSDate date];
+      }
+      [self.comments insertObject:newComment atIndex:0];
+      [self.tableView insertRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:0 inSection:0]] withRowAnimation:UITableViewRowAnimationTop];
+      self.commentTextField.text = @"";
+      [self.commentTextField resignFirstResponder];
+      [self.tableView scrollToRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0] atScrollPosition:UITableViewScrollPositionTop animated:YES];
+    });
+  }];
 }
 
 #pragma mark - Keyboard
