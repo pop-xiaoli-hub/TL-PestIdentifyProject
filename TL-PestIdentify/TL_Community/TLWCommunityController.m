@@ -10,12 +10,13 @@
 #import "TLWCommunityWaterfallLayout.h"
 #import "TLWVoiceInputViewController.h"
 #import "TLWPublishController.h"
+#import "TLWPostDetailController.h"
 #import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
-@interface TLWCommunityController () <UICollectionViewDataSource, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate >
+@interface TLWCommunityController () <UICollectionViewDataSource, UICollectionViewDelegate, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate>
 
 @property (nonatomic, strong) TLWCommunityView *myView;
 @property (nonatomic, strong) NSMutableArray *posts;
@@ -36,6 +37,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
   UICollectionView *collectionView = self.myView.collectionView;
   collectionView.dataSource = self;
+  collectionView.delegate = self;
   TLWCommunityWaterfallLayout *layout = (TLWCommunityWaterfallLayout *)collectionView.collectionViewLayout;
   layout.delegate = self;
   [collectionView registerClass:[TLWCommunityCell class] forCellWithReuseIdentifier:kCommunityCellID];
@@ -201,6 +203,17 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   }
   [cell configureWithPost:post];
   return cell;
+}
+
+#pragma mark - UICollectionViewDelegate
+
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+  if (indexPath.item >= self.posts.count) return;
+  TLWCommunityPost *post = self.posts[indexPath.item];
+  TLWPostDetailController *detailVC = [[TLWPostDetailController alloc] init];
+  detailVC.post = post;
+  detailVC.hidesBottomBarWhenPushed = YES;
+  [self.navigationController pushViewController:detailVC animated:YES];
 }
 
 #pragma mark - TLWCommunityWaterfallLayoutDelegate
