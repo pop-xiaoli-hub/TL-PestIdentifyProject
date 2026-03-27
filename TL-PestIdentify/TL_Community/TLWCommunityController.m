@@ -142,7 +142,8 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
         post.tags = dto.tags ?: @[];
         post.authorName = dto.authorName ?: @"";
         post.authorAvatar = dto.authorAvatar ?: @"";
-        post.likeCount = @0;
+        post.likeCount = dto.likeCount ?: @0;
+        NSLog(@"点赞数 : %@", post.likeCount);
         // imageAspectRatio 由瀑布流代理方法按行规则统一设置
         [accumulator addObject:post];
       }
@@ -201,6 +202,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   } else {
     post.imageAspectRatio = 0.75;
   }
+  NSLog(@"点赞数-1 : %@", post.likeCount);
   [cell configureWithPost:post];
   return cell;
 }

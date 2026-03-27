@@ -131,7 +131,7 @@
   [formatter setDateFormat:@"yyyy年MM月dd日 HH:mm"];
   self.timeLabel.text = [formatter stringFromDate:comment.createdAt];
   self.contentLabel.text = comment.content;
-  // self.likeLabel.text = [NSString stringWithFormat:@"%ld", (long)comment.likeCount];
+  //self.likeLabel.text = [NSString stringWithFormat:@"%@", comment.likeCount];
   if (comment.authorAvatar.length > 0) {
     [self.avatarView sd_setImageWithURL:[NSURL URLWithString:comment.authorAvatar]
                        placeholderImage:[UIImage imageNamed:@"hp_avator.png"]];
