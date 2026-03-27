@@ -123,6 +123,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
       if (error || !output || !output.data.list) {
         NSLog(@"[Community] 拉取失败: error=%@, output=%@", error, output);
+        fetchPageBlock = nil; // 打破 block 循环引用
         dispatch_async(dispatch_get_main_queue(), ^{
           s.tl_isFetchingFeed = NO;
           // 合并本地发布的 item，避免分页完成时覆盖掉刚发布的帖子
@@ -169,6 +170,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
       if (hasNext && pageIndex + 1 < maxPages) {
         fetchPageBlock(pageIndex + 1);
       } else {
+        fetchPageBlock = nil; // 打破 block 循环引用
         dispatch_async(dispatch_get_main_queue(), ^{
           s.tl_isFetchingFeed = NO;
           // 合并本地发布的 item，避免最终结果覆盖掉刚发布的帖子
