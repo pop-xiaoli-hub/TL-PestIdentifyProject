@@ -3,8 +3,29 @@ platform :ios, '12.0'
 target 'TL-PestIdentify' do
   pod 'LookinServer', :configurations => ['Debug']
   pod 'YYModel'
-  pod 'AgriPestClient', :git => 'https://github.com/lukecc00/AgriPest-IOS-SDK.git', :tag => 'v1.0.68'
+  pod 'AgriPestClient', :git => 'https://github.com/lukecc00/AgriPest-IOS-SDK.git', :branch => 'main'
   pod 'WCDB.objc'
   pod 'Masonry'
   pod 'SDWebImage', '~> 5.0'
+end
+
+# Xcode 26 兼容
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      # AFNetworking: Xcode 26 netinet6/in6.h private header 问题
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      if target.name == 'AFNetworking'
+        flags = config.build_settings['OTHER_CFLAGS'] || ['$(inherited)']
+        flags << '-fno-modules'
+        config.build_settings['OTHER_CFLAGS'] = flags
+      end
+      # WCDB.objc: C++ is_integral 特化在新 clang 下报错
+      if target.name == 'WCDB.objc' || target.name == 'WCDBOptimizedSQLCipher'
+        flags = config.build_settings['OTHER_CPLUSPLUSFLAGS'] || ['$(inherited)']
+        flags << '-Wno-invalid-specialization'
+        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = flags
+      end
+    end
+  end
 end

@@ -5,16 +5,15 @@
 
 #import "TLWAIAssistantController.h"
 #import "TLWAIAssistantView.h"
-#import "TLWCameraManager.h"
+#import "TLWImagePickerManager.h"
 #import "TWLSpeechManager.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWAIAssistantController () <TLWCameraManagerDelegate>
+@interface TLWAIAssistantController () <TLWImagePickerDelegate>
 @property (nonatomic, strong) TLWAIAssistantView *myView;
 @property (nonatomic, copy)   NSString           *initialQuestion;
-@property (nonatomic, strong) TLWCameraManager   *cameraManager;
 @property (nonatomic, assign) BOOL                showVoicePanelAfterKeyboardHide;
-@property (nonatomic, strong) UIImage            *pendingImage; // 待上传给 AI 的图片
+@property (nonatomic, strong) NSMutableArray<UIImage *> *pendingImages; // 待上传给 AI 的图片
 @end
 
 @implementation TLWAIAssistantController
@@ -34,9 +33,6 @@
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
-
-    self.cameraManager = [[TLWCameraManager alloc] initWithHostViewController:self];
-    self.cameraManager.delegate = self;
 
     [self.myView.backButton addTarget:self
                                action:@selector(tl_back)
@@ -73,6 +69,16 @@
                                                                           action:@selector(tl_dismissKeyboard)];
     tap.cancelsTouchesInView = NO;
     [self.myView addGestureRecognizer:tap];
+
+    // 删除预览图回调
+    __weak typeof(self) weakSelf = self;
+    self.myView.onRemoveImageAtIndex = ^(NSUInteger index) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf || index >= strongSelf.pendingImages.count) return;
+        [strongSelf.pendingImages removeObjectAtIndex:index];
+    };
+
+    _pendingImages = [NSMutableArray array];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -89,13 +95,9 @@
 }
 
 - (void)tl_camera {
-    [self.cameraManager setupCamera];
-    UIImagePickerController *picker = [[UIImagePickerController alloc] init];
-    picker.sourceType = UIImagePickerControllerSourceTypeCamera;
-    picker.allowsEditing = YES;
-    picker.delegate = self.cameraManager;
-    picker.modalPresentationStyle = UIModalPresentationFullScreen;
-    [self presentViewController:picker animated:YES completion:nil];
+    TLWImagePickerManager *picker = [[TLWImagePickerManager alloc] init];
+    picker.delegate = self;
+    [picker openCameraFrom:self];
 }
 
 - (void)tl_mic {
@@ -158,15 +160,30 @@
 }
 
 - (void)tl_gallery {
-    [self.cameraManager openPhotoAlbum];
+    TLWImagePickerManager *picker = [[TLWImagePickerManager alloc] init];
+    picker.delegate = self;
+    picker.maxCount = 9;
+    [picker openAlbumFrom:self];
 }
 
-#pragma mark - TLWCameraManagerDelegate
+#pragma mark - TLWImagePickerDelegate
 
-- (void)cameraManager:(TLWCameraManager *)manager didCapturePhoto:(UIImage *)image {
-    self.pendingImage = image;
+- (void)imagePicker:(TLWImagePickerManager *)picker didSelectImage:(UIImage *)image {
+    [self.pendingImages removeAllObjects];
+    [self.pendingImages addObject:image];
     [self.myView showSelectedImage:image];
     [self tl_uploadImageToAI:image];
+}
+
+- (void)imagePicker:(TLWImagePickerManager *)picker didSelectImages:(NSArray<UIImage *> *)images {
+    if (images.count == 0) return;
+    [self.pendingImages removeAllObjects];
+    [self.pendingImages addObjectsFromArray:images];
+    [self.myView showSelectedImages:images];
+    // TODO: 多图上传给 AI，目前先逐张调用
+    for (UIImage *image in images) {
+        [self tl_uploadImageToAI:image];
+    }
 }
 
 - (void)tl_uploadImageToAI:(UIImage *)image {

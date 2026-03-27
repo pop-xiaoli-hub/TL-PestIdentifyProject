@@ -19,13 +19,13 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
 @property (nonatomic, strong, readwrite) UIButton    *cameraButton;
 @property (nonatomic, strong, readwrite) UIButton    *micButton;
 @property (nonatomic, strong, readwrite) UIButton    *galleryButton;
-@property (nonatomic, strong, readwrite) UIButton    *removePreviewButton;
 @property (nonatomic, strong, readwrite) UIImageView *voiceSpeechImageView;
 @property (nonatomic, strong) UIView                 *voicePanel;
 @property (nonatomic, strong) UIView        *inputBar;
 @property (nonatomic, strong) UIView        *roundContainer;
 @property (nonatomic, strong) UIView        *previewRow;
-@property (nonatomic, strong) UIImageView   *previewImageView;
+@property (nonatomic, strong) UIScrollView  *previewScrollView;
+@property (nonatomic, strong) NSMutableArray<UIImage *> *previewImages;
 @property (nonatomic, strong) MASConstraint *inputBarBottomConstraint;
 @property (nonatomic, strong) MASConstraint *inputBarHeightConstraint;
 @property (nonatomic, strong) MASConstraint *chatScrollBottomConstraint;
@@ -200,35 +200,18 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
         make.height.mas_equalTo(kPreviewAreaHeight);
     }];
 
-    _previewImageView = [[UIImageView alloc] init];
-    _previewImageView.contentMode = UIViewContentModeScaleAspectFill;
-    _previewImageView.clipsToBounds = YES;
-    _previewImageView.layer.cornerRadius = 8;
-    _previewImageView.userInteractionEnabled = YES;
-    [_previewRow addSubview:_previewImageView];
-    [_previewImageView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.mas_equalTo(8);
-        make.left.mas_equalTo(25);
-        make.width.height.mas_equalTo(80);
+    _previewScrollView = [[UIScrollView alloc] init];
+    _previewScrollView.showsHorizontalScrollIndicator = NO;
+    _previewScrollView.showsVerticalScrollIndicator   = NO;
+    [_previewRow addSubview:_previewScrollView];
+    [_previewScrollView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.mas_equalTo(4);
+        make.left.mas_equalTo(16);
+        make.right.mas_equalTo(-16);
+        make.bottom.equalTo(_previewRow);
     }];
 
-    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self
-                                                                          action:@selector(tl_showFullscreenPreview)];
-    [_previewImageView addGestureRecognizer:tap];
-
-    _removePreviewButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_removePreviewButton setTitle:@"×" forState:UIControlStateNormal];
-    [_removePreviewButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    _removePreviewButton.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    _removePreviewButton.backgroundColor = [UIColor colorWithWhite:0 alpha:0.5];
-    _removePreviewButton.layer.cornerRadius = 10;
-    [_previewRow addSubview:_removePreviewButton];
-    [_removePreviewButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_previewImageView);
-        make.left.equalTo(_previewImageView.mas_right).offset(-10);
-        make.width.height.mas_equalTo(20);
-    }];
-    [_removePreviewButton addTarget:self action:@selector(hideSelectedImage) forControlEvents:UIControlEventTouchUpInside];
+    _previewImages = [NSMutableArray array];
 
     // ── inputRow（透明，roundContainer 底部，高度随 textView 动态增长）──
     UIView *inputRow = [[UIView alloc] init];
@@ -380,7 +363,13 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
 #pragma mark - Image Preview
 
 - (void)showSelectedImage:(UIImage *)image {
-    _previewImageView.image = image;
+    [self showSelectedImages:@[image]];
+}
+
+- (void)showSelectedImages:(NSArray<UIImage *> *)images {
+    [_previewImages removeAllObjects];
+    [_previewImages addObjectsFromArray:images];
+    [self tl_rebuildPreviewThumbnails];
     _previewRow.hidden = NO;
     [self tl_updateInputBarHeight];
     [UIView animateWithDuration:0.2 animations:^{
@@ -390,21 +379,85 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
 
 - (void)hideSelectedImage {
     _previewRow.hidden = YES;
-    _previewImageView.image = nil;
+    [_previewImages removeAllObjects];
+    [_previewScrollView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
     [self tl_updateInputBarHeight];
     [UIView animateWithDuration:0.2 animations:^{
         [self layoutIfNeeded];
     }];
 }
 
-- (void)tl_showFullscreenPreview {
+- (void)tl_rebuildPreviewThumbnails {
+    [_previewScrollView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+
+    CGFloat thumbSize = 80;
+    CGFloat gap       = 10;
+    CGFloat topInset  = 4;
+
+    for (NSUInteger i = 0; i < _previewImages.count; i++) {
+        CGFloat x = i * (thumbSize + gap);
+
+        // 缩略图
+        UIImageView *imgView = [[UIImageView alloc] initWithFrame:CGRectMake(x, topInset, thumbSize, thumbSize)];
+        imgView.image = _previewImages[i];
+        imgView.contentMode = UIViewContentModeScaleAspectFill;
+        imgView.clipsToBounds = YES;
+        imgView.layer.cornerRadius = 8;
+        imgView.userInteractionEnabled = YES;
+        imgView.tag = 1000 + (NSInteger)i;
+        [_previewScrollView addSubview:imgView];
+
+        // 点击大图预览
+        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self
+                                                                              action:@selector(tl_previewThumbnailTapped:)];
+        [imgView addGestureRecognizer:tap];
+
+        // × 删除按钮
+        UIButton *removeBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+        removeBtn.frame = CGRectMake(x + thumbSize - 18, topInset, 20, 20);
+        [removeBtn setTitle:@"×" forState:UIControlStateNormal];
+        [removeBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        removeBtn.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+        removeBtn.backgroundColor = [UIColor colorWithWhite:0 alpha:0.5];
+        removeBtn.layer.cornerRadius = 10;
+        removeBtn.tag = 2000 + (NSInteger)i;
+        [removeBtn addTarget:self action:@selector(tl_removePreviewImage:) forControlEvents:UIControlEventTouchUpInside];
+        [_previewScrollView addSubview:removeBtn];
+    }
+
+    CGFloat totalW = _previewImages.count * (thumbSize + gap) - gap;
+    _previewScrollView.contentSize = CGSizeMake(MAX(totalW, 0), thumbSize + topInset);
+}
+
+- (void)tl_removePreviewImage:(UIButton *)sender {
+    NSUInteger index = (NSUInteger)(sender.tag - 2000);
+    if (index >= _previewImages.count) return;
+
+    [_previewImages removeObjectAtIndex:index];
+
+    if (_previewImages.count == 0) {
+        [self hideSelectedImage];
+    } else {
+        [self tl_rebuildPreviewThumbnails];
+    }
+
+    if (self.onRemoveImageAtIndex) {
+        self.onRemoveImageAtIndex(index);
+    }
+}
+
+- (void)tl_previewThumbnailTapped:(UITapGestureRecognizer *)tap {
+    NSUInteger index = (NSUInteger)(tap.view.tag - 1000);
+    if (index >= _previewImages.count) return;
+
+    UIImage *image = _previewImages[index];
     UIWindow *window = UIApplication.sharedApplication.windows.firstObject;
 
     UIView *overlay = [[UIView alloc] initWithFrame:window.bounds];
     overlay.backgroundColor = [UIColor colorWithWhite:0 alpha:0.9];
 
     UIImageView *fullImageView = [[UIImageView alloc] init];
-    fullImageView.image = _previewImageView.image;
+    fullImageView.image = image;
     fullImageView.contentMode = UIViewContentModeScaleAspectFit;
     CGFloat padding = 20;
     fullImageView.frame = CGRectMake(padding, 80,

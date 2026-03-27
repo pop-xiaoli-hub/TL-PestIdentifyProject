@@ -15,8 +15,10 @@ static CGFloat   const kCellGap       = 1.0;
 #pragma mark - Cell
 
 @interface TLWPhotoCell : UICollectionViewCell
-@property (nonatomic, strong) UIImageView        *imageView;
-@property (nonatomic, assign) PHImageRequestID    requestID;
+@property (nonatomic, strong) UIImageView  *imageView;
+@property (nonatomic, strong) UIView       *selectCircle;   // 未选中的空心圆
+@property (nonatomic, strong) UILabel      *selectNumLabel; // 选中的序号圆
+@property (nonatomic, assign) PHImageRequestID requestID;
 @end
 
 @implementation TLWPhotoCell
@@ -25,13 +27,45 @@ static CGFloat   const kCellGap       = 1.0;
     self = [super initWithFrame:frame];
     if (self) {
         _requestID = PHInvalidImageRequestID;
+
         _imageView = [[UIImageView alloc] initWithFrame:self.bounds];
-        _imageView.contentMode         = UIViewContentModeScaleAspectFill;
-        _imageView.clipsToBounds       = YES;
-        _imageView.autoresizingMask    = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        _imageView.contentMode      = UIViewContentModeScaleAspectFill;
+        _imageView.clipsToBounds    = YES;
+        _imageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         [self.contentView addSubview:_imageView];
+
+        // 未选中：白色空心圆 26x26
+        _selectCircle = [[UIView alloc] init];
+        _selectCircle.layer.cornerRadius  = 13;
+        _selectCircle.layer.borderWidth   = 2.0;
+        _selectCircle.layer.borderColor   = [UIColor colorWithWhite:1 alpha:0.85].CGColor;
+        _selectCircle.backgroundColor     = [UIColor colorWithWhite:0 alpha:0.15];
+        _selectCircle.userInteractionEnabled = NO;
+        [self.contentView addSubview:_selectCircle];
+
+        // 选中：橙色实心圆 + 序号
+        _selectNumLabel = [[UILabel alloc] init];
+        _selectNumLabel.layer.cornerRadius  = 13;
+        _selectNumLabel.layer.masksToBounds = YES;
+        _selectNumLabel.backgroundColor     = [UIColor colorWithRed:0.97 green:0.60 blue:0.15 alpha:1.0];
+        _selectNumLabel.textColor           = UIColor.whiteColor;
+        _selectNumLabel.font                = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
+        _selectNumLabel.textAlignment       = NSTextAlignmentCenter;
+        _selectNumLabel.hidden              = YES;
+        _selectNumLabel.userInteractionEnabled = NO;
+        [self.contentView addSubview:_selectNumLabel];
     }
     return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGFloat size = 26;
+    CGFloat margin = 6;
+    CGRect r = CGRectMake(self.contentView.bounds.size.width - size - margin,
+                          margin, size, size);
+    _selectCircle.frame   = r;
+    _selectNumLabel.frame = r;
 }
 
 - (void)prepareForReuse {
@@ -40,7 +74,20 @@ static CGFloat   const kCellGap       = 1.0;
         [[PHImageManager defaultManager] cancelImageRequest:_requestID];
         _requestID = PHInvalidImageRequestID;
     }
-    _imageView.image = nil;
+    _imageView.image       = nil;
+    _selectCircle.hidden   = NO;
+    _selectNumLabel.hidden = YES;
+}
+
+- (void)configureWithSelectionIndex:(NSInteger)index {
+    if (index > 0) {
+        _selectCircle.hidden   = YES;
+        _selectNumLabel.hidden = NO;
+        _selectNumLabel.text   = [NSString stringWithFormat:@"%ld", (long)index];
+    } else {
+        _selectCircle.hidden   = NO;
+        _selectNumLabel.hidden = YES;
+    }
 }
 
 @end
@@ -58,6 +105,13 @@ static CGFloat   const kCellGap       = 1.0;
 @property (nonatomic, assign) CGSize                     thumbnailSize;
 @property (nonatomic, assign) BOOL                       didLayout;
 
+// 多选
+@property (nonatomic, strong) NSMutableArray<PHAsset *> *selectedAssets;
+@property (nonatomic, strong) UIView                    *bottomBar;
+@property (nonatomic, strong) UILabel                   *bottomCountLabel;
+@property (nonatomic, strong) UIButton                  *bottomDoneBtn;
+@property (nonatomic, strong) UILabel                   *bottomBadge;
+
 @end
 
 @implementation TLWPhotoPickerController
@@ -70,10 +124,15 @@ static CGFloat   const kCellGap       = 1.0;
     self.view.backgroundColor = UIColor.whiteColor;
     self.view.layer.contents = (__bridge id)[UIImage imageNamed:@"hp_backView"].CGImage;
 
+    if (_maxCount == 0) _maxCount = 1;
+    _selectedAssets = [NSMutableArray array];
     _imageManager = [[PHCachingImageManager alloc] init];
 
     [self setupNavBar];
     [self setupCollectionView];
+    if ([self isMultiSelectMode]) {
+        [self setupBottomBar];
+    }
     [self requestPhotoAccess];
 }
 
@@ -101,6 +160,10 @@ static CGFloat   const kCellGap       = 1.0;
     _layout.itemSize = CGSizeMake(cellW, cellW);
     _thumbnailSize   = CGSizeMake(cellW * UIScreen.mainScreen.scale,
                                    cellW * UIScreen.mainScreen.scale);
+}
+
+- (BOOL)isMultiSelectMode {
+    return _maxCount > 1;
 }
 
 #pragma mark - Setup
@@ -144,7 +207,7 @@ static CGFloat   const kCellGap       = 1.0;
     _layout.minimumInteritemSpacing = kCellGap;
     _layout.minimumLineSpacing      = kCellGap;
     _layout.sectionInset            = UIEdgeInsetsZero;
-    _layout.itemSize                = CGSizeMake(1, 1); // 占位，viewDidLayoutSubviews 更新
+    _layout.itemSize                = CGSizeMake(1, 1);
 
     _collectionView = [[UICollectionView alloc] initWithFrame:CGRectZero
                                          collectionViewLayout:_layout];
@@ -157,9 +220,104 @@ static CGFloat   const kCellGap       = 1.0;
     [self.view addSubview:_collectionView];
     [_collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_navBar.mas_bottom);
-        make.left.right.bottom.equalTo(self.view);
+        make.left.right.equalTo(self.view);
+        if ([self isMultiSelectMode]) {
+            make.bottom.equalTo(self.view).offset(-([self bottomBarHeight]));
+        } else {
+            make.bottom.equalTo(self.view);
+        }
     }];
 }
+
+- (CGFloat)bottomBarHeight {
+    UIWindow *window = UIApplication.sharedApplication.windows.firstObject;
+    CGFloat safeBottom = window.safeAreaInsets.bottom;
+    return 60 + safeBottom;
+}
+
+- (void)setupBottomBar {
+    CGFloat barH = [self bottomBarHeight];
+
+    _bottomBar = [[UIView alloc] init];
+    _bottomBar.backgroundColor = [UIColor colorWithWhite:0 alpha:0.75];
+    [self.view addSubview:_bottomBar];
+    [_bottomBar mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.right.bottom.equalTo(self.view);
+        make.height.mas_equalTo(barH);
+    }];
+
+    // "已选0张图片"
+    _bottomCountLabel = [UILabel new];
+    _bottomCountLabel.text      = @"已选0张图片";
+    _bottomCountLabel.font      = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    _bottomCountLabel.textColor = UIColor.whiteColor;
+    [_bottomBar addSubview:_bottomCountLabel];
+    [_bottomCountLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(_bottomBar).offset(24);
+        make.top.equalTo(_bottomBar).offset(18);
+    }];
+
+    // 完成按钮
+    _bottomDoneBtn = [UIButton buttonWithType:UIButtonTypeCustom];
+    _bottomDoneBtn.layer.cornerRadius = 22;
+    _bottomDoneBtn.clipsToBounds = YES;
+    _bottomDoneBtn.titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
+    [_bottomDoneBtn setTitle:@"完成" forState:UIControlStateNormal];
+    [_bottomDoneBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    [_bottomDoneBtn addTarget:self action:@selector(onDone) forControlEvents:UIControlEventTouchUpInside];
+
+    // 橙色渐变背景
+    CAGradientLayer *gradient = [CAGradientLayer layer];
+    gradient.colors = @[
+        (id)[UIColor colorWithRed:1.0 green:0.82 blue:0.0 alpha:1.0].CGColor,
+        (id)[UIColor colorWithRed:1.0 green:0.56 blue:0.13 alpha:1.0].CGColor
+    ];
+    gradient.startPoint = CGPointMake(0, 0.5);
+    gradient.endPoint   = CGPointMake(1, 0.5);
+    gradient.frame      = CGRectMake(0, 0, 88, 44);
+    gradient.cornerRadius = 22;
+    [_bottomDoneBtn.layer insertSublayer:gradient atIndex:0];
+
+    [_bottomBar addSubview:_bottomDoneBtn];
+    [_bottomDoneBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.right.equalTo(_bottomBar).offset(-24);
+        make.top.equalTo(_bottomBar).offset(8);
+        make.width.mas_equalTo(88);
+        make.height.mas_equalTo(44);
+    }];
+
+    // 角标数字
+    _bottomBadge = [UILabel new];
+    _bottomBadge.backgroundColor    = [UIColor colorWithRed:0.97 green:0.60 blue:0.15 alpha:1.0];
+    _bottomBadge.textColor          = UIColor.whiteColor;
+    _bottomBadge.font               = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
+    _bottomBadge.textAlignment      = NSTextAlignmentCenter;
+    _bottomBadge.layer.cornerRadius = 10;
+    _bottomBadge.clipsToBounds      = YES;
+    _bottomBadge.hidden             = YES;
+    [_bottomBar addSubview:_bottomBadge];
+    [_bottomBadge mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerX.equalTo(_bottomDoneBtn.mas_left).offset(-2);
+        make.centerY.equalTo(_bottomDoneBtn.mas_top).offset(2);
+        make.width.height.mas_equalTo(20);
+    }];
+
+    [self updateBottomBar];
+}
+
+- (void)updateBottomBar {
+    NSUInteger count = _selectedAssets.count;
+    _bottomCountLabel.text = [NSString stringWithFormat:@"已选%lu张图片", (unsigned long)count];
+
+    if (count > 0) {
+        _bottomBadge.hidden = NO;
+        _bottomBadge.text   = [NSString stringWithFormat:@"%lu", (unsigned long)count];
+    } else {
+        _bottomBadge.hidden = YES;
+    }
+}
+
+#pragma mark - Photo Access
 
 - (void)requestPhotoAccess {
     void (^handleStatus)(PHAuthorizationStatus) = ^(PHAuthorizationStatus s) {
@@ -225,6 +383,16 @@ static CGFloat   const kCellGap       = 1.0;
         if (result) cell.imageView.image = result;
     }];
 
+    // 多选模式下显示选中状态
+    if ([self isMultiSelectMode]) {
+        NSUInteger idx = [_selectedAssets indexOfObject:asset];
+        [cell configureWithSelectionIndex:(idx != NSNotFound) ? (NSInteger)(idx + 1) : 0];
+        cell.selectCircle.hidden = NO; // 始终显示圆圈
+    } else {
+        cell.selectCircle.hidden   = YES;
+        cell.selectNumLabel.hidden = YES;
+    }
+
     return cell;
 }
 
@@ -234,6 +402,38 @@ static CGFloat   const kCellGap       = 1.0;
 didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
     PHAsset *asset = _assets[(NSUInteger)indexPath.item];
 
+    // 单选模式：点击直接回调
+    if (![self isMultiSelectMode]) {
+        [self loadFullImageForAsset:asset completion:^(UIImage *image) {
+            if (self.onSelectImage) {
+                self.onSelectImage(image);
+            } else {
+                TLWAvatarCropController *cropVC = [[TLWAvatarCropController alloc] initWithImage:image];
+                cropVC.delegate = self.cropDelegate;
+                [self.navigationController pushViewController:cropVC animated:YES];
+            }
+        }];
+        return;
+    }
+
+    // 多选模式：切换选中状态
+    NSUInteger idx = [_selectedAssets indexOfObject:asset];
+    if (idx != NSNotFound) {
+        // 取消选中
+        [_selectedAssets removeObjectAtIndex:idx];
+    } else {
+        // 选中（检查上限）
+        if (_selectedAssets.count >= _maxCount) return;
+        [_selectedAssets addObject:asset];
+    }
+
+    [self updateBottomBar];
+    [_collectionView reloadData];
+}
+
+#pragma mark - Load Full Image
+
+- (void)loadFullImageForAsset:(PHAsset *)asset completion:(void (^)(UIImage *image))completion {
     PHImageRequestOptions *opts = [[PHImageRequestOptions alloc] init];
     opts.deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat;
     opts.synchronous  = NO;
@@ -243,14 +443,10 @@ didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
                             contentMode:PHImageContentModeDefault
                                 options:opts
                           resultHandler:^(UIImage *result, NSDictionary *info) {
-        if (!result) return;
         BOOL isDegraded = [info[PHImageResultIsDegradedKey] boolValue];
         if (isDegraded) return;
-
         dispatch_async(dispatch_get_main_queue(), ^{
-            TLWAvatarCropController *cropVC = [[TLWAvatarCropController alloc] initWithImage:result];
-            cropVC.delegate = self.cropDelegate;
-            [self.navigationController pushViewController:cropVC animated:YES];
+            if (completion) completion(result);
         });
     }];
 }
@@ -259,6 +455,41 @@ didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
 
 - (void)onBack {
     [self.navigationController popViewControllerAnimated:YES];
+}
+
+- (void)onDone {
+    if (_selectedAssets.count == 0) return;
+
+    // 批量加载原图
+    dispatch_group_t group = dispatch_group_create();
+    NSMutableDictionary<NSNumber *, UIImage *> *imageMap = [NSMutableDictionary dictionary];
+
+    for (NSUInteger i = 0; i < _selectedAssets.count; i++) {
+        PHAsset *asset = _selectedAssets[i];
+        dispatch_group_enter(group);
+        [self loadFullImageForAsset:asset completion:^(UIImage *image) {
+            if (image) {
+                @synchronized (imageMap) {
+                    imageMap[@(i)] = image;
+                }
+            }
+            dispatch_group_leave(group);
+        }];
+    }
+
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        // 按选中顺序排列
+        NSMutableArray<UIImage *> *images = [NSMutableArray array];
+        for (NSUInteger i = 0; i < self->_selectedAssets.count; i++) {
+            UIImage *img = imageMap[@(i)];
+            if (img) [images addObject:img];
+        }
+
+        if (self.onSelectImages) {
+            self.onSelectImages([images copy]);
+        }
+        [self.navigationController popViewControllerAnimated:YES];
+    });
 }
 
 @end

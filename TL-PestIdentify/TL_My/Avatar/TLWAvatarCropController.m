@@ -54,9 +54,12 @@ static CGFloat const kCropBottomHeight = 88.0;
 @property (nonatomic, strong) TLWCropOverlayView *overlayView;
 @property (nonatomic, strong) UIView             *navBar;
 @property (nonatomic, strong) CAGradientLayer    *navGradient;
+@property (nonatomic, strong) UIButton           *backButton;
 @property (nonatomic, assign) CGFloat             circleRadius;
 @property (nonatomic, assign) CGFloat             circleCenterY;
 @property (nonatomic, assign) BOOL                didInitialLayout;
+@property (nonatomic, strong) UIButton           *cancelButton;
+@property (nonatomic, strong) UIButton           *confirmButton;
 
 @end
 
@@ -88,10 +91,27 @@ static CGFloat const kCropBottomHeight = 88.0;
     self.hidesBottomBarWhenPushed = YES;
     self.view.backgroundColor = UIColor.blackColor;
 
+    // 背景图（和 app 整体风格一致）
+    UIImageView *bgImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_backView.png"]];
+    bgImageView.contentMode = UIViewContentModeScaleAspectFill;
+    [self.view addSubview:bgImageView];
+    [bgImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
+
+    // 半透明黑色蒙版
+    UIView *dimView = [[UIView alloc] init];
+    dimView.backgroundColor = [UIColor colorWithWhite:0 alpha:0.5];
+    [self.view addSubview:dimView];
+    [dimView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
+
     [self setupScrollView];
     [self setupOverlay];
     [self setupNavBar];
     [self setupBottomBar];
+    [self setActionButtonsEnabled:NO];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -115,6 +135,16 @@ static CGFloat const kCropBottomHeight = 88.0;
     if (_didInitialLayout) return;
     _didInitialLayout = YES;
     [self setupInitialZoom];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+
+    // 防止从相册点击进入时，上一页触摸事件残留触发“取消/确定”导致秒退。
+    [self setActionButtonsEnabled:NO];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self setActionButtonsEnabled:YES];
+    });
 }
 
 #pragma mark - Setup
@@ -167,11 +197,11 @@ static CGFloat const kCropBottomHeight = 88.0;
     _navGradient.endPoint   = CGPointMake(0.5, 1);
     [_navBar.layer insertSublayer:_navGradient atIndex:0];
 
-    UIButton *backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
-    [backButton addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
-    [_navBar addSubview:backButton];
-    [backButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
+    [_backButton addTarget:self action:@selector(onBack) forControlEvents:UIControlEventTouchUpInside];
+    [_navBar addSubview:_backButton];
+    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(_navBar).offset(16);
         make.bottom.equalTo(_navBar).offset(-8);
         make.width.height.mas_equalTo(44);
@@ -184,7 +214,7 @@ static CGFloat const kCropBottomHeight = 88.0;
     [_navBar addSubview:title];
     [title mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(_navBar);
-        make.centerY.equalTo(backButton);
+        make.centerY.equalTo(_backButton);
     }];
 }
 
@@ -198,13 +228,13 @@ static CGFloat const kCropBottomHeight = 88.0;
     }];
 
     // Cancel
-    UIButton *cancelBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    [cancelBtn setTitle:@"取消" forState:UIControlStateNormal];
-    [cancelBtn setTitleColor:[UIColor colorWithWhite:0.75 alpha:1] forState:UIControlStateNormal];
-    cancelBtn.titleLabel.font = [UIFont systemFontOfSize:16];
-    [cancelBtn addTarget:self action:@selector(onCancel) forControlEvents:UIControlEventTouchUpInside];
-    [bottomBar addSubview:cancelBtn];
-    [cancelBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+    _cancelButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_cancelButton setTitle:@"取消" forState:UIControlStateNormal];
+    [_cancelButton setTitleColor:[UIColor colorWithWhite:0.75 alpha:1] forState:UIControlStateNormal];
+    _cancelButton.titleLabel.font = [UIFont systemFontOfSize:16];
+    [_cancelButton addTarget:self action:@selector(onCancel) forControlEvents:UIControlEventTouchUpInside];
+    [bottomBar addSubview:_cancelButton];
+    [_cancelButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(bottomBar).offset(40);
         make.top.equalTo(bottomBar).offset(22);
         make.width.mas_equalTo(80);
@@ -212,20 +242,26 @@ static CGFloat const kCropBottomHeight = 88.0;
     }];
 
     // Confirm
-    UIButton *confirmBtn = [UIButton buttonWithType:UIButtonTypeCustom];
-    [confirmBtn setTitle:@"确定" forState:UIControlStateNormal];
-    [confirmBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    confirmBtn.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-    confirmBtn.backgroundColor    = [UIColor colorWithRed:0.97 green:0.60 blue:0.15 alpha:1.0];
-    confirmBtn.layer.cornerRadius = 22;
-    [confirmBtn addTarget:self action:@selector(onConfirm) forControlEvents:UIControlEventTouchUpInside];
-    [bottomBar addSubview:confirmBtn];
-    [confirmBtn mas_makeConstraints:^(MASConstraintMaker *make) {
+    _confirmButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_confirmButton setTitle:@"确定" forState:UIControlStateNormal];
+    [_confirmButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    _confirmButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    _confirmButton.backgroundColor    = [UIColor colorWithRed:0.97 green:0.60 blue:0.15 alpha:1.0];
+    _confirmButton.layer.cornerRadius = 22;
+    [_confirmButton addTarget:self action:@selector(onConfirm) forControlEvents:UIControlEventTouchUpInside];
+    [bottomBar addSubview:_confirmButton];
+    [_confirmButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.right.equalTo(bottomBar).offset(-40);
         make.top.equalTo(bottomBar).offset(22);
         make.width.mas_equalTo(100);
         make.height.mas_equalTo(44);
     }];
+}
+
+- (void)setActionButtonsEnabled:(BOOL)enabled {
+    _backButton.userInteractionEnabled = enabled;
+    _cancelButton.userInteractionEnabled = enabled;
+    _confirmButton.userInteractionEnabled = enabled;
 }
 
 - (void)setupInitialZoom {
