@@ -87,7 +87,7 @@
         make.top.mas_equalTo(cardTop);
         make.left.mas_equalTo(16);
         make.right.mas_equalTo(-16);
-        make.bottom.equalTo(self);
+        make.bottom.equalTo(self).priorityMedium();
     }];
 
     [self setupRowsInCard:card.contentView];

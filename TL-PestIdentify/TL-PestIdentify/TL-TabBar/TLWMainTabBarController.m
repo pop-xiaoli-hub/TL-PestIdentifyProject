@@ -66,15 +66,16 @@
         [vc didMoveToParentViewController:self];
     }
 
-    // ── 3. 显示第一个子 VC（首页）──────────────────────────────
-    [self.view addSubview:_childVCs[0].view];
+    // ── 3. 一次性添加所有子 VC 的 view，切换时只改 hidden ──────
+    for (NSInteger i = 0; i < _childVCs.count; i++) {
+        UIView *childView = _childVCs[i].view;
+        childView.hidden = (i != 0);
+        [self.view addSubview:childView];
+        [childView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.edges.equalTo(self.view);
+        }];
+    }
     _selectedIndex = 0;
-
-    // 子 VC 的 view 用 Masonry 撑满全屏
-    // TabBar 浮在内容上方，各页面自己用 safeAreaInsets 处理底部留白
-    [_childVCs[0].view mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(self.view);
-    }];
 
     // ── 4. 创建 TabBar，直接 addSubview，彻底脱离系统 UITabBar ──
     // 原来用 [self setValue:custom forKey:@"tabBar"] 的 KVC 方式
@@ -146,23 +147,13 @@
 #pragma mark - Tab 切换
 
 - (void)switchToIndex:(NSInteger)idx {
-    // 点击当前已选中的 tab，不做任何操作
     if (idx == _selectedIndex) return;
 
-    // 移除当前显示的子 VC view（Masonry 约束随 view 一起移除）
-    [_childVCs[_selectedIndex].view removeFromSuperview];
-
-    // 将新 VC 的 view 插入到 TabBar 下方，避免盖住 TabBar
-    [self.view insertSubview:_childVCs[idx].view belowSubview:_mainTabBar];
-
-    // 用 Masonry 撑满全屏
-    [_childVCs[idx].view mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(self.view);
-    }];
+    // hide/show 切换，无需重建约束
+    _childVCs[_selectedIndex].view.hidden = YES;
+    _childVCs[idx].view.hidden = NO;
 
     _selectedIndex = idx;
-
-    // 同步 TabBar 按钮选中状态
     [_mainTabBar tl_setSelectedIndex:idx];
 }
 

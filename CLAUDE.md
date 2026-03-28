@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-"植小保" (TL-PestIdentify) — an iOS pest identification app built with Objective-C. This is an early-stage project by lgf and 小wt (xiaoli pop). The app targets iOS 12.0+.
+"植小保" (TL-PestIdentify) — an iOS pest identification app built with Objective-C. Project by lgf and 小wt (xiaoli pop). The app targets iOS 12.0+.
 
 ## Build & Run
 
@@ -26,36 +26,50 @@ xcodebuild -workspace TL-PestIdentify/TL-PestIdentify.xcworkspace \
            build
 ```
 
-Run tests:
-```bash
-xcodebuild test -workspace TL-PestIdentify/TL-PestIdentify.xcworkspace \
-                -scheme TL-PestIdentify \
-                -destination 'platform=iOS Simulator,name=iPhone 16'
-```
-
 ## Architecture
 
-The app uses a classic MVC pattern with Objective-C, no Storyboard for custom screens (programmatic UI via Masonry).
+Classic MVC with Objective-C. No Storyboard for custom screens — all UI is programmatic via Masonry constraints.
 
-**App entry point:** `SceneDelegate` sets `TWLLoginViewController` as `rootViewController` directly — bypassing `Main.storyboard`'s initial `ViewController`.
+**App entry point:** `SceneDelegate` sets `TLWPasswordLoginController` (wrapped in `UINavigationController`) as `rootViewController`. Login success navigates to the main TabBar.
 
-**Module structure:**
-- `TL-PestIdentify/TL-PestIdentify/` — Core app files (AppDelegate, SceneDelegate, ViewController)
-- `TL-PestIdentify/TLWLogin/` — Login module (currently the only feature module)
-  - `TWLLoginViewController` — manages login logic and wires up button actions
-  - `TWLLoginView` — builds the entire login UI programmatically using Masonry constraints
+**UI conventions:**
+- All custom screens hide the system nav bar and draw their own nav bar
+- Pages with custom nav bars must implement right-swipe-back gesture
+- Background style: use `bgGradient` image asset as `UIImageView` background (not `layer.contents`)
+- Mock data in ViewControllers for UI preview when backend APIs are not ready
 
-**Login screen design pattern:** The View (`TWLLoginView`) exposes read-only `UITextField` and `UIButton` properties. The ViewController subscribes to button actions via `addTarget:action:forControlEvents:`. Business logic (API calls) is marked with `// TODO:` stubs.
+## Module Structure
 
-**Asset usage in TWLLoginView:** Most UI is built natively (CAGradientLayer background, Masonry constraints). Only specific PNG slices from the Figma design are used as `UIImageView` backgrounds:
-- `Group 1927.png` — app logo
-- `Frame 3.png` — phone number field background (includes the "send code" green capsule button visual)
-- `Group 1864.png` — login button (resizable)
-- `Vector-4.png` — terms checkbox circle
-- `Group 1906.png` — bottom social login icons (QQ, phone, label)
-- `Group 1908.png` — WeChat icon overlay
-
-All PNG assets live in `TL-PestIdentify/TLWLogin/病虫害App/`.
+```
+TL-PestIdentify/
+├── TL-PestIdentify/          # Core: AppDelegate, SceneDelegate, TabBar
+│   └── TL-TabBar/            # TLWTabBar, TLWTabBarItemView
+├── TL_Login/                 # Login & onboarding
+│   ├── login/                # SMS login, password login
+│   ├── wechat/               # WeChat bind
+│   └── guide/                # Guide, preference selection, crop
+├── TL_HomePage/              # Home feed, card cells
+├── TL_PhotoIdentify/         # Photo pest identification
+├── TL_Community/             # Community: post list, detail, comments
+│   └── cp_icon/              # Community icons
+├── TL_Publish/               # Publish post (photo picker, crop)
+├── TL_My/                    # Profile page
+│   ├── Avatar/               # TLWPhotoPickerController, TLWAvatarCropController
+│   ├── EditProfile/          # TLWEditProfileController/View
+│   ├── EditNickname/         # TLWEditNicknameController/View
+│   └── Setting/              # TLWSettingViewController/View
+├── TL_Record/                # Identification records list
+├── TL_RecordDetail/          # Record detail page
+├── TL_AiAssisstant/          # AI chat assistant
+├── TL_Message/               # Messages/notifications
+├── TL_Notification/          # Notification module
+└── TL_Common/                # Shared utilities
+    ├── Network/              # TLWSDKManager (API calls)
+    ├── TLWImagePickerManager # Photo picker manager
+    ├── TLWPhotoCell          # Shared photo cell
+    ├── TLWCameraManager      # Camera access
+    └── TWLSpeechManager      # Speech input
+```
 
 ## Dependencies (CocoaPods)
 
@@ -63,10 +77,13 @@ All PNG assets live in `TL-PestIdentify/TLWLogin/病虫害App/`.
 |-----|---------|---------|
 | AFNetworking | 4.0.1 | HTTP networking |
 | YYModel | 1.0.4 | JSON model mapping |
-| WCDB.objc | 2.1.15 | Local SQLite database |
+| WCDB.objc | master (git) | Local SQLite database |
 | Masonry | 1.1.0 | Autolayout DSL |
 | SDWebImage | ~5.0 | Async image loading |
+| AgriPestClient | v1.0.92 (git tag) | AI pest identification SDK |
 | LookinServer | 1.2.8 | UI inspector (Debug only) |
+
+> WCDB.objc 使用 git master 源：`https://github.com/Tencent/wcdb.git`
 
 ## Backend
 
@@ -74,8 +91,3 @@ All PNG assets live in `TL-PestIdentify/TLWLogin/病虫害App/`.
 - **服务端 IP**: 115.191.67.35
 - **部署方式**: Docker
 - **查看后端更新**: `gh api 'repos/lukecc00/AgroAiServer/commits?sha=master&per_page=20' --jq '.[] | "\(.commit.author.date) | \(.commit.author.name) | \(.commit.message)"'`
-
-## Current Branch State
-
-- Branch `feature-login`: Login module (`TLWLogin/`) is newly added and not yet integrated into the Xcode project file. The `TWLLoginViewController` and `TWLLoginView` files exist on disk but need to be added to the `.xcodeproj` to compile.
-- `ViewController` (from the original Storyboard template) is unused — the root VC is now `TWLLoginViewController`.
