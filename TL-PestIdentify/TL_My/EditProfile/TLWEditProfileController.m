@@ -7,6 +7,7 @@
 #import "TLWEditProfileView.h"
 #import "TLWEditNicknameController.h"
 #import "TLWAvatarCropController.h"
+#import "TLWChangePhoneController.h"
 #import "TLWImagePickerManager.h"
 #import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
@@ -90,6 +91,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
     [_myView.avatarRowButton  addTarget:self action:@selector(onAvatarTap)       forControlEvents:UIControlEventTouchUpInside];
     [_myView.nicknameRowButton addTarget:self action:@selector(onNicknameTap)    forControlEvents:UIControlEventTouchUpInside];
     [_myView.backgroundRowButton addTarget:self action:@selector(onBackgroundTap) forControlEvents:UIControlEventTouchUpInside];
+    [_myView.phoneRowButton   addTarget:self action:@selector(onPhoneTap)        forControlEvents:UIControlEventTouchUpInside];
 }
 
 - (TLWEditProfileView *)myView {
@@ -164,6 +166,11 @@ extern NSString * const TLWProfileDidUpdateNotification;
 - (void)onBackgroundTap {
     // TODO: push 背景图选择页（待建），用户选图后回调
     //   成功回调：POST /user/background，参数为所选图片；更新 myView.backgroundImageView
+}
+
+- (void)onPhoneTap {
+    TLWChangePhoneController *vc = [[TLWChangePhoneController alloc] init];
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 #pragma mark - TLWEditNicknameDelegate

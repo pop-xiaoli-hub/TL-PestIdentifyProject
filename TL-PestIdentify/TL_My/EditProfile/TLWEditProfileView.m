@@ -15,6 +15,7 @@ static CGFloat const kRowH = 56.0;
 @property (nonatomic, strong, readwrite) UIButton    *backgroundRowButton;
 @property (nonatomic, strong, readwrite) UIImageView *avatarImageView;
 @property (nonatomic, strong, readwrite) UILabel     *nicknameValueLabel;
+@property (nonatomic, strong, readwrite) UIButton    *phoneRowButton;
 @property (nonatomic, strong, readwrite) UILabel     *phoneValueLabel;
 @property (nonatomic, strong, readwrite) UILabel     *cropValueLabel;
 @end
@@ -181,9 +182,18 @@ static CGFloat const kRowH = 56.0;
     _phoneValueLabel = [self valueLabel];
     [row addSubview:_phoneValueLabel];
     [_phoneValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.right.equalTo(row).offset(-36);
+        make.centerY.equalTo(row);
+    }];
+
+    UILabel *chev = [self chevronLabel];
+    [row addSubview:chev];
+    [chev mas_makeConstraints:^(MASConstraintMaker *make) {
         make.right.equalTo(row).offset(-16);
         make.centerY.equalTo(row);
     }];
+
+    _phoneRowButton = [self overlayButtonOn:row];
     return row;
 }
 

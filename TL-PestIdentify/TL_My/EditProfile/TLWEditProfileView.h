@@ -15,6 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIButton    *backgroundRowButton;
 @property (nonatomic, strong, readonly) UIImageView *avatarImageView;
 @property (nonatomic, strong, readonly) UILabel     *nicknameValueLabel;
+@property (nonatomic, strong, readonly) UIButton    *phoneRowButton;
 @property (nonatomic, strong, readonly) UILabel     *phoneValueLabel;
 @property (nonatomic, strong, readonly) UILabel     *cropValueLabel;
 
