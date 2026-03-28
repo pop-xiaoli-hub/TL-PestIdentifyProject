@@ -33,8 +33,11 @@
 - 支持图片 + 文字混合输入
 
 ### 我的
+- 编辑资料页（Figma 1:1 还原，独立毛玻璃卡片设计）
 - 头像更换（相册选图 + 圆形裁剪）
-- 昵称 / 个人资料编辑
+- 昵称修改
+- 换绑手机号（短信验证码校验）
+- 修改密码
 - 设置页
 
 ---
@@ -73,8 +76,10 @@ TL-PestIdentify/
 ├── TL_Publish/                   # 发布帖子
 ├── TL_My/                        # 我的
 │   ├── Avatar/                   # 相册选图、头像裁剪
-│   ├── EditProfile/              # 编辑资料
+│   ├── EditProfile/              # 编辑资料（Figma 还原）
 │   ├── EditNickname/             # 修改昵称
+│   ├── ChangePhone/              # 换绑手机号
+│   ├── ChangePassword/           # 修改密码
 │   └── Setting/                  # 设置
 ├── TL_Record/                    # 识别记录列表
 │   └── TL_RecordDetail/          # 识别记录详情
@@ -158,6 +163,8 @@ gh api 'repos/lukecc00/AgroAiServer/commits?sha=master&per_page=20' \
 ### 待完成功能
 - [ ] **发布草稿回显** — 将 draftObject 内容回显到发布页（作物名称、文本、图片）
 - [ ] **记录详情 → AI 助手** — 跳转 AI 助手并预填当前病害名称作为问题
+- [x] **换绑手机号** — 短信验证码 + `changePhone` 接口
+- [x] **修改密码** — `updatePassword` 接口，6-20 位校验
 - [ ] **个人主页背景图** — push 背景图选择页，上传后调用 `POST /user/background`
 - [ ] **识别记录筛选** — 按日期 / 病虫害类型筛选面板
 - [ ] **分享功能** — 我的页面分享按钮
