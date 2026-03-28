@@ -40,12 +40,15 @@
 - (void)tl_setupSpeechRecognition {
   __weak typeof(self) weakSelf = self;
 
-  [TWLSpeechManager sharedManager].resultHandler = ^(NSString *text, BOOL isFinal) {
-    weakSelf.voiceView.searchTextField.text = text;
-  };
+  __block NSString *textBeforeRecording = @"";
 
   self.voiceView.onRecordingStart = ^{
+    textBeforeRecording = weakSelf.voiceView.searchTextField.text ?: @"";
     [[TWLSpeechManager sharedManager] startRecording];
+  };
+
+  [TWLSpeechManager sharedManager].resultHandler = ^(NSString *text, BOOL isFinal) {
+    weakSelf.voiceView.searchTextField.text = [textBeforeRecording stringByAppendingString:text];
   };
 
   self.voiceView.onRecordingEnd = ^{
