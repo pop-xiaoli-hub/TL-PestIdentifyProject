@@ -35,6 +35,7 @@
     }];
 
     [self setupNavBar];
+    [self setupPanel];
     [self setupCard];
 }
 
@@ -58,6 +59,28 @@
     [title mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self);
         make.centerY.equalTo(_backButton);
+    }];
+}
+
+#pragma mark - Panel
+
+- (void)setupPanel {
+    UIVisualEffectView *panelBlur = [[UIVisualEffectView alloc] initWithEffect:
+                                     [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight]];
+    panelBlur.layer.cornerRadius  = 28;
+    panelBlur.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+    panelBlur.layer.masksToBounds = YES;
+    [self addSubview:panelBlur];
+    [panelBlur mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_backButton.mas_bottom).offset(10);
+        make.left.right.bottom.equalTo(self);
+    }];
+
+    UIView *panelOverlay = [UIView new];
+    panelOverlay.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.82];
+    [panelBlur.contentView addSubview:panelOverlay];
+    [panelOverlay mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(panelBlur.contentView);
     }];
 }
 

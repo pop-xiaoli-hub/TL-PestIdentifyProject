@@ -1,19 +1,20 @@
 //
-//  TLWEditNicknameView.m
+//  TLWChangePasswordView.m
 //  TL-PestIdentify
 //
 
-#import "TLWEditNicknameView.h"
+#import "TLWChangePasswordView.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWEditNicknameView ()
+@interface TLWChangePasswordView ()
 @property (nonatomic, strong, readwrite) UIButton    *backButton;
-@property (nonatomic, strong, readwrite) UITextField *nicknameTextField;
+@property (nonatomic, strong, readwrite) UITextField *passwordField;
+@property (nonatomic, strong, readwrite) UITextField *confirmPasswordField;
 @property (nonatomic, strong, readwrite) UIButton    *confirmButton;
 @property (nonatomic, strong) CAGradientLayer        *confirmGradient;
 @end
 
-@implementation TLWEditNicknameView
+@implementation TLWChangePasswordView
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
@@ -52,7 +53,7 @@
     }];
 
     UILabel *title = [UILabel new];
-    title.text      = @"修改昵称";
+    title.text      = @"修改密码";
     title.textColor = UIColor.whiteColor;
     title.font      = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
     [self addSubview:title];
@@ -87,44 +88,56 @@
 #pragma mark - Content
 
 - (void)setupContent {
-    UILabel *sectionTitle = [UILabel new];
-    sectionTitle.text      = @"请输入您的昵称";
-    sectionTitle.font      = [UIFont systemFontOfSize:20 weight:UIFontWeightMedium];
-    sectionTitle.textColor = [UIColor colorWithRed:0.15 green:0.15 blue:0.15 alpha:1];
-    [self addSubview:sectionTitle];
-    [sectionTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_backButton.mas_bottom).offset(28);
+    // 新密码
+    UILabel *newTitle = [UILabel new];
+    newTitle.text      = @"请输入新密码";
+    newTitle.font      = [UIFont systemFontOfSize:20 weight:UIFontWeightMedium];
+    newTitle.textColor = [UIColor colorWithRed:0.15 green:0.15 blue:0.15 alpha:1];
+    [self addSubview:newTitle];
+    [newTitle mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_backButton.mas_bottom).offset(38);
         make.left.equalTo(self).offset(20);
     }];
 
-    _nicknameTextField = [UITextField new];
-    _nicknameTextField.placeholder   = @"王建军";
-    _nicknameTextField.font          = [UIFont systemFontOfSize:16];
-    _nicknameTextField.textColor     = [UIColor colorWithRed:0.15 green:0.15 blue:0.15 alpha:1];
-    _nicknameTextField.backgroundColor = UIColor.whiteColor;
-    _nicknameTextField.layer.cornerRadius = 10;
-    _nicknameTextField.layer.masksToBounds = YES;
-    _nicknameTextField.clearButtonMode  = UITextFieldViewModeWhileEditing;
-    UIView *leftPad = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 14, 1)];
-    _nicknameTextField.leftView      = leftPad;
-    _nicknameTextField.leftViewMode  = UITextFieldViewModeAlways;
-    [self addSubview:_nicknameTextField];
-    [_nicknameTextField mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(sectionTitle.mas_bottom).offset(20);
+    _passwordField = [self buildPasswordFieldWithPlaceholder:@"6-20位密码"];
+    [self addSubview:_passwordField];
+    [_passwordField mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(newTitle.mas_bottom).offset(16);
         make.left.equalTo(self).offset(20);
         make.right.equalTo(self).offset(-20);
         make.height.mas_equalTo(52);
     }];
 
+    // 确认密码
+    UILabel *confirmTitle = [UILabel new];
+    confirmTitle.text      = @"再次确认密码";
+    confirmTitle.font      = [UIFont systemFontOfSize:20 weight:UIFontWeightMedium];
+    confirmTitle.textColor = [UIColor colorWithRed:0.15 green:0.15 blue:0.15 alpha:1];
+    [self addSubview:confirmTitle];
+    [confirmTitle mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_passwordField.mas_bottom).offset(20);
+        make.left.equalTo(self).offset(20);
+    }];
+
+    _confirmPasswordField = [self buildPasswordFieldWithPlaceholder:@"请再次输入密码"];
+    [self addSubview:_confirmPasswordField];
+    [_confirmPasswordField mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(confirmTitle.mas_bottom).offset(16);
+        make.left.equalTo(self).offset(20);
+        make.right.equalTo(self).offset(-20);
+        make.height.mas_equalTo(52);
+    }];
+
+    // 确认按钮
     _confirmButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_confirmButton setTitle:@"确认" forState:UIControlStateNormal];
+    [_confirmButton setTitle:@"确认修改" forState:UIControlStateNormal];
     [_confirmButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     _confirmButton.titleLabel.font   = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
     _confirmButton.layer.cornerRadius = 26;
     _confirmButton.layer.masksToBounds = YES;
 
     _confirmGradient = [CAGradientLayer layer];
-    _confirmGradient.colors      = @[
+    _confirmGradient.colors = @[
         (__bridge id)[UIColor colorWithRed:1.00 green:0.76 blue:0.20 alpha:1].CGColor,
         (__bridge id)[UIColor colorWithRed:0.97 green:0.50 blue:0.08 alpha:1].CGColor
     ];
@@ -135,11 +148,30 @@
 
     [self addSubview:_confirmButton];
     [_confirmButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_nicknameTextField.mas_bottom).offset(24);
+        make.top.equalTo(_confirmPasswordField.mas_bottom).offset(28);
         make.left.equalTo(self).offset(20);
         make.right.equalTo(self).offset(-20);
         make.height.mas_equalTo(52);
     }];
+}
+
+#pragma mark - Helpers
+
+- (UITextField *)buildPasswordFieldWithPlaceholder:(NSString *)placeholder {
+    UITextField *tf = [UITextField new];
+    tf.placeholder       = placeholder;
+    tf.font              = [UIFont systemFontOfSize:16];
+    tf.textColor         = [UIColor colorWithRed:0.15 green:0.15 blue:0.15 alpha:1];
+    tf.backgroundColor   = UIColor.whiteColor;
+    tf.layer.cornerRadius = 10;
+    tf.layer.masksToBounds = YES;
+    tf.secureTextEntry   = YES;
+    tf.clearButtonMode   = UITextFieldViewModeWhileEditing;
+
+    UIView *left = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 14, 1)];
+    tf.leftView     = left;
+    tf.leftViewMode = UITextFieldViewModeAlways;
+    return tf;
 }
 
 @end
