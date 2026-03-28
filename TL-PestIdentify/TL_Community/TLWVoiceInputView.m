@@ -347,6 +347,7 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
       }];
       [self tl_startRingAnimation];
       [self tl_startEqualizerAnimation];
+      if (self.onRecordingStart) self.onRecordingStart();
       break;
     }
     case UIGestureRecognizerStateEnded:
@@ -357,6 +358,7 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
         self.inputtingLabel.alpha = 0.0;
       }];
       [self tl_stopRingAnimation];
+      if (self.onRecordingEnd) self.onRecordingEnd();
       break;
     }
     default:

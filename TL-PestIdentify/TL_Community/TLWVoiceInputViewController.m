@@ -5,6 +5,7 @@
 
 #import "TLWVoiceInputViewController.h"
 #import "TLWVoiceInputView.h"
+#import "TWLSpeechManager.h"
 
 @interface TLWVoiceInputViewController ()
 
@@ -28,6 +29,28 @@
 - (void)viewDidLoad {
   [super viewDidLoad];
   [self.voiceView.backButton addTarget:self action:@selector(tl_backTapped) forControlEvents:UIControlEventTouchUpInside];
+  [self tl_setupSpeechRecognition];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+  [super viewWillDisappear:animated];
+  [[TWLSpeechManager sharedManager] stopRecording];
+}
+
+- (void)tl_setupSpeechRecognition {
+  __weak typeof(self) weakSelf = self;
+
+  [TWLSpeechManager sharedManager].resultHandler = ^(NSString *text, BOOL isFinal) {
+    weakSelf.voiceView.searchTextField.text = text;
+  };
+
+  self.voiceView.onRecordingStart = ^{
+    [[TWLSpeechManager sharedManager] startRecording];
+  };
+
+  self.voiceView.onRecordingEnd = ^{
+    [[TWLSpeechManager sharedManager] stopRecording];
+  };
 }
 
 - (void)tl_backTapped {
