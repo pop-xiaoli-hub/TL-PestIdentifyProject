@@ -7,6 +7,7 @@
 #import "TLWMyView.h"
 #import "TLWEditProfileController.h"
 #import "TLWSettingViewController.h"
+#import "TLWMyFavoriteController.h"
 #import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
@@ -59,14 +60,17 @@ extern NSString * const TLWProfileDidUpdateNotification;
         [_myView.avatarImageView sd_setImageWithURL:avatarURL];
         [_myView.postAvatarImageView sd_setImageWithURL:avatarURL];
     }
-    _myView.favCountLabel.text    = @"0";
-    _myView.recordCountLabel.text = @"0";
+    _myView.favCountLabel.text    = [NSString stringWithFormat:@"%@", profile.favoriteCount ?: @(0)];
+    _myView.recordCountLabel.text = [NSString stringWithFormat:@"%@", profile.historyRecognitionCount ?: @(0)];
 }
 
 - (void)setupActions {
     [_myView.editProfileButton addTarget:self action:@selector(onEditProfile) forControlEvents:UIControlEventTouchUpInside];
     [_myView.settingButton     addTarget:self action:@selector(onSetting)     forControlEvents:UIControlEventTouchUpInside];
     [_myView.shareButton       addTarget:self action:@selector(onShare)       forControlEvents:UIControlEventTouchUpInside];
+
+    UITapGestureRecognizer *favTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onFavorite)];
+    [_myView.favStatView addGestureRecognizer:favTap];
 }
 
 - (TLWMyView *)myView {
@@ -87,6 +91,10 @@ extern NSString * const TLWProfileDidUpdateNotification;
     [self.navigationController pushViewController:vc animated:YES];
 }
 - (void)onShare { /* TODO: 分享 */ }
+- (void)onFavorite {
+    TLWMyFavoriteController *vc = [[TLWMyFavoriteController alloc] init];
+    [self.navigationController pushViewController:vc animated:YES];
+}
 
 - (void)onAvatarUpdated:(NSNotification *)noti {
     UIImage *avatar = noti.userInfo[@"avatar"];
