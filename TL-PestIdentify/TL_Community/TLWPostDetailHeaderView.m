@@ -20,17 +20,11 @@ static CGFloat const kHorizontalPad = 16.0;
 @property (nonatomic, strong) UIImageView   *avatarView;
 @property (nonatomic, strong) UILabel       *nameLabel;
 @property (nonatomic, strong) UILabel       *dateLabel;
-@property (nonatomic, strong) UIButton      *collectButton;
-@property (nonatomic, strong) UIButton      *likeButton;
-@property (nonatomic, assign) BOOL           isCollected;
-@property (nonatomic, assign) BOOL           isLiked;
 @property (nonatomic, strong) UILabel       *titleLabel;
 @property (nonatomic, strong) UILabel       *contentLabel;
 @property (nonatomic, strong) UIScrollView  *tagScrollView;
 @property (nonatomic, strong) UIView        *divider;
 @property (nonatomic, strong) UILabel       *commentSectionLabel;
-@property (nonatomic, strong) UILabel* collectedCountLabel;
-@property (nonatomic, strong) UILabel* likedCountLabel;
 @end
 
 @implementation TLWPostDetailHeaderView
@@ -103,7 +97,7 @@ static CGFloat const kHorizontalPad = 16.0;
   self.likeButton = [UIButton buttonWithType:UIButtonTypeCustom];
   [self.likeButton setImage:[UIImage imageNamed:@"cp_isLiked-1.png"] forState:UIControlStateNormal];
   self.likeButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
-  [self.likeButton addTarget:self action:@selector(likeTapped:) forControlEvents:UIControlEventTouchUpInside];
+
   [self addSubview:self.likeButton];
 
   self.likedCountLabel = [[UILabel alloc] init];
@@ -117,7 +111,6 @@ static CGFloat const kHorizontalPad = 16.0;
   self.collectButton = [UIButton buttonWithType:UIButtonTypeCustom];
   [self.collectButton setImage:[UIImage imageNamed:@"cp_collected-1.png"] forState:UIControlStateNormal];
   self.collectButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
-  [self.collectButton addTarget:self action:@selector(collectTapped:) forControlEvents:UIControlEventTouchUpInside];
   [self addSubview:self.collectButton];
 
   self.collectedCountLabel = [[UILabel alloc] init];
@@ -354,50 +347,6 @@ static CGFloat const kHorizontalPad = 16.0;
   NSInteger page = (NSInteger)((scrollView.contentOffset.x + w / 2.0) / w);
   self.currentPage = page;
   self.pageControl.currentPage = page;
-}
-
-#pragma mark - Actions
-
-- (void)collectTapped:(UIButton *)sender {
-  self.isCollected = !self.isCollected;
-  NSString *imgName = self.isCollected ? @"cp_collected-2.png" : @"cp_collected-1.png";
-  [sender setImage:[UIImage imageNamed:imgName] forState:UIControlStateNormal];
-  // 同步收藏数
-  NSInteger count = [self.collectedCountLabel.text integerValue];
-  count += self.isCollected ? 1 : -1;
-  self.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
-  // 数字颜色：已收藏时高亮
-  self.collectedCountLabel.textColor = self.isCollected
-    ? [UIColor colorWithRed:1.0 green:0.75 blue:0.0 alpha:1.0]
-    : [UIColor colorWithWhite:0.45 alpha:1.0];
-  [UIView animateWithDuration:0.12 animations:^{
-    sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
-  } completion:^(BOOL f) {
-    [UIView animateWithDuration:0.12 animations:^{
-      sender.transform = CGAffineTransformIdentity;
-    }];
-  }];
-}
-
-- (void)likeTapped:(UIButton *)sender {
-  self.isLiked = !self.isLiked;
-  NSString *imgName = self.isLiked ? @"cp_isLiked-2.png" : @"cp_isLiked-1.png";
-  [sender setImage:[UIImage imageNamed:imgName] forState:UIControlStateNormal];
-  // 同步点赞数
-  NSInteger count = [self.likedCountLabel.text integerValue];
-  count += self.isLiked ? 1 : -1;
-  self.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
-  // 数字颜色：已点赞时高亮
-  self.likedCountLabel.textColor = self.isLiked
-    ? [UIColor colorWithRed:1.0 green:0.30 blue:0.30 alpha:1.0]
-    : [UIColor colorWithWhite:0.45 alpha:1.0];
-  [UIView animateWithDuration:0.12 animations:^{
-    sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
-  } completion:^(BOOL f) {
-    [UIView animateWithDuration:0.12 animations:^{
-      sender.transform = CGAffineTransformIdentity;
-    }];
-  }];
 }
 
 #pragma mark - Height calculation

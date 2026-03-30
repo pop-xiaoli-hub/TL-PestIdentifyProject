@@ -190,7 +190,9 @@ static NSString * const kUsernameKey = @"TLW_username";
   return [self.api addCommentWithId:_id commentRequest:req completionHandler:handler];
 }
 
-
-
+- (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id
+                       completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
+  return [self.api favoritePostWithId:_id completionHandler:handler];
+}
 
 @end

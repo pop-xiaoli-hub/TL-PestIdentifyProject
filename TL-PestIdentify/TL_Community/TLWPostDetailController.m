@@ -52,6 +52,9 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [self buildInputBar];
   [self loadComments];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillChange:) name:UIKeyboardWillChangeFrameNotification object:nil];
+
+  [self.headerView.likeButton addTarget:self action:@selector(likeTapped:) forControlEvents:UIControlEventTouchUpInside];
+  [self.headerView.collectButton addTarget:self action:@selector(collectTapped:) forControlEvents:UIControlEventTouchUpInside];
 }
 
 - (void)tl_setHomePageBackView {
@@ -183,13 +186,14 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   self.likeButton = [UIButton buttonWithType:UIButtonTypeCustom];
   [self.likeButton setImage:[UIImage imageNamed:@"cp_capture.png"] forState:UIControlStateNormal];
   self.likeButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
-  [self.likeButton addTarget:self action:@selector(likeTapped) forControlEvents:UIControlEventTouchUpInside];
   [self.inputBar addSubview:self.likeButton];
   [self.likeButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self.inputBar).offset(14);
     make.centerY.equalTo(self.inputBar);
     make.width.height.mas_equalTo(32);
   }];
+
+  
 
   // Comment field
   UIView *fieldBg = [[UIView alloc] init];
@@ -344,20 +348,6 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   }
 }
 
-- (void)likeTapped {
-  self.liked = !self.liked;
-  UIColor *activeColor = [UIColor colorWithRed:1.0 green:0.35 blue:0.35 alpha:1.0];
-  UIColor *inactiveColor = [UIColor colorWithWhite:0.6 alpha:1.0];
-  self.likeButton.tintColor = self.liked ? activeColor : inactiveColor;
-  // Bounce animation
-  [UIView animateWithDuration:0.12 animations:^{
-    self.likeButton.transform = CGAffineTransformMakeScale(1.35, 1.35);
-  } completion:^(BOOL fin) {
-    [UIView animateWithDuration:0.12 animations:^{
-      self.likeButton.transform = CGAffineTransformIdentity;
-    }];
-  }];
-}
 
 - (void)sendComment {
   NSString *text = [self.commentTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -407,5 +397,136 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
     self.tableView.contentInset = UIEdgeInsetsMake(0, 0, offset + 56, 0);
   }];
 }
+
+- (void)tl_showTopToast:(NSString *)text {
+  if (text.length == 0) return;
+
+  // 挂到“全局 window”，保证在任何页面都能看到
+  UIWindow *hostWindow = nil;
+  if (@available(iOS 13.0, *)) {
+    // 仅使用前台激活的 Scene，避免取到后台/其他窗口的 keyWindow
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+      if (scene.activationState != UISceneActivationStateForegroundActive) continue;
+      if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+      UIWindowScene *windowScene = (UIWindowScene *)scene;
+
+      // 优先取 key window（当前场景正在接收事件的窗口）
+      for (UIWindow *w in windowScene.windows) {
+        if (w.isKeyWindow) {
+          hostWindow = w;
+          break;
+        }
+      }
+      if (!hostWindow) {
+        hostWindow = windowScene.windows.firstObject;
+      }
+      if (hostWindow) break;
+    }
+  } else {
+    // iOS 12 及以下：直接用当前控制器关联的 window 即可（避免使用废弃的 UIApplication.windows）
+    hostWindow = self.view.window;
+  }
+  if (!hostWindow) return;
+
+  UIView *old = [hostWindow viewWithTag:1107];
+  if (old) [old removeFromSuperview];
+
+  UILabel *toast = [UILabel new];
+  toast.tag = 1107;
+  toast.text = text;
+  toast.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+  toast.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
+  toast.textAlignment = NSTextAlignmentCenter;
+  toast.backgroundColor = UIColor.whiteColor;
+  toast.layer.cornerRadius = 19;
+  toast.layer.masksToBounds = YES;
+  toast.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
+  toast.layer.shadowOpacity = 1;
+  toast.layer.shadowRadius = 6;
+  toast.layer.shadowOffset = CGSizeMake(0, 2);
+  [hostWindow addSubview:toast];
+
+  [toast mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(hostWindow.mas_safeAreaLayoutGuideTop).offset(10);
+    make.centerX.equalTo(hostWindow);
+    make.width.mas_equalTo(190);
+    make.height.mas_equalTo(38);
+  }];
+
+  toast.alpha = 0;
+  [UIView animateWithDuration:0.25 animations:^{
+    toast.alpha = 1;
+  } completion:^(BOOL finished) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      [UIView animateWithDuration:0.25 animations:^{
+        toast.alpha = 0;
+      } completion:^(BOOL done) {
+        [toast removeFromSuperview];
+      }];
+    });
+  }];
+}
+
+#pragma mark - Actions
+
+- (void)collectTapped:(UIButton *)sender {
+  self.headerView.isCollected = !self.headerView.isCollected;
+  NSString *imgName = self.headerView.isCollected ? @"cp_collected-2.png" : @"cp_collected-1.png";
+  [sender setImage:[UIImage imageNamed:imgName] forState:UIControlStateNormal];
+  // 同步收藏数
+  NSInteger count = [self.headerView.collectedCountLabel.text integerValue];
+  count += self.headerView.isCollected ? 1 : -1;
+  self.headerView.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
+  // 数字颜色：已收藏时高亮
+  self.headerView.collectedCountLabel.textColor = self.headerView.isCollected
+    ? [UIColor colorWithRed:1.0 green:0.75 blue:0.0 alpha:1.0]
+    : [UIColor colorWithWhite:0.45 alpha:1.0];
+  [UIView animateWithDuration:0.12 animations:^{
+    sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
+  } completion:^(BOOL f) {
+    [UIView animateWithDuration:0.12 animations:^{
+      sender.transform = CGAffineTransformIdentity;
+    }];
+  }];
+  //调用收藏接口
+  NSLog(@"准备上传");
+  __weak typeof(self) weakSelf = self;
+  [[TLWSDKManager shared] favoritePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        NSLog(@"收藏接口服务器返回数据");
+        if (error || !output || output.code.integerValue != 200) {
+          NSLog(@"[Favorite] 收藏失败: %@", error.localizedDescription ?: output.message);
+          // 恢复按钮状态
+          weakSelf.liked = !weakSelf.liked;
+          [weakSelf.headerView.collectButton setImage:[UIImage imageNamed:@"cp_collected-1.png"] forState:UIControlStateNormal];
+          return;
+        }
+        NSLog(@"[Favorite] 收藏成功");
+      });
+    }];
+}
+
+- (void)likeTapped:(UIButton *)sender {
+  self.headerView.isLiked = !self.headerView.isLiked;
+  NSString *imgName = self.headerView.isLiked ? @"cp_isLiked-2.png" : @"cp_isLiked-1.png";
+  [sender setImage:[UIImage imageNamed:imgName] forState:UIControlStateNormal];
+  // 同步点赞数
+  NSInteger count = [self.headerView.likedCountLabel.text integerValue];
+  count += self.headerView.isLiked ? 1 : -1;
+  self.headerView.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
+  // 数字颜色：已点赞时高亮
+  self.headerView.likedCountLabel.textColor = self.headerView.isLiked
+    ? [UIColor colorWithRed:1.0 green:0.30 blue:0.30 alpha:1.0]
+    : [UIColor colorWithWhite:0.45 alpha:1.0];
+  [UIView animateWithDuration:0.12 animations:^{
+    sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
+  } completion:^(BOOL f) {
+    [UIView animateWithDuration:0.12 animations:^{
+      sender.transform = CGAffineTransformIdentity;
+    }];
+  }];
+}
+
+
 
 @end
