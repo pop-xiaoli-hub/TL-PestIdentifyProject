@@ -326,7 +326,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
       }
     NSLog(@"4");
       AGPostCreateRequest* request = [[AGPostCreateRequest alloc] init];
-      request.title = content.length > 15 ? [content substringToIndex:15] : content;
+      request.title = content.length > 12 ? [content substringToIndex:12] : content;
       request.content = [content copy];
       request.images = urls ?: @[];
       request.tags = [dict[@"crops"] copy] ?: @[];

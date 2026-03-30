@@ -87,6 +87,10 @@ NS_ASSUME_NONNULL_BEGIN
                                content:(NSString *)content
                      completionHandler:(void (^)(AGResultCommentResponseDto * output, NSError * error))handler;
 
+/// 收藏指定帖子
+- (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id
+                       completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
+
 @end
 
 NS_ASSUME_NONNULL_END
