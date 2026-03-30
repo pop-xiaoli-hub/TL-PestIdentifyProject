@@ -11,6 +11,7 @@
 @property (nonatomic, strong, readwrite) UIImageView *avatarImageView;
 @property (nonatomic, strong, readwrite) UILabel     *userNameLabel;
 @property (nonatomic, strong, readwrite) UILabel     *favCountLabel;
+@property (nonatomic, strong, readwrite) UIView      *favStatView;
 @property (nonatomic, strong, readwrite) UILabel     *recordCountLabel;
 @property (nonatomic, strong, readwrite) UIButton    *editProfileButton;
 @property (nonatomic, strong, readwrite) UIButton    *settingButton;
@@ -96,11 +97,13 @@
     }];
 
     UILabel *l1, *l2;
-    UIView *stat1 = [self statViewWithDesc:@"他的收藏" countLabel:&l1];
+    UIView *stat1 = [self statViewWithDesc:@"我的收藏" countLabel:&l1];
     UIView *stat2 = [self statViewWithDesc:@"识别记录"  countLabel:&l2];
     _favCountLabel    = l1;
+    _favStatView      = stat1;
     _recordCountLabel = l2;
 
+    stat1.userInteractionEnabled = YES;
     [statsRow addSubview:stat1];
     [statsRow addSubview:stat2];
     [stat1 mas_makeConstraints:^(MASConstraintMaker *make) {
