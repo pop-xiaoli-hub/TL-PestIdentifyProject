@@ -117,20 +117,24 @@
         [self showAlertWithMessage:@"请输入手机号和验证码"];
         return;
     }
+    self.loginView.loginTapButton.enabled = NO;
     AGSmsLoginRequest *req = [[AGSmsLoginRequest alloc] init];
     req.phone = phone;
     req.code  = code;
     [[TLWSDKManager shared].api loginBySmsWithSmsLoginRequest:req completionHandler:^(AGResultAuthResponse *output, NSError *error) {
-        if (error) {
-            [self showAlertWithMessage:error.localizedDescription];
-            return;
-        }
-        if (output.code.integerValue != 200) {
-            [self showAlertWithMessage:output.message ?: @"登录失败"];
-            return;
-        }
-        [[TLWSDKManager shared] saveAuthResponse:output.data];
-        [self navigateAfterLogin];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.loginView.loginTapButton.enabled = YES;
+            if (error) {
+                [self showAlertWithMessage:error.localizedDescription];
+                return;
+            }
+            if (output.code.integerValue != 200) {
+                [self showAlertWithMessage:output.message ?: @"登录失败"];
+                return;
+            }
+            [[TLWSDKManager shared] saveAuthResponse:output.data];
+            [self navigateAfterLogin];
+        });
     }];
 }
 

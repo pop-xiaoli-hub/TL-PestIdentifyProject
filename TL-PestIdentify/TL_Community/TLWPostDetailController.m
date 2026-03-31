@@ -482,6 +482,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 #pragma mark - Actions
 
 - (void)collectTapped:(UIButton *)sender {
+  sender.enabled = NO;
   self.headerView.isCollected = !self.headerView.isCollected;
   NSString *imgName = self.headerView.isCollected ? @"cp_collected-2.png" : @"cp_collected-1.png";
   [sender setImage:[UIImage imageNamed:imgName] forState:UIControlStateNormal];
@@ -505,6 +506,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   __weak typeof(self) weakSelf = self;
   [[TLWSDKManager shared] favoritePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
       dispatch_async(dispatch_get_main_queue(), ^{
+        sender.enabled = YES;
         NSLog(@"收藏接口服务器返回数据");
         if (error || !output || output.code.integerValue != 200) {
           if (!error && output.code.integerValue == 401) {

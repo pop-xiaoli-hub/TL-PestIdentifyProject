@@ -20,6 +20,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 @interface TLWEditProfileController () <TLWEditNicknameDelegate, TLWAvatarCropDelegate, TLWImagePickerDelegate>
 @property (nonatomic, strong) TLWEditProfileView *myView;
 @property (nonatomic, copy)   NSString           *nickname;
+@property (nonatomic, assign) BOOL isUploadingAvatar;
 @end
 
 @implementation TLWEditProfileController
@@ -123,6 +124,8 @@ extern NSString * const TLWProfileDidUpdateNotification;
 #pragma mark - TLWAvatarCropDelegate
 
 - (void)avatarCropController:(TLWAvatarCropController *)vc didConfirmImage:(UIImage *)image {
+    if (self.isUploadingAvatar) return;
+    self.isUploadingAvatar = YES;
     // 乐观更新：立刻通知所有页面用本地图片刷新头像
     [[NSNotificationCenter defaultCenter] postNotificationName:TLWAvatarDidUpdateNotification
                                                         object:nil
@@ -146,7 +149,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
                 return;
             }
             NSLog(@"头像上传失败: %@", error.localizedDescription ?: output.message);
-            dispatch_async(dispatch_get_main_queue(), ^{ [self showToast:@"头像同步失败，请重试"]; });
+            dispatch_async(dispatch_get_main_queue(), ^{ self.isUploadingAvatar = NO; [self showToast:@"头像同步失败，请重试"]; });
             return;
         }
         // 上传成功，直接改缓存 + 发通知
@@ -161,8 +164,10 @@ extern NSString * const TLWProfileDidUpdateNotification;
                         }];
                         return;
                     }
+                    self.isUploadingAvatar = NO;
                     [self showToast:@"头像同步失败，请重试"];
                 } else {
+                    self.isUploadingAvatar = NO;
                     // 静默更新缓存，不发通知，避免闪烁
                     [TLWSDKManager shared].cachedProfile.avatarUrl = output.data;
                     [self showToast:@"修改成功"];
