@@ -6,7 +6,8 @@
 #import "TLWToast.h"
 #import <Masonry/Masonry.h>
 
-static NSInteger const kToastTag = 9527;
+static NSInteger const kOverlayTag = 9526;
+static NSInteger const kToastTag   = 9527;
 
 @implementation TLWToast
 
@@ -17,46 +18,53 @@ static NSInteger const kToastTag = 9527;
         UIWindow *window = [self _keyWindow];
         if (!window) return;
 
-        // 移除已有 Toast，避免叠加
-        UIView *old = [window viewWithTag:kToastTag];
-        if (old) [old removeFromSuperview];
+        // 移除已有的
+        UIView *oldOverlay = [window viewWithTag:kOverlayTag];
+        if (oldOverlay) [oldOverlay removeFromSuperview];
 
+        // 半透明遮罩
+        UIView *overlay = [UIView new];
+        overlay.tag             = kOverlayTag;
+        overlay.backgroundColor = [UIColor colorWithWhite:0 alpha:0.25];
+        overlay.userInteractionEnabled = NO;
+        [window addSubview:overlay];
+        [overlay mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.edges.equalTo(window);
+        }];
+
+        // Toast 主体 — 居中、更大
         UILabel *toast = [UILabel new];
         toast.tag             = kToastTag;
         toast.text            = text;
-        toast.font            = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+        toast.font            = [UIFont systemFontOfSize:17 weight:UIFontWeightMedium];
         toast.textColor       = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
         toast.textAlignment   = NSTextAlignmentCenter;
         toast.backgroundColor = UIColor.whiteColor;
-        toast.numberOfLines   = 1;
-        toast.layer.cornerRadius  = 19;
-        toast.layer.masksToBounds = NO;
-        toast.layer.shadowColor   = [UIColor colorWithWhite:0 alpha:0.12].CGColor;
-        toast.layer.shadowOpacity = 1;
-        toast.layer.shadowRadius  = 8;
-        toast.layer.shadowOffset  = CGSizeMake(0, 2);
-        [window addSubview:toast];
+        toast.numberOfLines   = 0;
+        toast.layer.cornerRadius  = 16;
+        toast.layer.masksToBounds = YES;
+        [overlay addSubview:toast];
 
-        // 文字宽度自适应，最小 120，最大屏宽 - 80
+        // 文字宽度自适应，最小 160，最大屏宽 - 80
         CGFloat textWidth = [text sizeWithAttributes:@{NSFontAttributeName: toast.font}].width;
-        CGFloat toastWidth = MIN(MAX(textWidth + 40, 120), UIScreen.mainScreen.bounds.size.width - 80);
+        CGFloat toastWidth = MIN(MAX(textWidth + 56, 160), UIScreen.mainScreen.bounds.size.width - 80);
 
         [toast mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.centerX.equalTo(window);
-            make.centerY.equalTo(window).multipliedBy(1.25);
+            make.center.equalTo(overlay);
             make.width.mas_equalTo(toastWidth);
-            make.height.mas_equalTo(38);
+            make.height.mas_equalTo(52);
         }];
 
-        toast.alpha = 0;
-        [UIView animateWithDuration:0.25 animations:^{
-            toast.alpha = 1;
+        // 动画
+        overlay.alpha = 0;
+        [UIView animateWithDuration:0.2 animations:^{
+            overlay.alpha = 1;
         } completion:^(BOOL finished) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 [UIView animateWithDuration:0.25 animations:^{
-                    toast.alpha = 0;
+                    overlay.alpha = 0;
                 } completion:^(BOOL done) {
-                    [toast removeFromSuperview];
+                    [overlay removeFromSuperview];
                 }];
             });
         }];
