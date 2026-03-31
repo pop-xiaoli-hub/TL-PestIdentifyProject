@@ -14,7 +14,7 @@
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
 #import <Masonry/Masonry.h>
-
+#import "TLWDBManager.h"
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
 @interface TLWCommunityController () <UICollectionViewDataSource, UICollectionViewDelegate, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate>
@@ -203,10 +203,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
   TLWCommunityCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:kCommunityCellID forIndexPath:indexPath];
   TLWCommunityPost *post = self.posts[indexPath.item];
-  // 本地发布帖子的高度不要再依赖真实宽高比计算，统一使用固定比例
-//  if (post.imageAspectRatio <= 0.0) {
-//    post.imageAspectRatio = 0.65;
-//  }
+
   if (indexPath.row == 0) {
     post.imageAspectRatio = 0.60;
   } else {
@@ -371,6 +368,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
                 if (p.isLocalPending) {
                   p.isLocalPending = NO;
                   p._id = dto._id;
+                  p.images = urls;
                   p.likeCount = @0;
                   p.favoriteCount = @0;
                   pendingIndex = i;

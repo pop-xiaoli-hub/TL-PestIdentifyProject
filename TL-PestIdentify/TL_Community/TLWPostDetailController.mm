@@ -12,6 +12,7 @@
 #import <AgriPestClient/AGCommentResponseDto.h>
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
+#import "TLWDBManager.h"
 
 static NSString *const kCommentCellID = @"TLWCommentCell";
 
@@ -53,7 +54,6 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [self buildInputBar];
   [self loadComments];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillChange:) name:UIKeyboardWillChangeFrameNotification object:nil];
-
   [self.headerView.likeButton addTarget:self action:@selector(likeTapped:) forControlEvents:UIControlEventTouchUpInside];
   [self.headerView.collectButton addTarget:self action:@selector(collectTapped:) forControlEvents:UIControlEventTouchUpInside];
 }
@@ -116,8 +116,8 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   iconView.image = [[UIImage imageNamed:@"cp_post.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
   [navBar addSubview:iconView];
   [iconView mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.left.equalTo(titleLbl.mas_right).offset(2);
-      make.centerY.equalTo(titleLbl.mas_centerY);
+    make.left.equalTo(titleLbl.mas_right).offset(2);
+    make.centerY.equalTo(titleLbl.mas_centerY);
     make.height.width.mas_equalTo(17);
   }];
 
@@ -164,6 +164,10 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   } else {
     self.tableView.tableHeaderView = self.headerView;
   }
+  TLWDBManager* manager = [TLWDBManager shared];
+  if ([manager isCollectedPost:self.post._id]) {
+    [self.headerView.collectButton setImage:[UIImage imageNamed:@"cp_collected-2.png"] forState:UIControlStateNormal];
+  }
 }
 
 - (void)buildInputBar {
@@ -194,7 +198,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
     make.width.height.mas_equalTo(32);
   }];
 
-  
+
 
   // Comment field
   UIView *fieldBg = [[UIView alloc] init];
@@ -415,28 +419,24 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 - (void)collectTapped:(UIButton *)sender {
   sender.enabled = NO;
-  self.headerView.isCollected = !self.headerView.isCollected;
-  NSString *imgName = self.headerView.isCollected ? @"cp_collected-2.png" : @"cp_collected-1.png";
-  [sender setImage:[UIImage imageNamed:imgName] forState:UIControlStateNormal];
-  // 同步收藏数
-  NSInteger count = [self.headerView.collectedCountLabel.text integerValue];
-  count += self.headerView.isCollected ? 1 : -1;
-  self.headerView.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
-  // 数字颜色：已收藏时高亮
-  self.headerView.collectedCountLabel.textColor = self.headerView.isCollected
-    ? [UIColor colorWithRed:1.0 green:0.75 blue:0.0 alpha:1.0]
-    : [UIColor colorWithWhite:0.45 alpha:1.0];
-  [UIView animateWithDuration:0.12 animations:^{
-    sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
-  } completion:^(BOOL f) {
-    [UIView animateWithDuration:0.12 animations:^{
-      sender.transform = CGAffineTransformIdentity;
-    }];
-  }];
-  //调用收藏接口
-  NSLog(@"准备上传");
-  __weak typeof(self) weakSelf = self;
-  [[TLWSDKManager shared] favoritePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
+  // 先取当前状态
+  BOOL isCollected = self.headerView.isCollected;
+  // 判断当前状态
+  if (!isCollected) {
+    // 未收藏 → 切换为已收藏
+    self.headerView.isCollected = YES;
+    // 更换图片
+    [sender setImage:[UIImage imageNamed:@"cp_collected-2.png"] forState:UIControlStateNormal];
+    // 收藏数 +1
+    NSInteger count = [self.headerView.collectedCountLabel.text integerValue];
+    count += 1;
+    self.headerView.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)count];
+    // 数字高亮
+    self.headerView.collectedCountLabel.textColor = [UIColor colorWithRed:1.0 green:0.75 blue:0.0 alpha:1.0];
+   // 调用收藏接口
+    NSLog(@"准备上传");
+    __weak typeof(self) weakSelf = self;
+    [[TLWSDKManager shared] favoritePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
       dispatch_async(dispatch_get_main_queue(), ^{
         sender.enabled = YES;
         NSLog(@"收藏接口服务器返回数据");
@@ -454,8 +454,41 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
           return;
         }
         NSLog(@"[Favorite] 收藏成功");
+        TLWDBManager* manager = [TLWDBManager shared];
+        AGPostResponseDto* dto = [[AGPostResponseDto alloc] init];
+        dto._id = self.post._id;
+        dto.title = self.post.title;
+        dto.images = self.post.images;
+        dto.authorName = self.post.authorName;
+        dto.authorAvatar = self.post.authorAvatar;
+        dto.favoriteCount = self.post.favoriteCount;
+        if (![manager isCollectedPost:dto._id]) {
+          NSLog(@"收藏帖子插入表成功");
+          [manager upsertCollectedPostFromDto:dto];
+        }
       });
     }];
+  } else {
+    // 已收藏 → 切换为未收藏
+    self.headerView.isCollected = NO;
+    // 更换图片
+    [sender setImage:[UIImage imageNamed:@"cp_collected-1.png"] forState:UIControlStateNormal];
+    // 收藏数 -1（保证不小于0）
+    NSInteger count = [self.headerView.collectedCountLabel.text integerValue];
+    count -= 1;
+    self.headerView.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
+    // 数字恢复默认颜色
+    self.headerView.collectedCountLabel.textColor = [UIColor colorWithWhite:0.45 alpha:1.0];
+  }
+
+  // 按钮缩放动画
+  [UIView animateWithDuration:0.12 animations:^{
+    sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
+  } completion:^(BOOL finished) {
+    [UIView animateWithDuration:0.12 animations:^{
+      sender.transform = CGAffineTransformIdentity;
+    }];
+  }];
 }
 
 - (void)likeTapped:(UIButton *)sender {
@@ -468,8 +501,8 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   self.headerView.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
   // 数字颜色：已点赞时高亮
   self.headerView.likedCountLabel.textColor = self.headerView.isLiked
-    ? [UIColor colorWithRed:1.0 green:0.30 blue:0.30 alpha:1.0]
-    : [UIColor colorWithWhite:0.45 alpha:1.0];
+  ? [UIColor colorWithRed:1.0 green:0.30 blue:0.30 alpha:1.0]
+  : [UIColor colorWithWhite:0.45 alpha:1.0];
   [UIView animateWithDuration:0.12 animations:^{
     sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
   } completion:^(BOOL f) {
