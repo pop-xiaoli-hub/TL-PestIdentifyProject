@@ -171,7 +171,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
                     self.isUploadingAvatar = NO;
                     // 静默更新缓存，不发通知，避免闪烁
                     [TLWSDKManager shared].cachedProfile.avatarUrl = output.data;
-                    [TLWToast show:@"修改成功"];
+                    [TLWToast show:@"头像修改成功"];
                 }
             });
         }];
@@ -200,7 +200,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 - (void)editNicknameController:(TLWEditNicknameController *)vc didSaveNickname:(NSString *)nickname {
     _nickname = nickname;
     _myView.nicknameValueLabel.text = nickname;
-    [TLWToast show:@"修改成功"];
+    [TLWToast show:@"昵称修改成功"];
 }
 
 @end
