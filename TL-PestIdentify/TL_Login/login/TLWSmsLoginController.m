@@ -10,6 +10,7 @@
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
 #import "TLWSDKManager.h"
+#import "TLWToast.h"
 #import "TLWGuideController.h"
 #import "TLWPreferenceController.h"
 
@@ -117,20 +118,28 @@
         [self showAlertWithMessage:@"请输入手机号和验证码"];
         return;
     }
+    self.loginView.loginTapButton.enabled = NO;
     AGSmsLoginRequest *req = [[AGSmsLoginRequest alloc] init];
     req.phone = phone;
     req.code  = code;
     [[TLWSDKManager shared].api loginBySmsWithSmsLoginRequest:req completionHandler:^(AGResultAuthResponse *output, NSError *error) {
-        if (error) {
-            [self showAlertWithMessage:error.localizedDescription];
-            return;
-        }
-        if (output.code.integerValue != 200) {
-            [self showAlertWithMessage:output.message ?: @"登录失败"];
-            return;
-        }
-        [[TLWSDKManager shared] saveAuthResponse:output.data];
-        [self navigateAfterLogin];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.loginView.loginTapButton.enabled = YES;
+            if (error) {
+                [self showAlertWithMessage:error.localizedDescription];
+                return;
+            }
+            if (output.code.integerValue != 200) {
+                [self showAlertWithMessage:output.message ?: @"登录失败"];
+                return;
+            }
+            [[TLWSDKManager shared] saveAuthResponse:output.data];
+            // generatedPassword 非空 = 服务端自动注册了新账号
+            if (output.data.generatedPassword.length > 0) {
+                [TLWToast show:@"已为您自动注册账号"];
+            }
+            [self navigateAfterLogin];
+        });
     }];
 }
 

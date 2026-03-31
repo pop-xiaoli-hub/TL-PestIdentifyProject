@@ -98,6 +98,10 @@
                 return;
             }
             if (output.code.integerValue != 200) {
+                if (output.code.integerValue == 401) {
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onSendCode]; }];
+                    return;
+                }
                 self.myView.sendCodeButton.enabled = YES;
                 [self showAlert:output.message ?: @"发送失败"];
                 return;
@@ -150,6 +154,10 @@
                 return;
             }
             if (output.code.integerValue != 200) {
+                if (output.code.integerValue == 401) {
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
+                    return;
+                }
                 [self showAlert:output.message ?: @"换绑失败"];
                 return;
             }

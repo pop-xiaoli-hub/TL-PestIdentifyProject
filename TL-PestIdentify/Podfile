@@ -3,7 +3,7 @@ platform :ios, '12.0'
 target 'TL-PestIdentify' do
   pod 'LookinServer', :configurations => ['Debug']
   pod 'YYModel'
-  pod 'AgriPestClient', :git => 'https://github.com/lukecc00/AgriPest-IOS-SDK.git', :tag => 'v1.0.104'
+  pod 'AgriPestClient', :git => 'https://github.com/lukecc00/AgriPest-IOS-SDK.git', :tag => 'v1.0.105'
   pod 'WCDB.objc', :git => 'https://github.com/Tencent/wcdb.git', :branch => 'master'
   pod 'Masonry'
   pod 'SDWebImage', '~> 5.0'

@@ -65,11 +65,17 @@ extern NSString * const TLWProfileDidUpdateNotification;
                          NSCharacterSet.whitespaceCharacterSet];
     if (newName.length == 0) return;
 
+    _myView.confirmButton.enabled = NO;
     AGProfileUpdateRequest *req = [[AGProfileUpdateRequest alloc] init];
     req.fullName = newName;
     [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
+            self->_myView.confirmButton.enabled = YES;
             if (error || output.code.integerValue != 200) {
+                if (!error && output.code.integerValue == 401) {
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
+                    return;
+                }
                 NSLog(@"修改昵称失败: %@", error.localizedDescription ?: output.message);
                 return;
             }
