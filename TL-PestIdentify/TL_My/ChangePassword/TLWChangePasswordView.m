@@ -12,6 +12,7 @@
 @property (nonatomic, strong, readwrite) UITextField *confirmPasswordField;
 @property (nonatomic, strong, readwrite) UIButton    *confirmButton;
 @property (nonatomic, strong) CAGradientLayer        *confirmGradient;
+@property (nonatomic, strong) UIView                 *currentPwdBox;
 @end
 
 @implementation TLWChangePasswordView
@@ -88,6 +89,40 @@
 #pragma mark - Content
 
 - (void)setupContent {
+    // 当前密码显示区（默认隐藏，setCurrentPassword 时显示）
+    _currentPwdBox = [UIView new];
+    _currentPwdBox.backgroundColor = [UIColor colorWithWhite:1 alpha:0.85];
+    _currentPwdBox.layer.cornerRadius = 12;
+    _currentPwdBox.hidden = YES;
+    [self addSubview:_currentPwdBox];
+    [_currentPwdBox mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_backButton.mas_bottom).offset(28);
+        make.left.equalTo(self).offset(20);
+        make.right.equalTo(self).offset(-20);
+        make.height.mas_equalTo(52);
+    }];
+
+    UILabel *pwdTitleLabel = [UILabel new];
+    pwdTitleLabel.text      = @"当前密码";
+    pwdTitleLabel.font      = [UIFont systemFontOfSize:15];
+    pwdTitleLabel.textColor = [UIColor colorWithWhite:0.45 alpha:1];
+    pwdTitleLabel.tag       = 101;
+    [_currentPwdBox addSubview:pwdTitleLabel];
+    [pwdTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(_currentPwdBox).offset(14);
+        make.centerY.equalTo(_currentPwdBox);
+    }];
+
+    UILabel *pwdValueLabel = [UILabel new];
+    pwdValueLabel.font      = [UIFont monospacedSystemFontOfSize:16 weight:UIFontWeightMedium];
+    pwdValueLabel.textColor = [UIColor colorWithRed:0.15 green:0.15 blue:0.15 alpha:1];
+    pwdValueLabel.tag       = 102;
+    [_currentPwdBox addSubview:pwdValueLabel];
+    [pwdValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.right.equalTo(_currentPwdBox).offset(-14);
+        make.centerY.equalTo(_currentPwdBox);
+    }];
+
     // 新密码
     UILabel *newTitle = [UILabel new];
     newTitle.text      = @"请输入新密码";
@@ -95,7 +130,7 @@
     newTitle.textColor = [UIColor colorWithRed:0.15 green:0.15 blue:0.15 alpha:1];
     [self addSubview:newTitle];
     [newTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_backButton.mas_bottom).offset(38);
+        make.top.equalTo(_currentPwdBox.mas_bottom).offset(20);
         make.left.equalTo(self).offset(20);
     }];
 
@@ -153,6 +188,17 @@
         make.right.equalTo(self).offset(-20);
         make.height.mas_equalTo(52);
     }];
+}
+
+- (void)setCurrentPassword:(NSString *)currentPassword {
+    _currentPassword = [currentPassword copy];
+    if (currentPassword.length > 0) {
+        _currentPwdBox.hidden = NO;
+        UILabel *val = [_currentPwdBox viewWithTag:102];
+        val.text = currentPassword;
+    } else {
+        _currentPwdBox.hidden = YES;
+    }
 }
 
 #pragma mark - Helpers
