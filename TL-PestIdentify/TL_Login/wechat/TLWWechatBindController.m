@@ -8,6 +8,8 @@
 #import "TLWWechatBindController.h"
 #import "TLWWechatBindView.h"
 #import "TLWGuideController.h"
+#import "TLWSmsLoginController.h"
+#import "TLWPasswordLoginController.h"
 
 @interface TLWWechatBindController ()
 
@@ -33,8 +35,12 @@
                                     action:@selector(handleQQLogin)
                           forControlEvents:UIControlEventTouchUpInside];
 
-    [self.bindView.phoneLoginButton addTarget:self
-                                       action:@selector(handlePhoneLogin)
+    [self.bindView.smsLoginButton addTarget:self
+                                     action:@selector(handleSmsLogin)
+                           forControlEvents:UIControlEventTouchUpInside];
+
+    [self.bindView.passwordLoginButton addTarget:self
+                                          action:@selector(handlePasswordLogin)
                              forControlEvents:UIControlEventTouchUpInside];
 }
 
@@ -52,9 +58,29 @@
     // TODO: 接入 QQ SDK
 }
 
-- (void)handlePhoneLogin {
-    NSLog(@"手机号登录");
-    // TODO: 跳转到手机验证登录页
+- (void)handleSmsLogin {
+    UIViewController *presenter = self.presentingViewController;
+    [self dismissViewControllerAnimated:YES completion:^{
+        if ([presenter isKindOfClass:[TLWSmsLoginController class]]) {
+            return;
+        }
+        UINavigationController *nav = presenter.navigationController;
+        if (!nav) return;
+        TLWSmsLoginController *smsVC = [[TLWSmsLoginController alloc] init];
+        [nav pushViewController:smsVC animated:YES];
+    }];
+}
+
+- (void)handlePasswordLogin {
+    UIViewController *presenter = self.presentingViewController;
+    [self dismissViewControllerAnimated:YES completion:^{
+        if ([presenter isKindOfClass:[TLWPasswordLoginController class]]) {
+            return;
+        }
+        if ([presenter isKindOfClass:[TLWSmsLoginController class]]) {
+            [presenter.navigationController popViewControllerAnimated:YES];
+        }
+    }];
 }
 
 @end

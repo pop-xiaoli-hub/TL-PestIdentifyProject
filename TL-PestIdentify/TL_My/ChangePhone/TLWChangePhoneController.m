@@ -25,7 +25,7 @@
 }
 
 - (void)dealloc {
-    [_countdownTimer invalidate];
+    [self invalidateCountdownTimer];
 }
 
 #pragma mark - Lifecycle
@@ -48,6 +48,13 @@
     [self.navigationController setNavigationBarHidden:YES animated:animated];
     self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
     self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    if (self.isMovingFromParentViewController || self.isBeingDismissed) {
+        [self invalidateCountdownTimer];
+    }
 }
 
 #pragma mark - Setup
@@ -112,32 +119,36 @@
 }
 
 - (void)startCountdown {
+    [self invalidateCountdownTimer];
     _countdown = 60;
     [_myView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)_countdown] forState:UIControlStateDisabled];
     _myView.sendCodeButton.enabled = NO;
 
+    __weak typeof(self) weakSelf = self;
     _countdownTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
-        self.countdown--;
-        if (self.countdown <= 0) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) {
             [timer invalidate];
-            self.myView.sendCodeButton.enabled = YES;
-            [self.myView.sendCodeButton setTitle:@"发送验证码" forState:UIControlStateNormal];
+            return;
+        }
+
+        strongSelf.countdown--;
+        if (strongSelf.countdown <= 0) {
+            [timer invalidate];
+            strongSelf.countdownTimer = nil;
+            strongSelf.myView.sendCodeButton.enabled = YES;
+            [strongSelf.myView.sendCodeButton setTitle:@"发送验证码" forState:UIControlStateNormal];
         } else {
-            [self.myView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)self.countdown] forState:UIControlStateDisabled];
+            [strongSelf.myView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)strongSelf.countdown] forState:UIControlStateDisabled];
         }
     }];
 }
 
 - (void)onConfirm {
     NSString *phone = _myView.phoneField.text;
-    NSString *code  = _myView.codeField.text;
 
     if (phone.length < 11) {
         [self showAlert:@"请输入正确的手机号"];
-        return;
-    }
-    if (code.length == 0) {
-        [self showAlert:@"请输入验证码"];
         return;
     }
 
@@ -192,6 +203,11 @@
 - (TLWChangePhoneView *)myView {
     if (!_myView) _myView = [[TLWChangePhoneView alloc] initWithFrame:CGRectZero];
     return _myView;
+}
+
+- (void)invalidateCountdownTimer {
+    [self.countdownTimer invalidate];
+    self.countdownTimer = nil;
 }
 
 @end
