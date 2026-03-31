@@ -16,6 +16,9 @@
 @property (nonatomic, strong) UILabel *userLabel;
 @property (nonatomic, strong) UIImageView *likeIconView;
 @property (nonatomic, strong) UILabel *likeLabel;
+/// 本地发布中的毛玻璃遮罩（叠在 photoView 顶部）
+@property (nonatomic, strong) UIVisualEffectView *pendingBlurView;
+@property (nonatomic, strong) UILabel *pendingLabel;
 
 @end
 
@@ -141,6 +144,38 @@
     make.right.equalTo(self.likeIconView.mas_left).offset(-4);
     make.centerY.equalTo(self.avatarView);
   }];
+
+  // 本地发布中的毛玻璃遮罩，叠在整个 cell 顶部，默认隐藏
+  UIBlurEffect *pendingBlur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialLight];
+  self.pendingBlurView = [[UIVisualEffectView alloc] initWithEffect:pendingBlur];
+  self.pendingBlurView.layer.cornerRadius = 14.0;
+  self.pendingBlurView.layer.masksToBounds = YES;
+  self.pendingBlurView.hidden = YES;
+  [self.contentView addSubview:self.pendingBlurView];
+  [self.pendingBlurView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(self.contentView);
+  }];
+
+  // 遮罩上的「发布中」文字 + 菊花
+  UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+  spinner.color = [UIColor colorWithWhite:0.15 alpha:1.0];
+  [spinner startAnimating];
+  [self.pendingBlurView.contentView addSubview:spinner];
+
+  self.pendingLabel = [[UILabel alloc] init];
+  self.pendingLabel.text = @"发布中...";
+  self.pendingLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+  self.pendingLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+  [self.pendingBlurView.contentView addSubview:self.pendingLabel];
+
+  [spinner mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.centerX.equalTo(self.pendingBlurView);
+    make.centerY.equalTo(self.pendingBlurView).offset(-10);
+  }];
+  [self.pendingLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.centerX.equalTo(self.pendingBlurView);
+    make.top.equalTo(spinner.mas_bottom).offset(6);
+  }];
 }
 
 //- (void)configureWithPost:(TLWCommunityPost *)post {
@@ -191,6 +226,9 @@
   self.titleLabel.text = post.title.length > 0 ? post.title : post.content;
   self.userLabel.text = post.authorName;
   self.likeLabel.text = [NSString stringWithFormat:@"%@", post.likeCount];
+
+  // 本地发布中：显示毛玻璃遮罩；上传完成后隐藏
+  self.pendingBlurView.hidden = !post.isLocalPending;
 }
 
 @end

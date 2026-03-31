@@ -5,7 +5,6 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIImage.h>
-
 // SDK 头文件统一引入
 #import <AgriPestClient/AGApiService.h>
 #import <AgriPestClient/AGDefaultConfiguration.h>
@@ -87,9 +86,17 @@ NS_ASSUME_NONNULL_BEGIN
                                content:(NSString *)content
                      completionHandler:(void (^)(AGResultCommentResponseDto * output, NSError * error))handler;
 
+/// 收藏列表缓存（应用启动预拉取）
+@property (nonatomic, strong, readonly) NSArray<AGPostResponseDto *> *cachedFavoritedPosts;
+
+/// 获取当前用户收藏帖子列表（单页）
+- (NSURLSessionTask *)getFavoritedPostsWithPage:(NSNumber *)page size:(NSNumber *)size completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error))handler;
+
+/// 拉取当前用户全部收藏帖子（分页聚合）
+- (void)fetchAllFavoritedPostsWithCompletion:(void (^)(NSArray<AGPostResponseDto *> * _Nullable posts, NSError * _Nullable error))completion;
+
 /// 收藏指定帖子
-- (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id
-                       completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
+- (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
 
 @end
 

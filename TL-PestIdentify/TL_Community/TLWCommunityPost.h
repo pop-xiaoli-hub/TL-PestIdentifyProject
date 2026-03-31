@@ -27,8 +27,13 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *title;
 /// 点赞数量
 @property (nonatomic, assign) NSNumber* likeCount;
+
+@property (nonatomic, assign) NSNumber* favoriteCount;
 /// 图片纵横比（高度 / 宽度），用于计算瀑布流高度
 @property (nonatomic, assign) CGFloat imageAspectRatio;
+
+/// 是否为本地发布中（尚未上传成功）的帖子，显示毛玻璃遮罩
+@property (nonatomic, assign) BOOL isLocalPending;
 
 /// 根据给定宽度，返回 cell 的总高度（图片 + 文本 + 底部信息）
 - (CGFloat)cellHeightForWidth:(CGFloat)width;

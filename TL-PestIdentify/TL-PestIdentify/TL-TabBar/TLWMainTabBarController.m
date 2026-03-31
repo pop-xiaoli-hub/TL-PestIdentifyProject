@@ -11,6 +11,7 @@
 #import "TLWCommunityController.h"
 #import "TLWMessageController.h"
 #import "TLWMyController.h"
+#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 @interface TLWMainTabBarController () <UINavigationControllerDelegate>
 
@@ -107,6 +108,15 @@
         make.left.right.equalTo(self.view);
         make.bottom.equalTo(self.view).offset(10);
         make.height.mas_equalTo(tabHeight);
+    }];
+
+    // 应用启动进入主界面后，预拉取当前用户收藏帖子
+    [[TLWSDKManager shared] fetchAllFavoritedPostsWithCompletion:^(NSArray<AGPostResponseDto *> * _Nullable posts, NSError * _Nullable error) {
+        if (error) {
+            NSLog(@"[Favorite] 启动预拉取失败: %@", error.localizedDescription);
+            return;
+        }
+        NSLog(@"[Favorite] 启动预拉取完成, count=%lu", (unsigned long)posts.count);
     }];
 }
 
