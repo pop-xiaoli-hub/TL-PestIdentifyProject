@@ -68,7 +68,8 @@
         [[TLWSDKManager shared] logout];
         UIWindow *window = self.view.window;
         TLWSmsLoginController *loginVC = [[TLWSmsLoginController alloc] init];
-        window.rootViewController = loginVC;
+        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+        window.rootViewController = nav;
         [UIView transitionWithView:window
                           duration:0.35
                            options:UIViewAnimationOptionTransitionCrossDissolve

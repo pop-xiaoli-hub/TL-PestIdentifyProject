@@ -108,6 +108,12 @@ static NSInteger  const kPageSize       = 20;
             [self.favoriteView.collectionView.refreshControl endRefreshing];
 
             if (error || output.code.integerValue != 200) {
+                if (output.code.integerValue == 401) {
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                        [self fetchPage:page];
+                    }];
+                    return;
+                }
                 NSLog(@"[Favorite] 加载失败: %@", error ?: output.message);
                 [self.favoriteView showEmpty:(self.favorites.count == 0)];
                 return;

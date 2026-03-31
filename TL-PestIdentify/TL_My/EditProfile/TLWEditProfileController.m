@@ -11,6 +11,7 @@
 #import "TLWChangePasswordController.h"
 #import "TLWImagePickerManager.h"
 #import "TLWSDKManager.h"
+#import "TLWToast.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 
@@ -20,6 +21,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 @interface TLWEditProfileController () <TLWEditNicknameDelegate, TLWAvatarCropDelegate, TLWImagePickerDelegate>
 @property (nonatomic, strong) TLWEditProfileView *myView;
 @property (nonatomic, copy)   NSString           *nickname;
+@property (nonatomic, assign) BOOL isUploadingAvatar;
 @end
 
 @implementation TLWEditProfileController
@@ -123,6 +125,8 @@ extern NSString * const TLWProfileDidUpdateNotification;
 #pragma mark - TLWAvatarCropDelegate
 
 - (void)avatarCropController:(TLWAvatarCropController *)vc didConfirmImage:(UIImage *)image {
+    if (self.isUploadingAvatar) return;
+    self.isUploadingAvatar = YES;
     // 乐观更新：立刻通知所有页面用本地图片刷新头像
     [[NSNotificationCenter defaultCenter] postNotificationName:TLWAvatarDidUpdateNotification
                                                         object:nil
@@ -137,8 +141,16 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
     [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:^(AGResultString *output, NSError *error) {
         if (error || output.code.integerValue != 200) {
+            if (!error && output.code.integerValue == 401) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                        [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:nil];
+                    }];
+                });
+                return;
+            }
             NSLog(@"头像上传失败: %@", error.localizedDescription ?: output.message);
-            dispatch_async(dispatch_get_main_queue(), ^{ [self showToast:@"头像同步失败，请重试"]; });
+            dispatch_async(dispatch_get_main_queue(), ^{ self.isUploadingAvatar = NO; [TLWToast show:@"头像同步失败，请重试"]; });
             return;
         }
         // 上传成功，直接改缓存 + 发通知
@@ -147,11 +159,19 @@ extern NSString * const TLWProfileDidUpdateNotification;
         [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *res, NSError *err) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (err || res.code.integerValue != 200) {
-                    [self showToast:@"头像同步失败，请重试"];
+                    if (!err && res.code.integerValue == 401) {
+                        [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                            [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:nil];
+                        }];
+                        return;
+                    }
+                    self.isUploadingAvatar = NO;
+                    [TLWToast show:@"头像同步失败，请重试"];
                 } else {
+                    self.isUploadingAvatar = NO;
                     // 静默更新缓存，不发通知，避免闪烁
                     [TLWSDKManager shared].cachedProfile.avatarUrl = output.data;
-                    [self showToast:@"修改成功"];
+                    [TLWToast show:@"头像修改成功"];
                 }
             });
         }];
@@ -170,7 +190,8 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)onPasswordTap {
-    TLWChangePasswordController *vc = [[TLWChangePasswordController alloc] init];
+    NSString *pwd = [TLWSDKManager shared].generatedPassword;
+    TLWChangePasswordController *vc = [[TLWChangePasswordController alloc] initWithCurrentPassword:pwd];
     [self.navigationController pushViewController:vc animated:YES];
 }
 
@@ -179,40 +200,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 - (void)editNicknameController:(TLWEditNicknameController *)vc didSaveNickname:(NSString *)nickname {
     _nickname = nickname;
     _myView.nicknameValueLabel.text = nickname;
-    [self showToast:@"修改成功"];
-}
-
-#pragma mark - Toast
-
-- (void)showToast:(NSString *)text {
-    UILabel *toast = [UILabel new];
-    toast.text            = text;
-    toast.font            = [UIFont systemFontOfSize:15];
-    toast.textColor       = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
-    toast.textAlignment   = NSTextAlignmentCenter;
-    toast.backgroundColor = UIColor.whiteColor;
-    toast.layer.cornerRadius  = 8;
-    toast.layer.masksToBounds = NO;
-    toast.layer.shadowColor   = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
-    toast.layer.shadowOpacity = 1;
-    toast.layer.shadowRadius  = 6;
-    toast.layer.shadowOffset  = CGSizeMake(0, 2);
-    [self.view addSubview:toast];
-    [toast mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view).offset(50);
-        make.centerY.equalTo(self.view).multipliedBy(0.72);
-        make.width.mas_equalTo(108);
-        make.height.mas_equalTo(38);
-    }];
-
-    toast.alpha = 0;
-    [UIView animateWithDuration:0.25 animations:^{ toast.alpha = 1; } completion:^(BOOL f) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [UIView animateWithDuration:0.25 animations:^{ toast.alpha = 0; } completion:^(BOOL done) {
-                [toast removeFromSuperview];
-            }];
-        });
-    }];
+    [TLWToast show:@"昵称修改成功"];
 }
 
 @end

@@ -63,6 +63,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 获取本地保存的 refreshToken
 - (nullable NSString *)refreshToken;
 
+/// 自动注册时生成的密码（仅短信验证码登录自动注册时有值）
+@property (nonatomic, copy, nullable, readonly) NSString *generatedPassword;
+
 /// 上传多张图片，返回服务器 URL 数组
 - (nullable NSURLSessionTask *)uploadImages:(NSArray<UIImage *> *)images
                                      prefix:(NSString *)prefix
@@ -90,6 +93,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// 收藏指定帖子
 - (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id
                        completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
+
+/// Token 续期入口：检测到 401 时调用，自动用 refreshToken 换新 accessToken 后执行 retryBlock。
+/// 若 refreshToken 也已过期则强制跳回登录页。多个并发 401 只发一次刷新请求，其余排队等结果。
+- (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock;
 
 @end
 
