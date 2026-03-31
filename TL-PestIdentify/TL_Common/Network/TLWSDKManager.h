@@ -91,6 +91,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id
                        completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
 
+/// Token 续期入口：检测到 401 时调用，自动用 refreshToken 换新 accessToken 后执行 retryBlock。
+/// 若 refreshToken 也已过期则强制跳回登录页。多个并发 401 只发一次刷新请求，其余排队等结果。
+- (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock;
+
 @end
 
 NS_ASSUME_NONNULL_END

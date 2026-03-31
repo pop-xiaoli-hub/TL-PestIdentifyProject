@@ -265,6 +265,12 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       [self.footerSpinner stopAnimating];
 
       if (error || !output || output.code.integerValue != 200) {
+        if (!error && output.code.integerValue == 401) {
+          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [self fetchCommentsPage:page];
+          }];
+          return;
+        }
         NSLog(@"[Comments] 获取评论失败: %@", error.localizedDescription ?: output.message);
         return;
       }
@@ -360,6 +366,12 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
     dispatch_async(dispatch_get_main_queue(), ^{
       self.sendButton.enabled = YES;
       if (error || !output || output.code.integerValue != 200) {
+        if (!error && output.code.integerValue == 401) {
+          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [self sendComment];
+          }];
+          return;
+        }
         NSString *msg = output.message.length > 0 ? output.message : @"评论发送失败，请稍后重试";
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"发送失败" message:msg preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
@@ -495,6 +507,12 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       dispatch_async(dispatch_get_main_queue(), ^{
         NSLog(@"收藏接口服务器返回数据");
         if (error || !output || output.code.integerValue != 200) {
+          if (!error && output.code.integerValue == 401) {
+            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+              [weakSelf collectTapped:weakSelf.headerView.collectButton];
+            }];
+            return;
+          }
           NSLog(@"[Favorite] 收藏失败: %@", error.localizedDescription ?: output.message);
           // 恢复按钮状态
           weakSelf.liked = !weakSelf.liked;

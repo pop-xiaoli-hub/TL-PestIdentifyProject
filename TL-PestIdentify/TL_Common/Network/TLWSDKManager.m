@@ -15,6 +15,10 @@ static NSString * const kUsernameKey = @"TLW_username";
 
 @interface TLWSDKManager ()
 @property (nonatomic, strong, readwrite) AGUserProfileDto *cachedProfile;
+/// 是否正在刷新 token（防止并发多次刷新请求）
+@property (nonatomic, assign) BOOL isRefreshing;
+/// 等待 token 刷新完成后重试的 block 队列
+@property (nonatomic, strong) NSMutableArray<dispatch_block_t> *pendingRetryBlocks;
 @end
 
 @implementation TLWSDKManager
@@ -44,6 +48,7 @@ static NSString * const kUsernameKey = @"TLW_username";
         _username = [ud stringForKey:kUsernameKey];
         //  api服务入口，所有接口都从这里走
         _api = [[AGApiService alloc] init];
+        _pendingRetryBlocks = [NSMutableArray array];
     }
     return self;
 }
@@ -193,6 +198,64 @@ static NSString * const kUsernameKey = @"TLW_username";
 - (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id
                        completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
   return [self.api favoritePostWithId:_id completionHandler:handler];
+}
+
+- (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock {
+    // 把重试 block 入队（nil 也可以，只需要触发刷新）
+    if (retryBlock) {
+        [self.pendingRetryBlocks addObject:[retryBlock copy]];
+    }
+    // 已在刷新中，等结果就行，不重复发请求
+    if (self.isRefreshing) return;
+
+    NSString *rt = [self refreshToken];
+    if (!rt.length) {
+        // 没有 refresh token，直接跳登录
+        [self logout];
+        [self _navigateToLogin];
+        return;
+    }
+
+    self.isRefreshing = YES;
+    AGRefreshTokenRequest *req = [[AGRefreshTokenRequest alloc] init];
+    req.refreshToken = rt;
+
+    __weak typeof(self) weakSelf = self;
+    [_api refreshWithRefreshTokenRequest:req completionHandler:^(AGResultAuthResponse *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+            self.isRefreshing = NO;
+
+            if (!error && output.code.integerValue == 200) {
+                // 刷新成功：更新双 token，执行所有排队重试
+                [self saveAuthResponse:output.data];
+                NSArray<dispatch_block_t> *blocks = [self.pendingRetryBlocks copy];
+                [self.pendingRetryBlocks removeAllObjects];
+                for (dispatch_block_t block in blocks) { block(); }
+            } else {
+                // 刷新失败：清除凭证，跳回登录页
+                NSLog(@"[Token] refresh 失败，强制登出: %@", error ?: output.message);
+                [self.pendingRetryBlocks removeAllObjects];
+                [self logout];
+                [self _navigateToLogin];
+            }
+        });
+    }];
+}
+
+- (void)_navigateToLogin {
+    // 动态 import 避免循环依赖，运行时查找登录 VC 类
+    Class loginClass = NSClassFromString(@"TLWPasswordLoginController");
+    if (!loginClass) return;
+    UIViewController *loginVC = [[loginClass alloc] init];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    [UIView transitionWithView:window
+                      duration:0.35
+                       options:UIViewAnimationOptionTransitionCrossDissolve
+                    animations:^{ window.rootViewController = nav; }
+                    completion:nil];
 }
 
 @end
