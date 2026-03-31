@@ -11,6 +11,7 @@
 #import <objc/runtime.h>
 #import <AgriPestClient/AGCommentResponseDto.h>
 #import "TLWSDKManager.h"
+#import "TLWToast.h"
 
 static NSString *const kCommentCellID = @"TLWCommentCell";
 
@@ -407,75 +408,6 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [UIView animateWithDuration:duration animations:^{
     self.inputBar.transform = CGAffineTransformMakeTranslation(0, -offset);
     self.tableView.contentInset = UIEdgeInsetsMake(0, 0, offset + 56, 0);
-  }];
-}
-
-- (void)tl_showTopToast:(NSString *)text {
-  if (text.length == 0) return;
-
-  // 挂到“全局 window”，保证在任何页面都能看到
-  UIWindow *hostWindow = nil;
-  if (@available(iOS 13.0, *)) {
-    // 仅使用前台激活的 Scene，避免取到后台/其他窗口的 keyWindow
-    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-      if (scene.activationState != UISceneActivationStateForegroundActive) continue;
-      if (![scene isKindOfClass:[UIWindowScene class]]) continue;
-      UIWindowScene *windowScene = (UIWindowScene *)scene;
-
-      // 优先取 key window（当前场景正在接收事件的窗口）
-      for (UIWindow *w in windowScene.windows) {
-        if (w.isKeyWindow) {
-          hostWindow = w;
-          break;
-        }
-      }
-      if (!hostWindow) {
-        hostWindow = windowScene.windows.firstObject;
-      }
-      if (hostWindow) break;
-    }
-  } else {
-    // iOS 12 及以下：直接用当前控制器关联的 window 即可（避免使用废弃的 UIApplication.windows）
-    hostWindow = self.view.window;
-  }
-  if (!hostWindow) return;
-
-  UIView *old = [hostWindow viewWithTag:1107];
-  if (old) [old removeFromSuperview];
-
-  UILabel *toast = [UILabel new];
-  toast.tag = 1107;
-  toast.text = text;
-  toast.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-  toast.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
-  toast.textAlignment = NSTextAlignmentCenter;
-  toast.backgroundColor = UIColor.whiteColor;
-  toast.layer.cornerRadius = 19;
-  toast.layer.masksToBounds = YES;
-  toast.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
-  toast.layer.shadowOpacity = 1;
-  toast.layer.shadowRadius = 6;
-  toast.layer.shadowOffset = CGSizeMake(0, 2);
-  [hostWindow addSubview:toast];
-
-  [toast mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(hostWindow.mas_safeAreaLayoutGuideTop).offset(10);
-    make.centerX.equalTo(hostWindow);
-    make.width.mas_equalTo(190);
-    make.height.mas_equalTo(38);
-  }];
-
-  toast.alpha = 0;
-  [UIView animateWithDuration:0.25 animations:^{
-    toast.alpha = 1;
-  } completion:^(BOOL finished) {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      [UIView animateWithDuration:0.25 animations:^{
-        toast.alpha = 0;
-      } completion:^(BOOL done) {
-        [toast removeFromSuperview];
-      }];
-    });
   }];
 }
 

@@ -12,6 +12,7 @@ static NSString * const kTokenKey    = @"TLW_access_token";
 static NSString * const kRefreshKey  = @"TLW_refresh_token";
 static NSString * const kUserIdKey   = @"TLW_user_id";
 static NSString * const kUsernameKey = @"TLW_username";
+static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 @interface TLWSDKManager ()
 @property (nonatomic, strong, readwrite) AGUserProfileDto *cachedProfile;
@@ -67,6 +68,9 @@ static NSString * const kUsernameKey = @"TLW_username";
   [ud setObject:auth.refreshToken forKey:kRefreshKey];
   [ud setInteger:auth.userId.integerValue forKey:kUserIdKey];
   [ud setObject:auth.username     forKey:kUsernameKey];
+  if (auth.generatedPassword.length > 0) {
+    [ud setObject:auth.generatedPassword forKey:kGenPwdKey];
+  }
 
   _userId   = auth.userId.integerValue;
   _username = auth.username;
@@ -74,6 +78,10 @@ static NSString * const kUsernameKey = @"TLW_username";
 
 - (nullable NSString *)refreshToken {
   return [[NSUserDefaults standardUserDefaults] stringForKey:kRefreshKey];
+}
+
+- (nullable NSString *)generatedPassword {
+  return [[NSUserDefaults standardUserDefaults] stringForKey:kGenPwdKey];
 }
 
 - (void)fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion {
@@ -96,6 +104,7 @@ static NSString * const kUsernameKey = @"TLW_username";
   [ud removeObjectForKey:kRefreshKey];
   [ud removeObjectForKey:kUserIdKey];
   [ud removeObjectForKey:kUsernameKey];
+  [ud removeObjectForKey:kGenPwdKey];
 
   _userId   = 0;
   _username = nil;
@@ -207,7 +216,6 @@ static NSString * const kUsernameKey = @"TLW_username";
     }
     // 已在刷新中，等结果就行，不重复发请求
     if (self.isRefreshing) return;
-
     NSString *rt = [self refreshToken];
     if (!rt.length) {
         // 没有 refresh token，直接跳登录
@@ -243,6 +251,7 @@ static NSString * const kUsernameKey = @"TLW_username";
         });
     }];
 }
+
 
 - (void)_navigateToLogin {
     // 动态 import 避免循环依赖，运行时查找登录 VC 类

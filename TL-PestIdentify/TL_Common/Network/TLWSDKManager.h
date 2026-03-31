@@ -63,6 +63,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 获取本地保存的 refreshToken
 - (nullable NSString *)refreshToken;
 
+/// 自动注册时生成的密码（仅短信验证码登录自动注册时有值）
+@property (nonatomic, copy, nullable, readonly) NSString *generatedPassword;
+
 /// 上传多张图片，返回服务器 URL 数组
 - (nullable NSURLSessionTask *)uploadImages:(NSArray<UIImage *> *)images
                                      prefix:(NSString *)prefix

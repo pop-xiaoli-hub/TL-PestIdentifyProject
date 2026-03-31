@@ -6,13 +6,24 @@
 #import "TLWChangePasswordController.h"
 #import "TLWChangePasswordView.h"
 #import "TLWSDKManager.h"
+#import "TLWToast.h"
 #import <Masonry/Masonry.h>
 
 @interface TLWChangePasswordController ()
 @property (nonatomic, strong) TLWChangePasswordView *myView;
+@property (nonatomic, copy)   NSString *currentPassword;
 @end
 
 @implementation TLWChangePasswordController
+
+- (instancetype)initWithCurrentPassword:(NSString *)password {
+    self = [super init];
+    if (self) {
+        self.hidesBottomBarWhenPushed = YES;
+        _currentPassword = [password copy];
+    }
+    return self;
+}
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -22,6 +33,9 @@
         make.edges.equalTo(self.view);
     }];
     [self setupActions];
+    if (_currentPassword.length > 0) {
+        _myView.currentPassword = _currentPassword;
+    }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -52,11 +66,11 @@
     NSString *confirmPwd = _myView.confirmPasswordField.text ?: @"";
 
     if (newPwd.length < 6 || newPwd.length > 20) {
-        [self showToast:@"密码长度需为6-20位"];
+        [TLWToast show:@"密码长度需为6-20位"];
         return;
     }
     if (![newPwd isEqualToString:confirmPwd]) {
-        [self showToast:@"两次密码不一致"];
+        [TLWToast show:@"两次密码不一致"];
         return;
     }
 
@@ -69,46 +83,15 @@
                     [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
                     return;
                 }
-                [self showToast:error.localizedDescription ?: output.message ?: @"修改失败"];
+                [TLWToast show:error.localizedDescription ?: output.message ?: @"修改失败"];
                 return;
             }
-            [self showToast:@"密码修改成功"];
+            // 修改成功后清除旧密码记录
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"TLW_generated_password"];
+            [TLWToast show:@"密码修改成功"];
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 [self.navigationController popViewControllerAnimated:YES];
             });
-        });
-    }];
-}
-
-#pragma mark - Toast
-
-- (void)showToast:(NSString *)text {
-    UILabel *toast = [UILabel new];
-    toast.text            = text;
-    toast.font            = [UIFont systemFontOfSize:15];
-    toast.textColor       = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
-    toast.textAlignment   = NSTextAlignmentCenter;
-    toast.backgroundColor = UIColor.whiteColor;
-    toast.layer.cornerRadius  = 8;
-    toast.layer.masksToBounds = NO;
-    toast.layer.shadowColor   = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
-    toast.layer.shadowOpacity = 1;
-    toast.layer.shadowRadius  = 6;
-    toast.layer.shadowOffset  = CGSizeMake(0, 2);
-    [self.view addSubview:toast];
-    [toast mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
-        make.centerY.equalTo(self.view).multipliedBy(0.72);
-        make.width.mas_greaterThanOrEqualTo(120);
-        make.height.mas_equalTo(38);
-    }];
-
-    toast.alpha = 0;
-    [UIView animateWithDuration:0.25 animations:^{ toast.alpha = 1; } completion:^(BOOL f) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [UIView animateWithDuration:0.25 animations:^{ toast.alpha = 0; } completion:^(BOOL done) {
-                [toast removeFromSuperview];
-            }];
         });
     }];
 }

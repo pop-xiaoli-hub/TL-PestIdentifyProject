@@ -10,6 +10,7 @@
 #import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
 #import "TLWSDKManager.h"
+#import "TLWToast.h"
 #import "TLWGuideController.h"
 #import "TLWPreferenceController.h"
 
@@ -133,6 +134,10 @@
                 return;
             }
             [[TLWSDKManager shared] saveAuthResponse:output.data];
+            // generatedPassword 非空 = 服务端自动注册了新账号
+            if (output.data.generatedPassword.length > 0) {
+                [TLWToast show:@"已为您自动注册账号"];
+            }
             [self navigateAfterLogin];
         });
     }];
