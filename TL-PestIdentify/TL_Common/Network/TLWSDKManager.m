@@ -271,8 +271,7 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
   fetchPageBlock(0);
 }
 
-- (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id
-                       completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
+- (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
   return [self.api favoritePostWithId:_id completionHandler:handler];
 }
 
