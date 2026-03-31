@@ -235,8 +235,9 @@ static CGFloat const kHorizontalPad = 16.0;
   self.contentLabel.text = post.content.length > 0 ? post.content : @"";
   // 同步点赞数 / 收藏数（收藏数暂用点赞数占位，后端接入后替换）
   NSInteger likeCount = post.likeCount ? post.likeCount.integerValue : 0;
+  NSInteger favCount = post.favoriteCount ? post.favoriteCount.unsignedIntValue : 0;
   self.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)likeCount];
-  self.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)likeCount];
+  self.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)favCount];
   self.images = post.images ?: @[];
   [self reloadBannerImages];
   [self reloadTags:post.tags];

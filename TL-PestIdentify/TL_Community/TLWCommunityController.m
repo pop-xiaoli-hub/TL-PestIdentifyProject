@@ -150,7 +150,9 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
         post.authorName = dto.authorName ?: @"";
         post.authorAvatar = dto.authorAvatar ?: @"";
         post.likeCount = dto.likeCount ?: @0;
+        post.favoriteCount = dto.favoriteCount ?: @0;
         NSLog(@"点赞数 : %@", post.likeCount);
+        NSLog(@"收藏数 : %@", post.likeCount);
         // imageAspectRatio 由瀑布流代理方法按行规则统一设置
         [accumulator addObject:post];
       }
@@ -220,8 +222,11 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
   if (indexPath.item >= self.posts.count) return;
   TLWCommunityPost *post = self.posts[indexPath.item];
+  // 本地发布中的帖子禁止点击进入详情
+  if (post.isLocalPending) return;
   TLWPostDetailController *detailVC = [[TLWPostDetailController alloc] init];
   NSLog(@"post:%@", post.content);
+  NSLog(@"post.favcount = %@", post.favoriteCount);
   detailVC.post = post;
   detailVC.hidesBottomBarWhenPushed = YES;
   [self.navigationController pushViewController:detailVC animated:YES];
@@ -269,6 +274,8 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
     if (post.imageAspectRatio <= 0.0) {
       post.imageAspectRatio = 0.65;
     }
+    // 标记为本地发布中，cell 顶部会显示毛玻璃遮罩
+    post.isLocalPending = YES;
     // 插入到数组最前面，让新帖子显示在最上方
     [strongSelf.posts insertObject:post atIndex:0];
     NSLog(@"post.content: %@", post.content);
@@ -355,6 +362,25 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
               NSLog(@"7");
               NSLog(@"帖子发布成功");
               NSLog(@"strongSelf:%@", strongSelf);
+              [strongSelf tl_showTopToast:@"帖子发布成功"];
+              // 上传成功：找到本地发布中的帖子，清除 pending 标记并刷新对应 cell
+              NSInteger pendingIndex = NSNotFound;
+              AGPostResponseDto* dto = output.data;
+              for (NSInteger i = 0; i < (NSInteger)strongSelf.posts.count; i++) {
+                TLWCommunityPost *p = strongSelf.posts[i];
+                if (p.isLocalPending) {
+                  p.isLocalPending = NO;
+                  p._id = dto._id;
+                  p.likeCount = @0;
+                  p.favoriteCount = @0;
+                  pendingIndex = i;
+                  break;
+                }
+              }
+              if (pendingIndex != NSNotFound) {
+                NSIndexPath *ip = [NSIndexPath indexPathForItem:pendingIndex inSection:0];
+                [strongSelf.myView.collectionView reloadItemsAtIndexPaths:@[ip]];
+              }
               [TLWToast show:@"帖子发布成功"];
             });
     }];

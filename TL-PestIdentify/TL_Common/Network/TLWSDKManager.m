@@ -16,6 +16,7 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 @interface TLWSDKManager ()
 @property (nonatomic, strong, readwrite) AGUserProfileDto *cachedProfile;
+@property (nonatomic, strong, readwrite) NSArray<AGPostResponseDto *> *cachedFavoritedPosts;
 /// 是否正在刷新 token（防止并发多次刷新请求）
 @property (nonatomic, assign) BOOL isRefreshing;
 /// 等待 token 刷新完成后重试的 block 队列
@@ -47,6 +48,7 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
         }
         _userId   = [ud integerForKey:kUserIdKey];
         _username = [ud stringForKey:kUsernameKey];
+        _cachedFavoritedPosts = @[];
         //  api服务入口，所有接口都从这里走
         _api = [[AGApiService alloc] init];
         _pendingRetryBlocks = [NSMutableArray array];
@@ -202,6 +204,71 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
   AGCommentRequest *req = [[AGCommentRequest alloc] init];
   req.content = content;
   return [self.api addCommentWithId:_id commentRequest:req completionHandler:handler];
+}
+
+- (NSURLSessionTask *)getFavoritedPostsWithPage:(NSNumber *)page size:(NSNumber *)size completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error))handler {
+  return [self.api getFavoritedPostsWithPage:page size:size completionHandler:handler];
+}
+
+- (void)fetchAllFavoritedPostsWithCompletion:(void (^)(NSArray<AGPostResponseDto *> * _Nullable posts, NSError * _Nullable error))completion {
+  if (![self isLoggedIn]) {
+    self.cachedFavoritedPosts = @[];
+    if (completion) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        completion(@[], nil);
+      });
+    }
+    return;
+  }
+
+  NSInteger pageSize = 20;
+  NSInteger maxPages = 50;
+  NSMutableArray<AGPostResponseDto *> *accumulator = [NSMutableArray array];
+  __weak typeof(self) weakSelf = self;
+
+  __block void (^fetchPageBlock)(NSInteger pageIndex);
+  fetchPageBlock = ^(NSInteger pageIndex) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+
+    [strongSelf getFavoritedPostsWithPage:@(pageIndex)
+                                     size:@(pageSize)
+                        completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
+      __strong typeof(weakSelf) s = weakSelf;
+      if (!s) return;
+
+      if (error || !output || output.code.integerValue != 200) {
+        NSError *finalError = error;
+        if (!finalError) {
+          NSString *msg = output.message ?: @"拉取收藏帖子失败";
+          finalError = [NSError errorWithDomain:@"TLWSDKManager.favorite"
+                                           code:output.code.integerValue
+                                       userInfo:@{NSLocalizedDescriptionKey : msg}];
+        }
+        fetchPageBlock = nil;
+        dispatch_async(dispatch_get_main_queue(), ^{
+          if (completion) completion(nil, finalError);
+        });
+        return;
+      }
+
+      NSArray<AGPostResponseDto *> *list = output.data.list ?: @[];
+      [accumulator addObjectsFromArray:list];
+
+      BOOL hasNext = output.data.hasNext.boolValue;
+      if (hasNext && pageIndex + 1 < maxPages) {
+        fetchPageBlock(pageIndex + 1);
+      } else {
+        fetchPageBlock = nil;
+        s.cachedFavoritedPosts = [accumulator copy];
+        dispatch_async(dispatch_get_main_queue(), ^{
+          if (completion) completion(s.cachedFavoritedPosts, nil);
+        });
+      }
+    }];
+  };
+
+  fetchPageBlock(0);
 }
 
 - (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id
