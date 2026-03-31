@@ -1,4 +1,5 @@
 //
+//
 //  TLWSDKManager.m
 //  TL-PestIdentify
 //
@@ -88,12 +89,15 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 - (void)fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion {
     [_api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
-        if (!error && output.code.integerValue == 200) {
-            self.cachedProfile = output.data;
-        }
         dispatch_async(dispatch_get_main_queue(), ^{
-            [[NSNotificationCenter defaultCenter] postNotificationName:TLWProfileDidUpdateNotification object:nil];
-            if (completion) completion(self.cachedProfile);
+            if (!error && output.code.integerValue == 200) {
+                self.cachedProfile = output.data;
+                [[NSNotificationCenter defaultCenter] postNotificationName:TLWProfileDidUpdateNotification object:nil];
+                if (completion) completion(self.cachedProfile);
+                return;
+            }
+
+            if (completion) completion(nil);
         });
     }];
 }
@@ -110,6 +114,8 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
   _userId   = 0;
   _username = nil;
+  self.cachedProfile = nil;
+  self.cachedFavoritedPosts = @[];
 }
 
 - (NSURLSessionTask* )uploadImages:(NSArray<UIImage* >* )images prefix:(NSString* )prefix completion:(void(^)(NSArray<NSString* > *urls, NSError* error))completion {

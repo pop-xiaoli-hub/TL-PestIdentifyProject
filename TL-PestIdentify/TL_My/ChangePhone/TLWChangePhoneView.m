@@ -160,42 +160,27 @@
         make.height.mas_equalTo(48);
     }];
 
-    // 验证码行
-    UILabel *codeTitle = [UILabel new];
-    codeTitle.text      = @"验证码";
-    codeTitle.font      = [UIFont systemFontOfSize:14];
-    codeTitle.textColor = [UIColor colorWithWhite:0.45 alpha:1];
-    [content addSubview:codeTitle];
-    [codeTitle mas_makeConstraints:^(MASConstraintMaker *make) {
+    UILabel *tipLabel = [UILabel new];
+    tipLabel.text = @"当前接口仅提交新手机号，不做短信验证码校验。";
+    tipLabel.font = [UIFont systemFontOfSize:13];
+    tipLabel.textColor = [UIColor colorWithWhite:0.45 alpha:1];
+    tipLabel.numberOfLines = 0;
+    [content addSubview:tipLabel];
+    [tipLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_phoneField.mas_bottom).offset(16);
         make.left.equalTo(content).offset(20);
-    }];
-
-    _codeField = [self buildTextFieldWithPlaceholder:@"请输入验证码" keyboard:UIKeyboardTypeNumberPad];
-    [content addSubview:_codeField];
-    [_codeField mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(codeTitle.mas_bottom).offset(8);
-        make.left.equalTo(content).offset(20);
-        make.right.equalTo(content).offset(-130);
-        make.height.mas_equalTo(48);
-    }];
-
-    // 发送验证码按钮
-    _sendCodeButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    _sendCodeButton.layer.cornerRadius = 24;
-    _sendCodeButton.clipsToBounds      = YES;
-    _sendCodeButton.titleLabel.font    = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-    [_sendCodeButton setTitle:@"发送验证码" forState:UIControlStateNormal];
-    [_sendCodeButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    [_sendCodeButton setTitleColor:[UIColor colorWithWhite:1 alpha:0.5] forState:UIControlStateDisabled];
-    _sendCodeButton.backgroundColor = [UIColor colorWithRed:0.97 green:0.60 blue:0.15 alpha:1.0];
-    [content addSubview:_sendCodeButton];
-    [_sendCodeButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerY.equalTo(_codeField);
         make.right.equalTo(content).offset(-20);
-        make.width.mas_equalTo(104);
-        make.height.mas_equalTo(48);
     }];
+
+    _codeField = [self buildTextFieldWithPlaceholder:@"当前版本未启用验证码校验" keyboard:UIKeyboardTypeNumberPad];
+    _codeField.enabled = NO;
+    _codeField.hidden = YES;
+    [content addSubview:_codeField];
+
+    _sendCodeButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    _sendCodeButton.hidden = YES;
+    _sendCodeButton.enabled = NO;
+    [content addSubview:_sendCodeButton];
 
     // 确认按钮
     _confirmButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -219,7 +204,7 @@
 
     [content addSubview:_confirmButton];
     [_confirmButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_codeField.mas_bottom).offset(32);
+        make.top.equalTo(tipLabel.mas_bottom).offset(24);
         make.left.equalTo(content).offset(20);
         make.right.equalTo(content).offset(-20);
         make.height.mas_equalTo(52);

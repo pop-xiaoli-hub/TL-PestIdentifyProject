@@ -6,7 +6,7 @@
 #import "TLWSettingViewController.h"
 #import "TLWSettingView.h"
 #import "TLWSDKManager.h"
-#import "TLWSmsLoginController.h"
+#import "TLWPasswordLoginController.h"
 #import <Masonry/Masonry.h>
 
 @interface TLWSettingViewController ()
@@ -67,8 +67,9 @@
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
         [[TLWSDKManager shared] logout];
         UIWindow *window = self.view.window;
-        TLWSmsLoginController *loginVC = [[TLWSmsLoginController alloc] init];
+        TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+        nav.navigationBarHidden = YES;
         window.rootViewController = nav;
         [UIView transitionWithView:window
                           duration:0.35

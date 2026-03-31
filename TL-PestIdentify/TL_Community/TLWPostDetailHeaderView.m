@@ -47,6 +47,14 @@ static CGFloat const kHorizontalPad = 16.0;
   self.autoScrollTimer = nil;
 }
 
+- (void)didMoveToWindow {
+  [super didMoveToWindow];
+  if (!self.window) {
+    [self.autoScrollTimer invalidate];
+    self.autoScrollTimer = nil;
+  }
+}
+
 - (void)buildBanner {
   self.bannerScrollView = [[UIScrollView alloc] init];
   self.bannerScrollView.pagingEnabled = YES;
@@ -300,11 +308,15 @@ static CGFloat const kHorizontalPad = 16.0;
     }];
   }
   if (count > 1) {
-    self.autoScrollTimer = [NSTimer scheduledTimerWithTimeInterval:3.0
-                                                            target:self
-                                                          selector:@selector(autoScrollBanner)
-                                                          userInfo:nil
-                                                           repeats:YES];
+    __weak typeof(self) weakSelf = self;
+    self.autoScrollTimer = [NSTimer scheduledTimerWithTimeInterval:3.0 repeats:YES block:^(NSTimer * _Nonnull timer) {
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        [timer invalidate];
+        return;
+      }
+      [strongSelf autoScrollBanner];
+    }];
   }
 }
 

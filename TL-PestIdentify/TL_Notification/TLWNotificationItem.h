@@ -4,6 +4,7 @@
 //
 
 #import <Foundation/Foundation.h>
+@class AGMessageResponseDto;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -16,13 +17,15 @@ typedef NS_ENUM(NSInteger, TLWNotificationTag) {
 
 @interface TLWNotificationItem : NSObject
 
-@property (nonatomic, copy)   NSString          *title;
-@property (nonatomic, copy)   NSString          *bodyText;
-@property (nonatomic, assign) BOOL               hasUnread;
-@property (nonatomic, assign) BOOL               isExpanded;
-@property (nonatomic, assign) TLWNotificationTag  tag;
+@property (nonatomic, copy)            NSString          *title;
+@property (nonatomic, copy)            NSString          *bodyText;
+@property (nonatomic, assign)          BOOL               hasUnread;
+@property (nonatomic, assign)          BOOL               isExpanded;
+@property (nonatomic, assign)          TLWNotificationTag  tag;
+@property (nonatomic, strong, nullable) NSNumber          *messageId;
+@property (nonatomic, strong, nullable) NSDate            *createdAt;
 
-+ (NSArray<TLWNotificationItem *> *)mockItems;
++ (instancetype)itemFromDto:(AGMessageResponseDto *)dto;
 
 @end
 

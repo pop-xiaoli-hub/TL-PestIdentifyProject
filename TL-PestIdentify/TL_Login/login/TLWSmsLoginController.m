@@ -25,6 +25,10 @@
 
 @implementation TLWSmsLoginController
 
+- (void)dealloc {
+    [self invalidateCountdownTimer];
+}
+
 - (void)loadView {
     self.loginView = [[TLWSmsLoginView alloc] initWithFrame:[UIScreen mainScreen].bounds];
     self.view = self.loginView;
@@ -94,21 +98,36 @@
 }
 
 - (void)startCountdown {
+    [self invalidateCountdownTimer];
     self.countdown = 60;
     [self.loginView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)self.countdown] forState:UIControlStateDisabled];
     self.loginView.sendCodeButton.enabled = NO;
 
+    __weak typeof(self) weakSelf = self;
     self.countdownTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(NSTimer *timer) {
-        self.countdown--;
-        if (self.countdown <= 0) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) {
             [timer invalidate];
-            self.countdownTimer = nil;
-            self.loginView.sendCodeButton.enabled = YES;
-            [self.loginView.sendCodeButton setTitle:@"获取验证码" forState:UIControlStateNormal];
+            return;
+        }
+
+        strongSelf.countdown--;
+        if (strongSelf.countdown <= 0) {
+            [timer invalidate];
+            strongSelf.countdownTimer = nil;
+            strongSelf.loginView.sendCodeButton.enabled = YES;
+            [strongSelf.loginView.sendCodeButton setTitle:@"获取验证码" forState:UIControlStateNormal];
         } else {
-            [self.loginView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)self.countdown] forState:UIControlStateDisabled];
+            [strongSelf.loginView.sendCodeButton setTitle:[NSString stringWithFormat:@"%lds", (long)strongSelf.countdown] forState:UIControlStateDisabled];
         }
     }];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    if (self.isMovingFromParentViewController || self.isBeingDismissed) {
+        [self invalidateCountdownTimer];
+    }
 }
 
 - (void)handleLogin {
@@ -214,6 +233,11 @@
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)invalidateCountdownTimer {
+    [self.countdownTimer invalidate];
+    self.countdownTimer = nil;
 }
 
 @end

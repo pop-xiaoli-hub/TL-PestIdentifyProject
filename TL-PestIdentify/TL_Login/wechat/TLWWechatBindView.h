@@ -13,7 +13,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, readonly) UIButton *wechatAuthButton;    // 一键授权
 @property (nonatomic, strong, readonly) UIButton *qqLoginButton;
-@property (nonatomic, strong, readonly) UIButton *phoneLoginButton;
+@property (nonatomic, strong, readonly) UIButton *smsLoginButton;
+@property (nonatomic, strong, readonly) UIButton *passwordLoginButton;
 
 @end
 

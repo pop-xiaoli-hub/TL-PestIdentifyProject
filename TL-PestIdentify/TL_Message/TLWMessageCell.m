@@ -5,6 +5,7 @@
 
 #import "TLWMessageCell.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 
 @interface TLWMessageCell ()
 
@@ -113,7 +114,12 @@
 }
 
 - (void)configureWithItem:(TLWMessageItem *)item {
-    _avatarView.image = [UIImage imageNamed:item.avatarImageName];
+    if (item.avatarUrl.length > 0) {
+        [_avatarView sd_setImageWithURL:[NSURL URLWithString:item.avatarUrl]
+                       placeholderImage:[UIImage imageNamed:@"forkAvatar"]];
+    } else {
+        _avatarView.image = [UIImage imageNamed:item.avatarImageName];
+    }
     _titleLabel.text = item.title;
     _subtitleLabel.text = item.subtitle;
 
@@ -124,13 +130,26 @@
     _timeLabel.text = item.timeString;
 
     if (isUser) {
-        // Red dot goes on thumbnail corner
+        // Load post cover image
+        UIImageView *thumbImg = _thumbnailView.subviews.firstObject;
+        if ([thumbImg isKindOfClass:[UIImageView class]]) {
+            if (item.postImageUrl.length > 0) {
+                [thumbImg sd_setImageWithURL:[NSURL URLWithString:item.postImageUrl]
+                           placeholderImage:nil];
+            } else {
+                thumbImg.image = nil;
+            }
+        }
+
+        // Red dot goes on thumbnail corner, must be above thumbnail
         _redDot.hidden = !item.hasUnread;
         [_redDot mas_remakeConstraints:^(MASConstraintMaker *make) {
             make.width.height.mas_equalTo(9);
             make.right.equalTo(_thumbnailView).offset(3);
             make.top.equalTo(_thumbnailView).offset(-3);
         }];
+        [self.contentView bringSubviewToFront:_redDot];
+
         // Title/subtitle right boundary: up to timeLabel
         [_titleLabel mas_updateConstraints:^(MASConstraintMaker *make) {
             make.right.lessThanOrEqualTo(_timeLabel.mas_left).offset(-8);

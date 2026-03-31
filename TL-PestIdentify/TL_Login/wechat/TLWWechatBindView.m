@@ -13,7 +13,8 @@
 // 公开控件（readwrite）
 @property (nonatomic, strong, readwrite) UIButton *wechatAuthButton;
 @property (nonatomic, strong, readwrite) UIButton *qqLoginButton;
-@property (nonatomic, strong, readwrite) UIButton *phoneLoginButton;
+@property (nonatomic, strong, readwrite) UIButton *smsLoginButton;
+@property (nonatomic, strong, readwrite) UIButton *passwordLoginButton;
 
 @end
 
@@ -196,15 +197,44 @@
 #pragma mark - 底部区域（与登录页相同位置：safeAreaBottom - 100）
 
 - (void)setupBottomSection {
-    // "其它方式登录" 图片分割线
-    UIImageView *dividerImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"dividerOtherLogin"]];
-    dividerImageView.contentMode = UIViewContentModeScaleAspectFit;
-    [self addSubview:dividerImageView];
-    [dividerImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+    UIView *dividerView = [[UIView alloc] init];
+    dividerView.backgroundColor = UIColor.clearColor;
+    [self addSubview:dividerView];
+    [dividerView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-120);
-        make.left.equalTo(self).offset(60);
-        make.right.equalTo(self).offset(-60);
-        make.height.mas_equalTo(16);
+        make.left.equalTo(self).offset(34);
+        make.right.equalTo(self).offset(-34);
+        make.height.mas_equalTo(20);
+    }];
+
+    UILabel *divLabel = [[UILabel alloc] init];
+    divLabel.text = @"其它方式登录";
+    divLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
+    divLabel.textColor = [UIColor colorWithRed:0.298 green:0.298 blue:0.298 alpha:0.65];
+    divLabel.textAlignment = NSTextAlignmentCenter;
+    [dividerView addSubview:divLabel];
+    [divLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(dividerView);
+    }];
+
+    UIView *leftLine = [[UIView alloc] init];
+    leftLine.backgroundColor = [UIColor colorWithRed:0 green:0 blue:0 alpha:0.18];
+    [dividerView addSubview:leftLine];
+    [leftLine mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(dividerView);
+        make.right.equalTo(divLabel.mas_left).offset(-8);
+        make.centerY.equalTo(dividerView);
+        make.height.mas_equalTo(0.5);
+    }];
+
+    UIView *rightLine = [[UIView alloc] init];
+    rightLine.backgroundColor = [UIColor colorWithRed:0 green:0 blue:0 alpha:0.18];
+    [dividerView addSubview:rightLine];
+    [rightLine mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.right.equalTo(dividerView);
+        make.left.equalTo(divLabel.mas_right).offset(8);
+        make.centerY.equalTo(dividerView);
+        make.height.mas_equalTo(0.5);
     }];
 
     // ── QQ登录 ──
@@ -213,13 +243,15 @@
     [self addSubview:_qqLoginButton];
     [_qqLoginButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-20);
-        make.centerX.equalTo(self).offset(-60);
+        make.centerX.equalTo(self).offset(-90);
         make.width.mas_equalTo(90);
         make.height.mas_equalTo(78);
     }];
 
     UIImageView *qqIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconQQ"]];
     qqIcon.contentMode = UIViewContentModeScaleAspectFit;
+    qqIcon.clipsToBounds = YES;
+    qqIcon.layer.cornerRadius = 27;
     qqIcon.userInteractionEnabled = NO;
     [_qqLoginButton addSubview:qqIcon];
     [qqIcon mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -242,23 +274,25 @@
     }];
 
     // ── 手机号登录 ──
-    _phoneLoginButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    _phoneLoginButton.backgroundColor = UIColor.clearColor;
-    [self addSubview:_phoneLoginButton];
-    [_phoneLoginButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    _smsLoginButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    _smsLoginButton.backgroundColor = UIColor.clearColor;
+    [self addSubview:_smsLoginButton];
+    [_smsLoginButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-20);
-        make.centerX.equalTo(self).offset(60);
+        make.centerX.equalTo(self);
         make.width.mas_equalTo(90);
         make.height.mas_equalTo(78);
     }];
 
     UIImageView *phoneIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconPhone"]];
     phoneIcon.contentMode = UIViewContentModeScaleAspectFit;
+    phoneIcon.clipsToBounds = YES;
+    phoneIcon.layer.cornerRadius = 27;
     phoneIcon.userInteractionEnabled = NO;
-    [_phoneLoginButton addSubview:phoneIcon];
+    [_smsLoginButton addSubview:phoneIcon];
     [phoneIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_phoneLoginButton);
-        make.centerX.equalTo(_phoneLoginButton);
+        make.top.equalTo(_smsLoginButton);
+        make.centerX.equalTo(_smsLoginButton);
         make.width.height.mas_equalTo(54);
     }];
 
@@ -268,11 +302,47 @@
     phoneLabel.textColor     = [UIColor colorWithRed:0.298 green:0.298 blue:0.298 alpha:0.8];
     phoneLabel.textAlignment = NSTextAlignmentCenter;
     phoneLabel.userInteractionEnabled = NO;
-    [_phoneLoginButton addSubview:phoneLabel];
+    [_smsLoginButton addSubview:phoneLabel];
     [phoneLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(phoneIcon.mas_bottom).offset(6);
-        make.centerX.equalTo(_phoneLoginButton);
-        make.bottom.equalTo(_phoneLoginButton);
+        make.centerX.equalTo(_smsLoginButton);
+        make.bottom.equalTo(_smsLoginButton);
+    }];
+
+    // ── 账号密码登录 ──
+    _passwordLoginButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    _passwordLoginButton.backgroundColor = UIColor.clearColor;
+    [self addSubview:_passwordLoginButton];
+    [_passwordLoginButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-20);
+        make.centerX.equalTo(self).offset(90);
+        make.width.mas_equalTo(90);
+        make.height.mas_equalTo(78);
+    }];
+
+    UIImageView *passwordIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconPhone"]];
+    passwordIcon.contentMode = UIViewContentModeScaleAspectFit;
+    passwordIcon.clipsToBounds = YES;
+    passwordIcon.layer.cornerRadius = 27;
+    passwordIcon.userInteractionEnabled = NO;
+    [_passwordLoginButton addSubview:passwordIcon];
+    [passwordIcon mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_passwordLoginButton);
+        make.centerX.equalTo(_passwordLoginButton);
+        make.width.height.mas_equalTo(54);
+    }];
+
+    UILabel *passwordLabel = [[UILabel alloc] init];
+    passwordLabel.text          = @"账号密码登录";
+    passwordLabel.font          = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    passwordLabel.textColor     = [UIColor colorWithRed:0.298 green:0.298 blue:0.298 alpha:0.8];
+    passwordLabel.textAlignment = NSTextAlignmentCenter;
+    passwordLabel.userInteractionEnabled = NO;
+    [_passwordLoginButton addSubview:passwordLabel];
+    [passwordLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(passwordIcon.mas_bottom).offset(6);
+        make.centerX.equalTo(_passwordLoginButton);
+        make.bottom.equalTo(_passwordLoginButton);
     }];
 }
 

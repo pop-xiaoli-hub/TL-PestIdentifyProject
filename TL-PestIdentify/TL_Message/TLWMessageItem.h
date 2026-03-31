@@ -21,8 +21,11 @@ typedef NS_ENUM(NSInteger, TLWMessageItemType) {
 @property (nonatomic, copy) NSString *subtitle;
 @property (nonatomic, copy, nullable) NSString *timeString;
 @property (nonatomic, assign) BOOL hasUnread;
-
-+ (NSArray<TLWMessageItem *> *)mockItems;
+@property (nonatomic, copy, nullable) NSString *avatarUrl;
+@property (nonatomic, strong, nullable) NSNumber *unreadCount;
+@property (nonatomic, strong, nullable) NSNumber *postId;
+@property (nonatomic, strong, nullable) NSNumber *messageId;
+@property (nonatomic, copy, nullable) NSString *postImageUrl;
 
 @end
 
