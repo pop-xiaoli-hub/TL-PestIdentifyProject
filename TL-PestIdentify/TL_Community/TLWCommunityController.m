@@ -381,7 +381,6 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
                 NSIndexPath *ip = [NSIndexPath indexPathForItem:pendingIndex inSection:0];
                 [strongSelf.myView.collectionView reloadItemsAtIndexPaths:@[ip]];
               }
-              [TLWToast show:@"帖子发布成功"];
             });
     }];
   }];
