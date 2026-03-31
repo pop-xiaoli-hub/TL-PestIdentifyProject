@@ -137,6 +137,14 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
     [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:^(AGResultString *output, NSError *error) {
         if (error || output.code.integerValue != 200) {
+            if (!error && output.code.integerValue == 401) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                        [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:nil];
+                    }];
+                });
+                return;
+            }
             NSLog(@"头像上传失败: %@", error.localizedDescription ?: output.message);
             dispatch_async(dispatch_get_main_queue(), ^{ [self showToast:@"头像同步失败，请重试"]; });
             return;
@@ -147,6 +155,12 @@ extern NSString * const TLWProfileDidUpdateNotification;
         [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *res, NSError *err) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (err || res.code.integerValue != 200) {
+                    if (!err && res.code.integerValue == 401) {
+                        [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                            [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:nil];
+                        }];
+                        return;
+                    }
                     [self showToast:@"头像同步失败，请重试"];
                 } else {
                     // 静默更新缓存，不发通知，避免闪烁

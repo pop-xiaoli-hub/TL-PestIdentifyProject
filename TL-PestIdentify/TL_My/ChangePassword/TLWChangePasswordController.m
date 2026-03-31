@@ -65,6 +65,10 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             self->_myView.confirmButton.enabled = YES;
             if (error || output.code.integerValue != 200) {
+                if (!error && output.code.integerValue == 401) {
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
+                    return;
+                }
                 [self showToast:error.localizedDescription ?: output.message ?: @"修改失败"];
                 return;
             }

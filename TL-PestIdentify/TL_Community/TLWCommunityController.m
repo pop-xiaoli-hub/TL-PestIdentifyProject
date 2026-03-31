@@ -336,6 +336,16 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
             dispatch_async(dispatch_get_main_queue(), ^{
               NSLog(@"5");
               if (output.code.integerValue != 200) {
+                if (output.code.integerValue == 401) {
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                        [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *r, NSError *e) {
+                            dispatch_async(dispatch_get_main_queue(), ^{
+                                [strongSelf tl_showTopToast:(r.code.integerValue == 200) ? @"帖子发布成功" : @"帖子发送失败"];
+                            });
+                        }];
+                    }];
+                    return;
+                }
                 NSLog(@"6");
                 [strongSelf tl_showTopToast:@"帖子发送失败"];
                 NSLog(@"帖子发布失败");

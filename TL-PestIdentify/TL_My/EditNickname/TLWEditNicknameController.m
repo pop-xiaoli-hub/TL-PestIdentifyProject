@@ -70,6 +70,10 @@ extern NSString * const TLWProfileDidUpdateNotification;
     [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (error || output.code.integerValue != 200) {
+                if (!error && output.code.integerValue == 401) {
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
+                    return;
+                }
                 NSLog(@"修改昵称失败: %@", error.localizedDescription ?: output.message);
                 return;
             }
