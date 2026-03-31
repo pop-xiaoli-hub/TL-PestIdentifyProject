@@ -37,8 +37,19 @@
 - 头像更换（相册选图 + 圆形裁剪）
 - 昵称修改
 - 换绑手机号（短信验证码校验）
-- 修改密码
+- 修改密码（支持显示自动注册时的原始密码）
+- 我的收藏列表（分页加载 + 下拉刷新）
 - 设置页
+
+### 登录安全
+- 双 Token 机制（accessToken + refreshToken）
+- accessToken 过期自动续期，续期失败强制跳回登录页
+- 全部 API 接口接入 401 自动重试
+- SMS 验证码登录自动注册提示
+
+### 通用组件
+- 统一 Toast 组件（TLWToast，白色居中 + 半透明遮罩）
+- 关键按钮防抖（登录、收藏、提交等）
 
 ---
 
@@ -80,6 +91,7 @@ TL-PestIdentify/
 │   ├── EditNickname/             # 修改昵称
 │   ├── ChangePhone/              # 换绑手机号
 │   ├── ChangePassword/           # 修改密码
+│   ├── Favorite/                 # 我的收藏
 │   └── Setting/                  # 设置
 ├── TL_Record/                    # 识别记录列表
 │   └── TL_RecordDetail/          # 识别记录详情
@@ -91,6 +103,7 @@ TL-PestIdentify/
     ├── TLWImagePickerManager     # 相册选图管理
     ├── TLWPhotoCell              # 通用相册格子 Cell
     ├── TLWCameraManager          # 相机权限与调用
+    ├── TLWToast                  # 统一 Toast 组件
     └── TWLSpeechManager          # 语音识别
 ```
 
@@ -113,7 +126,7 @@ TL-PestIdentify/
 | WCDB.objc | master (git) | 本地 SQLite 数据库 |
 | Masonry | 1.1.0 | AutoLayout DSL |
 | SDWebImage | ~5.0 | 异步图片加载缓存 |
-| AgriPestClient | v1.0.92 | AI 病虫害识别 SDK |
+| AgriPestClient | v1.0.105 | AI 病虫害识别 SDK |
 | LookinServer | 1.2.8 | UI 层级调试（仅 Debug）|
 
 ---
@@ -164,7 +177,12 @@ gh api 'repos/lukecc00/AgroAiServer/commits?sha=master&per_page=20' \
 - [ ] **发布草稿回显** — 将 draftObject 内容回显到发布页（作物名称、文本、图片）
 - [ ] **记录详情 → AI 助手** — 跳转 AI 助手并预填当前病害名称作为问题
 - [x] **换绑手机号** — 短信验证码 + `changePhone` 接口
-- [x] **修改密码** — `updatePassword` 接口，6-20 位校验
+- [x] **修改密码** — `updatePassword` 接口，6-20 位校验，支持显示原密码
+- [x] **双 Token 续期** — 401 自动 refresh，全接口覆盖
+- [x] **统一 Toast** — TLWToast 组件，居中 + 遮罩
+- [x] **按钮防抖** — 登录/改昵称/收藏/头像上传
+- [x] **我的收藏** — 收藏列表分页 + 从个人主页跳转
+- [x] **自动注册提示** — SMS 登录时检测并提示
 - [ ] **个人主页背景图** — push 背景图选择页，上传后调用 `POST /user/background`
 - [ ] **识别记录筛选** — 按日期 / 病虫害类型筛选面板
 - [ ] **分享功能** — 我的页面分享按钮
