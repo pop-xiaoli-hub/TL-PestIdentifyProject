@@ -257,8 +257,7 @@ static NSString * const kUsernameKey = @"TLW_username";
   fetchPageBlock(0);
 }
 
-- (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id
-                       completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
+- (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
   return [self.api favoritePostWithId:_id completionHandler:handler];
 }
 
