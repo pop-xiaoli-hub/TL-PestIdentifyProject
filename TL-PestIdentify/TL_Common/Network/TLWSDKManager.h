@@ -24,7 +24,9 @@
 #import <AgriPestClient/AGResultListString.h>
 #import <AgriPestClient/AGResultPageResultPostResponseDto.h>
 #import <AgriPestClient/AGResultPostResponseDto.h>
+#import <AgriPestClient/AGResultSearchResultResponse.h>
 #import <AgriPestClient/AGPostResponseDto.h>
+#import <AgriPestClient/AGSearchResultResponse.h>
 #import <AgriPestClient/AGResultPageResultCommentResponseDto.h>
 #import <AgriPestClient/AGCommentRequest.h>
 #import <AgriPestClient/AGResultCommentResponseDto.h>
@@ -82,6 +84,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSURLSessionTask *)getSuggestionsWithQ:(NSString *)q
                         completionHandler:(void (^)(AGResultListString * output, NSError * error))handler;
 
+/// 高级模糊搜索帖子，返回匹配结果、推荐内容及关键词建议
+- (NSURLSessionTask *)searchPostsWithQ:(NSString *)q
+                                  page:(NSNumber *)page
+                                  size:(NSNumber *)size
+                     completionHandler:(void (^)(AGResultSearchResultResponse * output, NSError * error))handler;
+
 /// 获取帖子详情
 - (NSURLSessionTask *)getPostDetailWithId:(NSNumber *)_id
                         completionHandler:(void (^)(AGResultPostResponseDto * output, NSError * error))handler;
@@ -112,6 +120,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 取消收藏指定帖子
 - (NSURLSessionTask *)unfavoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
+
+/// 点赞指定帖子
+- (NSURLSessionTask *)likePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
+
+/// 取消点赞指定帖子
+- (NSURLSessionTask *)unlikePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
 
 /// Token 续期入口：检测到 401 时调用，自动用 refreshToken 换新 accessToken 后执行 retryBlock。
 /// 若 refreshToken 也已过期则强制跳回登录页。多个并发 401 只发一次刷新请求，其余排队等结果。
