@@ -10,6 +10,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWPostDetailController : UIViewController
+@property (nonatomic, copy)void(^reloadPosts)(NSNumber*);
 
 /// 外部传入帖子数据
 @property (nonatomic, strong) NSNumber* _id;

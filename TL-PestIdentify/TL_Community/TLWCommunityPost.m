@@ -27,6 +27,7 @@
     post.title = dict[@"title"] ?: @"";
     post.authorName = dict[@"userName"] ?: @"";
     post.likeCount = @(0);
+    post.isLiked = NO;
 
     NSNumber *ratioNumber = dict[@"imageAspectRatio"];
     if (ratioNumber) {
@@ -44,4 +45,3 @@
 
 
 @end
-
