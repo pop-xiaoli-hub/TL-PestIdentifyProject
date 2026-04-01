@@ -19,6 +19,7 @@ static NSInteger  const kPageSize       = 20;
 @property (nonatomic, assign) NSInteger currentPage;
 @property (nonatomic, assign) BOOL hasMore;
 @property (nonatomic, assign) BOOL isLoading;
+@property (nonatomic, assign) BOOL hasAppearedOnce;
 
 @end
 
@@ -59,6 +60,14 @@ static NSInteger  const kPageSize       = 20;
     self.favoriteView.collectionView.refreshControl = rc;
 
     [self loadFirstPage];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    if (self.hasAppearedOnce) {
+        [self onRefresh];
+    }
+    self.hasAppearedOnce = YES;
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -120,7 +129,7 @@ static NSInteger  const kPageSize       = 20;
             }
 
             AGPageResultPostResponseDto *pageData = output.data;
-            NSArray *list = pageData.list ?: @[];
+            NSArray<AGPostResponseDto *> *list = pageData.list ?: @[];
 
             if (page == 0) {
                 [self.favorites removeAllObjects];

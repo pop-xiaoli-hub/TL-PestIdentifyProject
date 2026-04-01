@@ -191,6 +191,11 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
                completionHandler:handler];
 }
 
+- (NSURLSessionTask *)getPostDetailWithId:(NSNumber *)_id
+                        completionHandler:(void (^)(AGResultPostResponseDto * output, NSError * error))handler {
+  return [self.api getPostDetailWithId:_id completionHandler:handler];
+}
+
 - (NSURLSessionTask *)getCommentsWithId:(NSNumber *)_id
                                     page:(NSNumber *)page
                                     size:(NSNumber *)size
@@ -273,6 +278,10 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 //获取收藏的帖子
 - (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
   return [self.api favoritePostWithId:_id completionHandler:handler];
+}
+
+- (NSURLSessionTask *)unfavoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
+  return [self.api unfavoritePostWithId:_id completionHandler:handler];
 }
 
 - (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock {

@@ -23,6 +23,7 @@
 #import <AgriPestClient/AGResultString.h>
 #import <AgriPestClient/AGResultListString.h>
 #import <AgriPestClient/AGResultPageResultPostResponseDto.h>
+#import <AgriPestClient/AGResultPostResponseDto.h>
 #import <AgriPestClient/AGPostResponseDto.h>
 #import <AgriPestClient/AGResultPageResultCommentResponseDto.h>
 #import <AgriPestClient/AGCommentRequest.h>
@@ -77,6 +78,10 @@ NS_ASSUME_NONNULL_BEGIN
                                      size:(NSNumber *)size
                         completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error)) handler;
 
+/// 获取帖子详情
+- (NSURLSessionTask *)getPostDetailWithId:(NSNumber *)_id
+                        completionHandler:(void (^)(AGResultPostResponseDto * output, NSError * error))handler;
+
 /// 获取帖子评论列表（分页）
 /// - 与你提供的方法签名保持一致
 - (NSURLSessionTask *)getCommentsWithId:(NSNumber *) _id
@@ -100,6 +105,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 收藏指定帖子
 - (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
+
+/// 取消收藏指定帖子
+- (NSURLSessionTask *)unfavoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
 
 /// Token 续期入口：检测到 401 时调用，自动用 refreshToken 换新 accessToken 后执行 retryBlock。
 /// 若 refreshToken 也已过期则强制跳回登录页。多个并发 401 只发一次刷新请求，其余排队等结果。

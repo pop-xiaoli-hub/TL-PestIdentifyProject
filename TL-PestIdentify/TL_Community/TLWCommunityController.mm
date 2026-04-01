@@ -22,10 +22,11 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 @property (nonatomic, strong) TLWCommunityView *myView;
 @property (nonatomic, strong) NSMutableArray *posts;
 @property (nonatomic, assign) BOOL tl_isFetchingFeed;
-
+@property (nonatomic, strong) NSMutableArray* collectePosts;
 @end
 
 @implementation TLWCommunityController
+
 
 
 - (void)viewDidLoad {
@@ -55,9 +56,20 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
 }
 
+
+
+- (void)loadCollectedPosts {
+  TLWSDKManager* manager = [TLWSDKManager shared];
+  __weak typeof(self) weakSelf = self;
+  [manager fetchAllFavoritedPostsWithCompletion:^(NSArray<AGPostResponseDto *> * _Nullable posts, NSError * _Nullable error) {
+    NSLog(@"获取到所有收藏的帖子数位：%ld", posts.count);
+    weakSelf.collectePosts = [NSMutableArray arrayWithArray:posts];
+  }];
+}
+
 - (void)viewDidAppear:(BOOL)animated {
   [super viewDidAppear:animated];
-
+  [self loadCollectedPosts];
 }
 
 
@@ -224,7 +236,8 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   TLWPostDetailController *detailVC = [[TLWPostDetailController alloc] init];
   NSLog(@"post:%@", post.content);
   NSLog(@"post.favcount = %@", post.favoriteCount);
-  detailVC.post = post;
+  detailVC._id = post._id;
+  detailVC.hasCollectedPosts = self.collectePosts;
   detailVC.hidesBottomBarWhenPushed = YES;
   [self.navigationController pushViewController:detailVC animated:YES];
 }

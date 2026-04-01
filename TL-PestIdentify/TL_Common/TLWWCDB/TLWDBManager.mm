@@ -16,6 +16,7 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
 @interface TLWDBManager ()
 @property (nonatomic, strong) WCTDatabase *database;
 @property (nonatomic, strong) WCTTable<TLWDBCollectedModel *> *collectedTable;
+@property (nonatomic, assign) NSInteger nextGeneratedLocalId;
 
 @end
 
@@ -37,6 +38,7 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
         _database = [[WCTDatabase alloc] initWithPath:dbPath];
         [_database createTable:kTLWCollectedTableName withClass:TLWDBCollectedModel.class];
         _collectedTable = [_database getTable:kTLWCollectedTableName withClass:TLWDBCollectedModel.class];
+        _nextGeneratedLocalId = [self loadNextLocalId];
     }
     return self;
 }
@@ -52,7 +54,15 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
         return NO;
     }
 
-    BOOL success = [self.collectedTable insertOrReplaceObject:model];
+    TLWDBCollectedModel *existingModel = [self fetchCollectedPostByPostId:postDto._id];
+    BOOL success = NO;
+    if (existingModel) {
+        model.localId = existingModel.localId;
+        success = [self.collectedTable insertOrReplaceObject:model];
+    } else {
+        model.localId = [self generateNextLocalId];
+        success = [self.collectedTable insertObject:model];
+    }
     if (!success) {
         NSLog(@"[DB] upsert 单条收藏失败");
         return NO;
@@ -66,19 +76,36 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
         return YES;
     }
 
-    NSMutableArray<TLWDBCollectedModel *> *models = [NSMutableArray array];
+    NSMutableArray<TLWDBCollectedModel *> *insertModels = [NSMutableArray array];
+    NSMutableArray<TLWDBCollectedModel *> *replaceModels = [NSMutableArray array];
     for (AGPostResponseDto *dto in postDtos) {
         TLWDBCollectedModel *model = [self buildModelFromDto:dto];
         if (model) {
-            [models addObject:model];
+            TLWDBCollectedModel *existingModel = [self fetchCollectedPostByPostId:dto._id];
+            if (existingModel) {
+                model.localId = existingModel.localId;
+                [replaceModels addObject:model];
+            } else {
+                model.localId = [self generateNextLocalId];
+                [insertModels addObject:model];
+            }
         }
     }
-    if (models.count == 0) {
+    if (insertModels.count == 0 && replaceModels.count == 0) {
         return NO;
     }
 
-    BOOL success = [self.collectedTable insertOrReplaceObjects:models];
-    if (!success) {
+    BOOL insertSuccess = YES;
+    if (insertModels.count > 0) {
+        insertSuccess = [self.collectedTable insertObjects:insertModels];
+    }
+
+    BOOL replaceSuccess = YES;
+    if (replaceModels.count > 0) {
+        replaceSuccess = [self.collectedTable insertOrReplaceObjects:replaceModels];
+    }
+
+    if (!insertSuccess || !replaceSuccess) {
         NSLog(@"[DB] upsert 批量收藏失败");
         return NO;
     }
@@ -117,7 +144,7 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
 
 - (NSString *)dbPath {
     NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    return [documentsPath stringByAppendingPathComponent:@"tlw_collected_posts.db"];
+    return [documentsPath stringByAppendingPathComponent:@"tlw_database.db"];
 }
 
 - (TLWDBCollectedModel *)buildModelFromDto:(AGPostResponseDto *)postDto {
@@ -142,6 +169,23 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
         model.favoriteCount,
         model.collectedAt);
     return model;
+}
+
+- (NSInteger)loadNextLocalId {
+    NSArray<TLWDBCollectedModel *> *allModels = [self fetchAllCollectedPosts];
+    NSInteger maxLocalId = 0;
+    for (TLWDBCollectedModel *model in allModels) {
+        if (model.localId > maxLocalId) {
+            maxLocalId = model.localId;
+        }
+    }
+    return maxLocalId + 1;
+}
+
+- (NSInteger)generateNextLocalId {
+    NSInteger localId = self.nextGeneratedLocalId;
+    self.nextGeneratedLocalId += 1;
+    return localId;
 }
 
 @end

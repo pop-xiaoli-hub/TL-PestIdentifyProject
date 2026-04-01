@@ -10,9 +10,9 @@
 #import <Masonry/Masonry.h>
 #import <objc/runtime.h>
 #import <AgriPestClient/AGCommentResponseDto.h>
+#import <AgriPestClient/AGPostResponseDto.h>
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
-#import "TLWDBManager.h"
 
 static NSString *const kCommentCellID = @"TLWCommentCell";
 
@@ -34,6 +34,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 @property (nonatomic, assign) NSInteger likeCount;
 @property (nonatomic, assign) BOOL liked;
+@property (nonatomic, assign) BOOL isLoadingDetail;
 
 // 分页加载
 @property (nonatomic, assign) NSInteger currentPage;
@@ -45,6 +46,10 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 @implementation TLWPostDetailController
 
+//- (void)viewDidLoad {
+//  TLWSDKManager* manager = TLW
+//}
+
 - (void)viewDidLoad {
   [super viewDidLoad];
   [self tl_setHomePageBackView];
@@ -52,7 +57,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [self buildNavBar];
   [self buildTableView];
   [self buildInputBar];
-  [self loadComments];
+  [self fetchPostDetail];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillChange:) name:UIKeyboardWillChangeFrameNotification object:nil];
   [self.headerView.likeButton addTarget:self action:@selector(likeTapped:) forControlEvents:UIControlEventTouchUpInside];
   [self.headerView.collectButton addTarget:self action:@selector(collectTapped:) forControlEvents:UIControlEventTouchUpInside];
@@ -152,22 +157,31 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
   // Header view — tableHeaderView 必须用 frame 驱动，先设置正确尺寸再赋值
   CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
-  CGFloat headerH = self.post ? [TLWPostDetailHeaderView heightForPost:self.post] : 600;
+  CGFloat headerH = [TLWPostDetailHeaderView heightForPost:self.post];
   self.headerView = [[TLWPostDetailHeaderView alloc] initWithFrame:CGRectMake(0, 0, screenW, headerH)];
   self.headerView.translatesAutoresizingMaskIntoConstraints = YES;
   if (self.post) {
-    [self.headerView configureWithPost:self.post];
-    // configureWithPost 之后内容确定，重新计算精确高度并刷新 tableHeaderView
-    CGFloat finalH = [TLWPostDetailHeaderView heightForPost:self.post];
-    self.headerView.frame = CGRectMake(0, 0, screenW, finalH);
-    self.tableView.tableHeaderView = self.headerView;
-  } else {
-    self.tableView.tableHeaderView = self.headerView;
+    [self refreshHeaderWithPost:self.post];
   }
-  TLWDBManager* manager = [TLWDBManager shared];
-  if ([manager isCollectedPost:self.post._id]) {
-    [self.headerView.collectButton setImage:[UIImage imageNamed:@"cp_collected-2.png"] forState:UIControlStateNormal];
+  self.tableView.tableHeaderView = self.headerView;
+}
+
+- (void)refreshHeaderWithPost:(TLWCommunityPost *)post {
+  if (!self.headerView || !post) return;
+
+  CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
+  [self.headerView configureWithPost:post];
+  CGFloat finalH = [TLWPostDetailHeaderView heightForPost:post];
+  self.headerView.frame = CGRectMake(0, 0, screenW, finalH);
+  self.tableView.tableHeaderView = self.headerView;
+  
+  for (AGPostResponseDto* dto in self.hasCollectedPosts) {
+    if ([post._id isEqualToNumber:dto._id]) {
+      [self applyCollectedUI:YES count:post.favoriteCount.integerValue];
+      return;
+    }
   }
+  [self applyCollectedUI:NO count:post.favoriteCount.integerValue];
 }
 
 - (void)buildInputBar {
@@ -251,7 +265,8 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 }
 
 - (void)fetchCommentsPage:(NSInteger)page {
-  if (!self.post._id || self.isLoadingComments || !self.hasMoreComments) return;
+  NSNumber *postId = self.post._id ?: self._id;
+  if (!postId || self.isLoadingComments || !self.hasMoreComments) return;
   self.isLoadingComments = YES;
 
   // 显示底部加载指示器
@@ -260,7 +275,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
     self.tableView.tableFooterView = self.footerSpinner;
   }
 
-  [[TLWSDKManager shared] getCommentsWithId:self.post._id
+  [[TLWSDKManager shared] getCommentsWithId:postId
                                        page:@(page)
                                        size:@20
                           completionHandler:^(AGResultPageResultCommentResponseDto *output, NSError *error) {
@@ -301,6 +316,62 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       } else if (page == 0) {
         [self.tableView reloadData];
       }
+    });
+  }];
+}
+
+- (TLWCommunityPost *)communityPostFromDto:(AGPostResponseDto *)dto {
+  if (!dto) return nil;
+
+  TLWCommunityPost *post = [[TLWCommunityPost alloc] init];
+  post._id = dto._id;
+  post.title = dto.title ?: @"";
+  post.content = dto.content ?: @"";
+  post.images = dto.images ?: @[];
+  post.tags = dto.tags ?: @[];
+  post.authorName = dto.authorName ?: @"";
+  post.authorAvatar = dto.authorAvatar ?: @"";
+  post.likeCount = dto.likeCount ?: @0;
+  post.favoriteCount = dto.favoriteCount ?: @0;
+  post.imageAspectRatio = self.post.imageAspectRatio > 0 ? self.post.imageAspectRatio : (4.0 / 3.0);
+  return post;
+}
+
+- (void)fetchPostDetail {
+  if (self.isLoadingDetail || !self._id) return;
+  self.isLoadingDetail = YES;
+
+  __weak typeof(self) weakSelf = self;
+  [[TLWSDKManager shared] getPostDetailWithId:self._id completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) self = weakSelf;
+      if (!self) return;
+      self.isLoadingDetail = NO;
+
+      if (error || !output || output.code.integerValue != 200) {
+        if (!error && output.code.integerValue == 401) {
+          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [self fetchPostDetail];
+          }];
+          return;
+        }
+        NSLog(@"[PostDetail] 获取详情失败: %@", error.localizedDescription ?: output.message);
+        if (self.post) {
+          [self refreshHeaderWithPost:self.post];
+        }
+        if (self.comments.count == 0) {
+          [self loadComments];
+        }
+        return;
+      }
+
+      TLWCommunityPost *post = [self communityPostFromDto:output.data];
+      if (!post) {
+        return;
+      }
+      self.post = post;
+      [self refreshHeaderWithPost:self.post];
+      [self loadComments];
     });
   }];
 }
@@ -417,68 +488,67 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 #pragma mark - Actions
 
+- (void)applyCollectedUI:(BOOL)isCollected count:(NSInteger)count {
+  self.headerView.isCollected = isCollected;
+  NSString *imageName = isCollected ? @"cp_collected-2.png" : @"cp_collected-1.png";
+  [self.headerView.collectButton setImage:[UIImage imageNamed:imageName] forState:UIControlStateNormal];
+  self.headerView.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
+  self.headerView.collectedCountLabel.textColor = isCollected
+  ? [UIColor colorWithRed:1.0 green:0.75 blue:0.0 alpha:1.0]
+  : [UIColor colorWithWhite:0.45 alpha:1.0];
+}
+
 - (void)collectTapped:(UIButton *)sender {
   sender.enabled = NO;
-  // 先取当前状态
   BOOL isCollected = self.headerView.isCollected;
-  // 判断当前状态
+  NSInteger previousCount = [self.headerView.collectedCountLabel.text integerValue];
+  __weak typeof(self) weakSelf = self;
+
   if (!isCollected) {
-    // 未收藏 → 切换为已收藏
-    self.headerView.isCollected = YES;
-    // 更换图片
-    [sender setImage:[UIImage imageNamed:@"cp_collected-2.png"] forState:UIControlStateNormal];
-    // 收藏数 +1
-    NSInteger count = [self.headerView.collectedCountLabel.text integerValue];
-    count += 1;
-    self.headerView.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)count];
-    // 数字高亮
-    self.headerView.collectedCountLabel.textColor = [UIColor colorWithRed:1.0 green:0.75 blue:0.0 alpha:1.0];
-   // 调用收藏接口
-    NSLog(@"准备上传");
-    __weak typeof(self) weakSelf = self;
+    NSInteger optimisticCount = previousCount + 1;
+    [self applyCollectedUI:YES count:optimisticCount];
     [[TLWSDKManager shared] favoritePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
       dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
         sender.enabled = YES;
-        NSLog(@"收藏接口服务器返回数据");
         if (error || !output || output.code.integerValue != 200) {
           if (!error && output.code.integerValue == 401) {
             [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
-              [weakSelf collectTapped:weakSelf.headerView.collectButton];
+              [strongSelf collectTapped:strongSelf.headerView.collectButton];
             }];
             return;
           }
           NSLog(@"[Favorite] 收藏失败: %@", error.localizedDescription ?: output.message);
-          // 恢复按钮状态
-          weakSelf.liked = !weakSelf.liked;
-          [weakSelf.headerView.collectButton setImage:[UIImage imageNamed:@"cp_collected-1.png"] forState:UIControlStateNormal];
+          [strongSelf applyCollectedUI:NO count:previousCount];
           return;
         }
-        NSLog(@"[Favorite] 收藏成功");
-        TLWDBManager* manager = [TLWDBManager shared];
-        AGPostResponseDto* dto = [[AGPostResponseDto alloc] init];
-        dto._id = self.post._id;
-        dto.title = self.post.title;
-        dto.images = self.post.images;
-        dto.authorName = self.post.authorName;
-        dto.authorAvatar = self.post.authorAvatar;
-        dto.favoriteCount = self.post.favoriteCount;
-        if (![manager isCollectedPost:dto._id]) {
-          NSLog(@"收藏帖子插入表成功");
-          [manager upsertCollectedPostFromDto:dto];
-        }
+        strongSelf.post.favoriteCount = @(optimisticCount);
       });
     }];
   } else {
-    // 已收藏 → 切换为未收藏
-    self.headerView.isCollected = NO;
-    // 更换图片
-    [sender setImage:[UIImage imageNamed:@"cp_collected-1.png"] forState:UIControlStateNormal];
-    // 收藏数 -1（保证不小于0）
-    NSInteger count = [self.headerView.collectedCountLabel.text integerValue];
-    count -= 1;
-    self.headerView.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
-    // 数字恢复默认颜色
-    self.headerView.collectedCountLabel.textColor = [UIColor colorWithWhite:0.45 alpha:1.0];
+    NSInteger optimisticCount = MAX(0, previousCount - 1);
+    [self applyCollectedUI:NO count:optimisticCount];
+    [[TLWSDKManager shared] unfavoritePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        sender.enabled = YES;
+        if (error || !output || output.code.integerValue != 200) {
+          if (!error && output.code.integerValue == 401) {
+            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+              [strongSelf collectTapped:strongSelf.headerView.collectButton];
+            }];
+            return;
+          }
+          NSLog(@"[Favorite] 取消收藏失败: %@", error.localizedDescription ?: output.message);
+          [strongSelf applyCollectedUI:YES count:previousCount];
+          return;
+        }
+
+        strongSelf.post.favoriteCount = @(optimisticCount);
+      });
+    }];
   }
 
   // 按钮缩放动画
