@@ -91,7 +91,7 @@
   self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
   self.avatarView.clipsToBounds = YES;
   self.avatarView.layer.cornerRadius = 10.0;
-  self.avatarView.image = [UIImage imageNamed:@"hp_avator.png"];
+  self.avatarView.image = [UIImage imageNamed:@"hp_avatar.png"];
 
   self.userLabel = [[UILabel alloc] init];
   self.userLabel.font = [UIFont systemFontOfSize:11];
@@ -222,7 +222,7 @@
   } else {
     self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
   }
-  [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar] placeholderImage:[UIImage imageNamed:@"cm_placehilder"]];
+  [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar] placeholderImage:[UIImage imageNamed:@"hp_avatar.png"]];
   self.titleLabel.text = post.title.length > 0 ? post.title : post.content;
   self.userLabel.text = post.authorName;
   self.likeLabel.text = [NSString stringWithFormat:@"%@", post.likeCount];
@@ -233,4 +233,3 @@
 }
 
 @end
-

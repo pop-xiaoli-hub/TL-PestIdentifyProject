@@ -5,92 +5,12 @@
 
 #import "TLWPhotoPickerController.h"
 #import "TLWAvatarCropController.h"
+#import "TLWPhotoCell.h"
 #import <Photos/Photos.h>
 #import <Masonry/Masonry.h>
 
-static NSString * const kPhotoCellID  = @"TLWPhotoCell";
 static CGFloat   const kColumnCount   = 4.0;
 static CGFloat   const kCellGap       = 1.0;
-
-#pragma mark - Cell
-
-@interface TLWPhotoCell : UICollectionViewCell
-@property (nonatomic, strong) UIImageView  *imageView;
-@property (nonatomic, strong) UIView       *selectCircle;   // 未选中的空心圆
-@property (nonatomic, strong) UILabel      *selectNumLabel; // 选中的序号圆
-@property (nonatomic, assign) PHImageRequestID requestID;
-@end
-
-@implementation TLWPhotoCell
-
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = [super initWithFrame:frame];
-    if (self) {
-        _requestID = PHInvalidImageRequestID;
-
-        _imageView = [[UIImageView alloc] initWithFrame:self.bounds];
-        _imageView.contentMode      = UIViewContentModeScaleAspectFill;
-        _imageView.clipsToBounds    = YES;
-        _imageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [self.contentView addSubview:_imageView];
-
-        // 未选中：白色空心圆 26x26
-        _selectCircle = [[UIView alloc] init];
-        _selectCircle.layer.cornerRadius  = 13;
-        _selectCircle.layer.borderWidth   = 2.0;
-        _selectCircle.layer.borderColor   = [UIColor colorWithWhite:1 alpha:0.85].CGColor;
-        _selectCircle.backgroundColor     = [UIColor colorWithWhite:0 alpha:0.15];
-        _selectCircle.userInteractionEnabled = NO;
-        [self.contentView addSubview:_selectCircle];
-
-        // 选中：橙色实心圆 + 序号
-        _selectNumLabel = [[UILabel alloc] init];
-        _selectNumLabel.layer.cornerRadius  = 13;
-        _selectNumLabel.layer.masksToBounds = YES;
-        _selectNumLabel.backgroundColor     = [UIColor colorWithRed:0.97 green:0.60 blue:0.15 alpha:1.0];
-        _selectNumLabel.textColor           = UIColor.whiteColor;
-        _selectNumLabel.font                = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
-        _selectNumLabel.textAlignment       = NSTextAlignmentCenter;
-        _selectNumLabel.hidden              = YES;
-        _selectNumLabel.userInteractionEnabled = NO;
-        [self.contentView addSubview:_selectNumLabel];
-    }
-    return self;
-}
-
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    CGFloat size = 26;
-    CGFloat margin = 6;
-    CGRect r = CGRectMake(self.contentView.bounds.size.width - size - margin,
-                          margin, size, size);
-    _selectCircle.frame   = r;
-    _selectNumLabel.frame = r;
-}
-
-- (void)prepareForReuse {
-    [super prepareForReuse];
-    if (_requestID != PHInvalidImageRequestID) {
-        [[PHImageManager defaultManager] cancelImageRequest:_requestID];
-        _requestID = PHInvalidImageRequestID;
-    }
-    _imageView.image       = nil;
-    _selectCircle.hidden   = NO;
-    _selectNumLabel.hidden = YES;
-}
-
-- (void)configureWithSelectionIndex:(NSInteger)index {
-    if (index > 0) {
-        _selectCircle.hidden   = YES;
-        _selectNumLabel.hidden = NO;
-        _selectNumLabel.text   = [NSString stringWithFormat:@"%ld", (long)index];
-    } else {
-        _selectCircle.hidden   = NO;
-        _selectNumLabel.hidden = YES;
-    }
-}
-
-@end
 
 #pragma mark - Controller
 
@@ -220,7 +140,7 @@ static CGFloat   const kCellGap       = 1.0;
     _collectionView.delegate          = self;
     _collectionView.backgroundColor   = UIColor.clearColor;
     [_collectionView registerClass:[TLWPhotoCell class]
-        forCellWithReuseIdentifier:kPhotoCellID];
+        forCellWithReuseIdentifier:kTLWPhotoCellID];
 
     [self.view addSubview:_collectionView];
     [_collectionView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -372,7 +292,7 @@ static CGFloat   const kCellGap       = 1.0;
 
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView
                   cellForItemAtIndexPath:(NSIndexPath *)indexPath {
-    TLWPhotoCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:kPhotoCellID
+    TLWPhotoCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:kTLWPhotoCellID
                                                                    forIndexPath:indexPath];
     PHAsset *asset = _assets[(NSUInteger)indexPath.item];
 
@@ -391,11 +311,10 @@ static CGFloat   const kCellGap       = 1.0;
     // 多选模式下显示选中状态
     if ([self isMultiSelectMode]) {
         NSUInteger idx = [_selectedAssets indexOfObject:asset];
+        [cell setShowsSelectionIndicator:YES];
         [cell configureWithSelectionIndex:(idx != NSNotFound) ? (NSInteger)(idx + 1) : 0];
-        cell.selectCircle.hidden = NO; // 始终显示圆圈
     } else {
-        cell.selectCircle.hidden   = YES;
-        cell.selectNumLabel.hidden = YES;
+        [cell setShowsSelectionIndicator:NO];
     }
 
     return cell;

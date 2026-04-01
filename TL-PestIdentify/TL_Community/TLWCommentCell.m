@@ -42,7 +42,7 @@
   self.avatarView.clipsToBounds = YES;
   self.avatarView.layer.cornerRadius = 18.0;
   self.avatarView.backgroundColor = [UIColor colorWithWhite:0.88 alpha:1.0];
-  self.avatarView.image = [UIImage imageNamed:@"hp_avator.png"];
+  self.avatarView.image = [UIImage imageNamed:@"hp_avatar.png"];
   [self.contentView addSubview:self.avatarView];
 
   // Name
@@ -134,9 +134,9 @@
   //self.likeLabel.text = [NSString stringWithFormat:@"%@", comment.likeCount];
   if (comment.authorAvatar.length > 0) {
     [self.avatarView sd_setImageWithURL:[NSURL URLWithString:comment.authorAvatar]
-                       placeholderImage:[UIImage imageNamed:@"hp_avator.png"]];
+                       placeholderImage:[UIImage imageNamed:@"hp_avatar.png"]];
   } else {
-    self.avatarView.image = [UIImage imageNamed:@"hp_avator.png"];
+    self.avatarView.image = [UIImage imageNamed:@"hp_avatar.png"];
   }
 }
 
