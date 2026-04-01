@@ -18,6 +18,8 @@ static CGFloat const kItemGap = 10.0;
 
 /// 每行最多放置的标签个数（横向填满再换行）
 static NSInteger const kTagItemsPerRow = 5;
+/// 联想词列表内边距
+static CGFloat const kSuggestionListHorizontalInset = 12.0;
 
 @interface TLWCommunityView () <UIGestureRecognizerDelegate>
 
@@ -262,34 +264,58 @@ static NSInteger const kTagItemsPerRow = 5;
   [overlay addGestureRecognizer:swipeDown];
 
   // 更强对比的毛玻璃背景
+  UIView *panelContainer = [[UIView alloc] init];
+  panelContainer.layer.cornerRadius = 20.0;
+  panelContainer.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.18].CGColor;
+  panelContainer.layer.shadowOpacity = 1.0;
+  panelContainer.layer.shadowRadius = 22.0;
+  panelContainer.layer.shadowOffset = CGSizeMake(0, 12);
+  [overlay addSubview:panelContainer];
+
   UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialLight];
   UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+  blurView.layer.cornerRadius = 20.0;
   blurView.layer.masksToBounds = YES;
-  blurView.layer.cornerRadius = 14.0;
-  [overlay addSubview:blurView];
+  [panelContainer addSubview:blurView];
   self.searchBlurPanel = blurView;
   UIView *contentView = blurView.contentView;
   UIView *glassLayer = [[UIView alloc] init];
-  glassLayer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.32];
+  glassLayer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.22];
   glassLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
   [contentView addSubview:glassLayer];
+  UIView *highlightLayer = [[UIView alloc] init];
+  highlightLayer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.20];
+  highlightLayer.userInteractionEnabled = NO;
+  highlightLayer.layer.cornerRadius = 20.0;
+  highlightLayer.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+  highlightLayer.layer.masksToBounds = YES;
+  [contentView addSubview:highlightLayer];
   // 边框
-  blurView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.55].CGColor;
+  blurView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.42].CGColor;
   blurView.layer.borderWidth = 1.0;
-  [blurView mas_makeConstraints:^(MASConstraintMaker *make) {
+  [panelContainer mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(overlay).offset(16);
     make.right.equalTo(overlay).offset(-16);
     // 毛玻璃板距离搜索栏底部 10pt，这里用覆盖层顶部再下移 10
     make.top.equalTo(self.searchContainer.mas_bottom).offset(10);
   }];
+  [blurView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(panelContainer);
+  }];
   [glassLayer mas_makeConstraints:^(MASConstraintMaker *make) {
     make.edges.equalTo(contentView);
+  }];
+  [highlightLayer mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.left.right.equalTo(contentView);
+    make.height.mas_equalTo(72);
   }];
 
   UITableView *suggestionTableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
   suggestionTableView.backgroundColor = [UIColor clearColor];
-  suggestionTableView.separatorInset = UIEdgeInsetsMake(0, 16, 0, 16);
-  suggestionTableView.rowHeight = 50.0;
+  suggestionTableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+  suggestionTableView.separatorInset = UIEdgeInsetsZero;
+  suggestionTableView.contentInset = UIEdgeInsetsMake(10, 0, 8, 0);
+  suggestionTableView.rowHeight = 58.0;
   suggestionTableView.scrollEnabled = NO;
   suggestionTableView.hidden = YES;
   suggestionTableView.tableFooterView = [UIView new];
@@ -301,8 +327,9 @@ static NSInteger const kTagItemsPerRow = 5;
   [contentView addSubview:suggestionTableView];
   self.suggestionTableView = suggestionTableView;
   [suggestionTableView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(contentView).offset(8);
-    make.left.right.equalTo(contentView);
+    make.top.equalTo(contentView).offset(6);
+    make.left.equalTo(contentView).offset(kSuggestionListHorizontalInset);
+    make.right.equalTo(contentView).offset(-kSuggestionListHorizontalInset);
     self.suggestionTableHeightConstraint = make.height.mas_equalTo(0);
   }];
   
@@ -420,7 +447,8 @@ static NSInteger const kTagItemsPerRow = 5;
 
 - (void)tl_setSuggestionListHidden:(BOOL)hidden itemCount:(NSInteger)itemCount {
   NSInteger visibleCount = MAX(0, MIN(itemCount, 6));
-  CGFloat targetHeight = hidden ? 0.0 : visibleCount * self.suggestionTableView.rowHeight;
+  UIEdgeInsets contentInset = self.suggestionTableView.contentInset;
+  CGFloat targetHeight = hidden ? 0.0 : visibleCount * self.suggestionTableView.rowHeight + contentInset.top + contentInset.bottom;
   self.suggestionTableView.hidden = hidden;
   self.suggestionTableView.scrollEnabled = itemCount > 6;
   [self.suggestionTableHeightConstraint setOffset:targetHeight];
