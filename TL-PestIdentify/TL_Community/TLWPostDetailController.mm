@@ -353,6 +353,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   post.authorAvatar = dto.authorAvatar ?: @"";
   post.likeCount = dto.likeCount ?: @0;
   post.isLiked = dto.isLiked.boolValue;
+  post.isCollected = dto.isFavorited.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
   post.isLiked = dto.isLiked;
   post.isFavorited = dto.isFavorited;

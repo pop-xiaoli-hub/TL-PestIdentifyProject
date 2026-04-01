@@ -30,6 +30,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// 当前用户是否已点赞
 @property (nonatomic, assign) BOOL isLiked;
 
+@property (nonatomic, assign) BOOL isCollected;
+
 @property (nonatomic, assign) NSNumber* favoriteCount;
 /// 当前用户是否已点赞
 @property (nonatomic, strong, nullable) NSNumber *isLiked;
