@@ -4,6 +4,7 @@
 //
 
 #import <UIKit/UIKit.h>
+#import <AgriPestClient/AGPostResponseDto.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -19,6 +20,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIButton    *shareButton;
 @property (nonatomic, strong, readonly) UIImageView *postAvatarImageView;
 @property (nonatomic, strong, readonly) UILabel     *postNameLabel;
+
+/// 点击某条帖子时触发，参数为帖子 ID
+@property (nonatomic, copy, nullable) void (^onPostTapped)(NSNumber *postId);
+
+/// 用真实帖子数据刷新"我的帖子"区域
+- (void)reloadPosts:(NSArray<AGPostResponseDto *> *)posts;
 
 @end
 
