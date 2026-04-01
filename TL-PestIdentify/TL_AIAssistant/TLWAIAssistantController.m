@@ -53,6 +53,9 @@
     [self.myView.galleryButton addTarget:self
                                   action:@selector(tl_gallery)
                         forControlEvents:UIControlEventTouchUpInside];
+    [self.myView.sendButton addTarget:self
+                               action:@selector(tl_send)
+                     forControlEvents:UIControlEventTouchUpInside];
 
     // 键盘通知
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -184,6 +187,14 @@
     for (UIImage *image in images) {
         [self tl_uploadImageToAI:image];
     }
+}
+
+- (void)tl_send {
+    // TODO: 发送文字 + 图片到 AI 接口，追加对话气泡
+    self.myView.inputTextField.text = @"";
+    [self.pendingImages removeAllObjects];
+    // hideSelectedImage 内部会调用 tl_updateSendButtonVisibility，此时 text 已清空
+    [self.myView hideSelectedImage];
 }
 
 - (void)tl_uploadImageToAI:(UIImage *)image {

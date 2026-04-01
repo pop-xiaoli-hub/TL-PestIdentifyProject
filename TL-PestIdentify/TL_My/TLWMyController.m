@@ -8,6 +8,7 @@
 #import "TLWEditProfileController.h"
 #import "TLWSettingViewController.h"
 #import "TLWMyFavoriteController.h"
+#import "TLWPostDetailController.h"
 #import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
@@ -39,6 +40,25 @@ extern NSString * const TLWProfileDidUpdateNotification;
                                                  name:TLWAvatarDidUpdateNotification
                                                object:nil];
     [self applyProfile];
+    [self fetchMyPosts];
+
+    __weak typeof(self) weakSelf = self;
+    self.myView.onPostTapped = ^(NSNumber *postId) {
+        TLWPostDetailController *vc = [[TLWPostDetailController alloc] init];
+        vc._id = postId;
+        vc.hidesBottomBarWhenPushed = YES;
+        [weakSelf.navigationController pushViewController:vc animated:YES];
+    };
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    __weak typeof(self) weakSelf = self;
+    [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+        // TLWProfileDidUpdateNotification 会自动触发 applyProfile，无需额外处理
+        (void)weakSelf;
+    }];
+    [self fetchMyPosts];
 }
 
 - (void)dealloc {
@@ -91,6 +111,26 @@ extern NSString * const TLWProfileDidUpdateNotification;
     [self.navigationController pushViewController:vc animated:YES];
 }
 - (void)onShare { /* TODO: 分享 */ }
+
+- (void)fetchMyPosts {
+    __weak typeof(self) weakSelf = self;
+    [[TLWSDKManager shared] getMyPostsWithPage:@(0) size:@(20) completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        if (error || !output) return;
+        if (output.code.integerValue == 401) {
+            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                [strongSelf fetchMyPosts];
+            }];
+            return;
+        }
+        if (output.code.integerValue != 200) return;
+        NSArray<AGPostResponseDto *> *posts = output.data.list ?: @[];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [strongSelf.myView reloadPosts:posts];
+        });
+    }];
+}
 - (void)onFavorite {
     TLWMyFavoriteController *vc = [[TLWMyFavoriteController alloc] init];
     [self.navigationController pushViewController:vc animated:YES];

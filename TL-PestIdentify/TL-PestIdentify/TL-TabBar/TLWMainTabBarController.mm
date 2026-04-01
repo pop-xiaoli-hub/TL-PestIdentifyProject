@@ -151,9 +151,18 @@
 - (void)switchToIndex:(NSInteger)idx {
     if (idx == _selectedIndex) return;
 
-    // hide/show 切换，无需重建约束
-    _childVCs[_selectedIndex].view.hidden = YES;
-    _childVCs[idx].view.hidden = NO;
+    UIViewController *fromVC = _childVCs[_selectedIndex];
+    UIViewController *toVC   = _childVCs[idx];
+
+    // 正确触发 viewWillDisappear / viewWillAppear 等生命周期
+    [fromVC beginAppearanceTransition:NO animated:NO];
+    [toVC   beginAppearanceTransition:YES animated:NO];
+
+    fromVC.view.hidden = YES;
+    toVC.view.hidden   = NO;
+
+    [fromVC endAppearanceTransition];
+    [toVC   endAppearanceTransition];
 
     _selectedIndex = idx;
     [_mainTabBar tl_setSelectedIndex:idx];

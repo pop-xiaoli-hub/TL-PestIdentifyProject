@@ -12,6 +12,7 @@
 @property (nonatomic, strong, readonly) UIButton    *cameraButton;
 @property (nonatomic, strong, readonly) UIButton    *micButton;
 @property (nonatomic, strong, readonly) UIButton    *galleryButton;
+@property (nonatomic, strong, readonly) UIButton    *sendButton;
 @property (nonatomic, strong, readonly) UIImageView *voiceSpeechImageView;
 
 /// 删除某张预览图时回调，index 对应 images 数组下标

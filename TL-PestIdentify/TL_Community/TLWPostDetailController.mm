@@ -42,6 +42,17 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 @property (nonatomic, assign) BOOL hasMoreComments;
 @property (nonatomic, strong) UIActivityIndicatorView *footerSpinner;
 
+- (void)submitCollectTargetState:(BOOL)shouldCollect
+                     previousState:(BOOL)previousState
+                     previousCount:(NSInteger)previousCount
+                   optimisticCount:(NSInteger)optimisticCount
+                            sender:(UIButton *)sender;
+- (void)submitLikeTargetState:(BOOL)shouldLike
+                 previousState:(BOOL)previousState
+                 previousCount:(NSInteger)previousCount
+               optimisticCount:(NSInteger)optimisticCount
+                        sender:(UIButton *)sender;
+
 @end
 
 @implementation TLWPostDetailController
@@ -175,14 +186,22 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   CGFloat finalH = [TLWPostDetailHeaderView heightForPost:post];
   self.headerView.frame = CGRectMake(0, 0, screenW, finalH);
   self.tableView.tableHeaderView = self.headerView;
-  
-  for (AGPostResponseDto* dto in self.hasCollectedPosts) {
-    if ([post._id isEqualToNumber:dto._id]) {
-      [self applyCollectedUI:YES count:post.favoriteCount.integerValue];
-      return;
+
+  BOOL isLiked = post.isLiked.boolValue;
+  [self applyLikedUI:isLiked count:post.likeCount.integerValue];
+
+  BOOL hasFavoritedState = (post.isFavorited != nil);
+  BOOL isCollected = hasFavoritedState ? post.isFavorited.boolValue : NO;
+  if (!hasFavoritedState) {
+    for (AGPostResponseDto *dto in self.hasCollectedPosts) {
+      if ([post._id isEqualToNumber:dto._id]) {
+        isCollected = YES;
+        break;
+      }
     }
   }
-  [self applyCollectedUI:NO count:post.favoriteCount.integerValue];
+  post.isFavorited = @(isCollected);
+  [self applyCollectedUI:isCollected count:post.favoriteCount.integerValue];
 }
 
 - (void)buildInputBar {
@@ -335,16 +354,20 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   post.likeCount = dto.likeCount ?: @0;
   post.isLiked = dto.isLiked.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
+  post.isLiked = dto.isLiked;
+  post.isFavorited = dto.isFavorited;
   post.imageAspectRatio = self.post.imageAspectRatio > 0 ? self.post.imageAspectRatio : (4.0 / 3.0);
   return post;
 }
 
 - (void)fetchPostDetail {
-  if (self.isLoadingDetail || !self._id) return;
+  NSNumber *postId = self._id ?: self.post._id;
+  if (self.isLoadingDetail || !postId) return;
+  self._id = postId;
   self.isLoadingDetail = YES;
 
   __weak typeof(self) weakSelf = self;
-  [[TLWSDKManager shared] getPostDetailWithId:self._id completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+  [[TLWSDKManager shared] getPostDetailWithId:postId completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
     dispatch_async(dispatch_get_main_queue(), ^{
       __strong typeof(weakSelf) self = weakSelf;
       if (!self) return;
@@ -490,6 +513,16 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 #pragma mark - Actions
 
+- (void)applyLikedUI:(BOOL)isLiked count:(NSInteger)count {
+  self.headerView.isLiked = isLiked;
+  NSString *imageName = isLiked ? @"cp_isLiked-2.png" : @"cp_isLiked-1.png";
+  [self.headerView.likeButton setImage:[UIImage imageNamed:imageName] forState:UIControlStateNormal];
+  self.headerView.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
+  self.headerView.likedCountLabel.textColor = isLiked
+  ? [UIColor colorWithRed:1.0 green:0.30 blue:0.30 alpha:1.0]
+  : [UIColor colorWithWhite:0.45 alpha:1.0];
+}
+
 - (void)applyCollectedUI:(BOOL)isCollected count:(NSInteger)count {
   self.headerView.isCollected = isCollected;
   NSString *imageName = isCollected ? @"cp_collected-2.png" : @"cp_collected-1.png";
@@ -511,59 +544,21 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 }
 
 - (void)collectTapped:(UIButton *)sender {
-  sender.enabled = NO;//防抖
+  NSNumber *postId = self.post._id ?: self._id;
+  if (!postId) return;
+
   BOOL isCollected = self.headerView.isCollected;
+  BOOL shouldCollect = !isCollected;
   NSInteger previousCount = [self.headerView.collectedCountLabel.text integerValue];
-  __weak typeof(self) weakSelf = self;
+  NSInteger optimisticCount = shouldCollect ? previousCount + 1 : MAX(0, previousCount - 1);
+  [self applyCollectedUI:shouldCollect count:optimisticCount];
+  sender.enabled = NO; // 防抖
 
-  if (!isCollected) {
-    NSInteger optimisticCount = previousCount + 1;
-    [self applyCollectedUI:YES count:optimisticCount];
-    [[TLWSDKManager shared] favoritePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) return;
-        sender.enabled = YES;
-        if (error || !output || output.code.integerValue != 200) {
-          if (!error && output.code.integerValue == 401) {
-            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
-              [strongSelf collectTapped:strongSelf.headerView.collectButton];
-            }];
-            return;
-          }
-          NSLog(@"[Favorite] 收藏失败: %@", error.localizedDescription ?: output.message);
-          [strongSelf applyCollectedUI:NO count:previousCount];
-          return;
-        }
-        strongSelf.post.favoriteCount = @(optimisticCount);
-        strongSelf.reloadPosts(strongSelf.post._id);
-      });
-    }];
-  } else {
-    NSInteger optimisticCount = MAX(0, previousCount - 1);
-    [self applyCollectedUI:NO count:optimisticCount];
-    [[TLWSDKManager shared] unfavoritePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) return;
-        sender.enabled = YES;
-        if (error || !output || output.code.integerValue != 200) {
-          if (!error && output.code.integerValue == 401) {
-            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
-              [strongSelf collectTapped:strongSelf.headerView.collectButton];
-            }];
-            return;
-          }
-          NSLog(@"[Favorite] 取消收藏失败: %@", error.localizedDescription ?: output.message);
-          [strongSelf applyCollectedUI:YES count:previousCount];
-          return;
-        }
-
-        strongSelf.post.favoriteCount = @(optimisticCount);
-        strongSelf.reloadPosts(strongSelf.post._id);
-      });
-    }];
-  }
+  [self submitCollectTargetState:shouldCollect
+                    previousState:isCollected
+                    previousCount:previousCount
+                  optimisticCount:optimisticCount
+                           sender:sender];
 
   // 按钮缩放动画
   [UIView animateWithDuration:0.12 animations:^{
@@ -642,6 +637,96 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       sender.transform = CGAffineTransformIdentity;
     }];
   }];
+}
+
+- (void)submitCollectTargetState:(BOOL)shouldCollect
+                    previousState:(BOOL)previousState
+                    previousCount:(NSInteger)previousCount
+                  optimisticCount:(NSInteger)optimisticCount
+                           sender:(UIButton *)sender {
+  __weak typeof(self) weakSelf = self;
+  void (^completion)(AGResultVoid *, NSError *) = ^(AGResultVoid *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) return;
+      sender.enabled = YES;
+      if (error || !output || output.code.integerValue != 200) {
+        if (!error && output.code.integerValue == 401) {
+          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [strongSelf submitCollectTargetState:shouldCollect
+                                   previousState:previousState
+                                   previousCount:previousCount
+                                 optimisticCount:optimisticCount
+                                          sender:strongSelf.headerView.collectButton];
+          }];
+          return;
+        }
+        NSLog(@"[Favorite] %@失败: %@", shouldCollect ? @"收藏" : @"取消收藏", error.localizedDescription ?: output.message);
+        [strongSelf applyCollectedUI:previousState count:previousCount];
+        return;
+      }
+      strongSelf.post.favoriteCount = @(optimisticCount);
+      strongSelf.post.isFavorited = @(shouldCollect);
+    });
+  };
+
+  NSNumber *postId = self.post._id ?: self._id;
+  if (!postId) {
+    sender.enabled = YES;
+    [self applyCollectedUI:previousState count:previousCount];
+    return;
+  }
+
+  if (shouldCollect) {
+    [[TLWSDKManager shared] favoritePostWithId:postId completionHandler:completion];
+  } else {
+    [[TLWSDKManager shared] unfavoritePostWithId:postId completionHandler:completion];
+  }
+}
+
+- (void)submitLikeTargetState:(BOOL)shouldLike
+                 previousState:(BOOL)previousState
+                 previousCount:(NSInteger)previousCount
+               optimisticCount:(NSInteger)optimisticCount
+                        sender:(UIButton *)sender {
+  __weak typeof(self) weakSelf = self;
+  void (^completion)(AGResultVoid *, NSError *) = ^(AGResultVoid *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) return;
+      sender.enabled = YES;
+      if (error || !output || output.code.integerValue != 200) {
+        if (!error && output.code.integerValue == 401) {
+          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [strongSelf submitLikeTargetState:shouldLike
+                                previousState:previousState
+                                previousCount:previousCount
+                              optimisticCount:optimisticCount
+                                       sender:strongSelf.headerView.likeButton];
+          }];
+          return;
+        }
+        NSLog(@"[Like] %@失败: %@", shouldLike ? @"点赞" : @"取消点赞", error.localizedDescription ?: output.message);
+        [strongSelf applyLikedUI:previousState count:previousCount];
+        return;
+      }
+      strongSelf.post.likeCount = @(optimisticCount);
+      strongSelf.post.isLiked = @(shouldLike);
+    });
+  };
+
+  NSNumber *postId = self.post._id ?: self._id;
+  if (!postId) {
+    sender.enabled = YES;
+    [self applyLikedUI:previousState count:previousCount];
+    return;
+  }
+
+  if (shouldLike) {
+    [[TLWSDKManager shared].api likePostWithId:postId completionHandler:completion];
+  } else {
+    [[TLWSDKManager shared].api unlikePostWithId:postId completionHandler:completion];
+  }
 }
 
 
