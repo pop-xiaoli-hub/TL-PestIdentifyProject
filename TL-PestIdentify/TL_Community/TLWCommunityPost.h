@@ -30,9 +30,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, assign) NSNumber* favoriteCount;
 /// 当前用户是否已点赞
-@property (nonatomic, assign) BOOL isLiked;
+@property (nonatomic, strong, nullable) NSNumber *isLiked;
 /// 当前用户是否已收藏
-@property (nonatomic, assign) BOOL isFavorited;
+@property (nonatomic, strong, nullable) NSNumber *isFavorited;
 /// 图片纵横比（高度 / 宽度），用于计算瀑布流高度
 @property (nonatomic, assign) CGFloat imageAspectRatio;
 

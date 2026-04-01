@@ -300,8 +300,8 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
         post.authorAvatar = dto.authorAvatar ?: @"";
         post.likeCount = dto.likeCount ?: @0;
         post.favoriteCount = dto.favoriteCount ?: @0;
-        post.isLiked = dto.isLiked.boolValue;
-        post.isFavorited = dto.isFavorited.boolValue;
+        post.isLiked = dto.isLiked;
+        post.isFavorited = dto.isFavorited;
         NSLog(@"点赞数 : %@", post.likeCount);
         NSLog(@"收藏数 : %@", post.likeCount);
         // imageAspectRatio 由瀑布流代理方法按行规则统一设置
