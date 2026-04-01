@@ -98,6 +98,9 @@ NS_ASSUME_NONNULL_BEGIN
                                content:(NSString *)content
                      completionHandler:(void (^)(AGResultCommentResponseDto * output, NSError * error))handler;
 
+/// 获取当前用户自己发布的帖子列表（分页）
+- (NSURLSessionTask *)getMyPostsWithPage:(NSNumber *)page size:(NSNumber *)size completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error))handler;
+
 /// 收藏列表缓存（应用启动预拉取）
 @property (nonatomic, strong, readonly) NSArray<AGPostResponseDto *> *cachedFavoritedPosts;
 

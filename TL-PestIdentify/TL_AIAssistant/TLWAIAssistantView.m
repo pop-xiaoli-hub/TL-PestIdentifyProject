@@ -19,6 +19,7 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
 @property (nonatomic, strong, readwrite) UIButton    *cameraButton;
 @property (nonatomic, strong, readwrite) UIButton    *micButton;
 @property (nonatomic, strong, readwrite) UIButton    *galleryButton;
+@property (nonatomic, strong, readwrite) UIButton    *sendButton;
 @property (nonatomic, strong, readwrite) UIImageView *voiceSpeechImageView;
 @property (nonatomic, strong) UIView                 *voicePanel;
 @property (nonatomic, strong) UIView        *inputBar;
@@ -34,6 +35,7 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
 @property (nonatomic, strong) MASConstraint *roundContainerCenterYConstraint;
 @property (nonatomic, strong) MASConstraint *roundContainerTopConstraint;
 @property (nonatomic, strong) MASConstraint *inputRowHeightConstraint;
+@property (nonatomic, strong) MASConstraint *textViewRightConstraint;
 @property (nonatomic, assign) CGFloat        safeBottomInset;
 @property (nonatomic, assign) CGFloat        currentTextViewHeight;
 @property (nonatomic, assign) CGFloat        keyboardHeight;
@@ -257,6 +259,18 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
         make.width.height.mas_equalTo(24);
     }];
 
+    // Send button（右侧，有内容时替换 mic+gallery）
+    _sendButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_sendButton setImage:[UIImage imageNamed:@"iconSend"] forState:UIControlStateNormal];
+    _sendButton.contentMode = UIViewContentModeScaleAspectFit;
+    _sendButton.hidden = YES;
+    [inputRow addSubview:_sendButton];
+    [_sendButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.right.mas_equalTo(-14);
+        make.centerY.equalTo(inputRow);
+        make.width.height.mas_equalTo(24);
+    }];
+
     // Text field（camera 右侧 → mic 左侧）
     _inputTextField = [[UITextView alloc] init];
     _inputTextField.backgroundColor = [UIColor clearColor];
@@ -268,12 +282,14 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
     _inputTextField.returnKeyType = UIReturnKeyDefault;
     _inputTextField.delegate = self;
     [inputRow addSubview:_inputTextField];
+    __block MASConstraint *textViewRightConstraint;
     [_inputTextField mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(_cameraButton.mas_right).offset(6);
-        make.right.equalTo(_micButton.mas_left).offset(-6);
+        textViewRightConstraint = make.right.equalTo(_micButton.mas_left).offset(-6);
         make.top.equalTo(_cameraButton.mas_top);
         self.textViewHeightConstraint = make.height.mas_equalTo(kTextViewBaseHeight);
     }];
+    _textViewRightConstraint = textViewRightConstraint;
 
     // ── voicePanel（roundContainer 下方，语音模式时展开）──
     _voicePanel = [[UIView alloc] init];
@@ -296,6 +312,30 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
         make.width.height.mas_equalTo(110);
     }];
 
+}
+
+#pragma mark - Send Button Visibility
+
+- (void)tl_updateSendButtonVisibility {
+    BOOL hasContent = (_inputTextField.text.length > 0) || (_previewImages.count > 0);
+    if (hasContent) {
+        _micButton.hidden    = YES;
+        _galleryButton.hidden = YES;
+        _sendButton.hidden   = NO;
+        [_textViewRightConstraint uninstall];
+        [_inputTextField mas_updateConstraints:^(MASConstraintMaker *make) {
+            self->_textViewRightConstraint = make.right.equalTo(self->_sendButton.mas_left).offset(-6);
+        }];
+    } else {
+        _micButton.hidden    = NO;
+        _galleryButton.hidden = NO;
+        _sendButton.hidden   = YES;
+        [_textViewRightConstraint uninstall];
+        [_inputTextField mas_updateConstraints:^(MASConstraintMaker *make) {
+            self->_textViewRightConstraint = make.right.equalTo(self->_micButton.mas_left).offset(-6);
+        }];
+    }
+    [self setNeedsLayout];
 }
 
 #pragma mark - Height update
@@ -354,6 +394,7 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
     _currentTextViewHeight = MAX(kTextViewBaseHeight, MIN(45, size.height));
     self.textViewHeightConstraint.offset = _currentTextViewHeight;
 
+    [self tl_updateSendButtonVisibility];
     [self tl_updateInputBarHeight];
     [UIView animateWithDuration:0.15 animations:^{
         [self layoutIfNeeded];
@@ -371,6 +412,7 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
     [_previewImages addObjectsFromArray:images];
     [self tl_rebuildPreviewThumbnails];
     _previewRow.hidden = NO;
+    [self tl_updateSendButtonVisibility];
     [self tl_updateInputBarHeight];
     [UIView animateWithDuration:0.2 animations:^{
         [self layoutIfNeeded];
@@ -381,6 +423,7 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
     _previewRow.hidden = YES;
     [_previewImages removeAllObjects];
     [_previewScrollView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+    [self tl_updateSendButtonVisibility];
     [self tl_updateInputBarHeight];
     [UIView animateWithDuration:0.2 animations:^{
         [self layoutIfNeeded];

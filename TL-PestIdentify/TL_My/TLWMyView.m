@@ -5,6 +5,7 @@
 
 #import "TLWMyView.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 
 @interface TLWMyView ()
 
@@ -18,6 +19,8 @@
 @property (nonatomic, strong, readwrite) UIButton    *shareButton;
 @property (nonatomic, strong, readwrite) UIImageView *postAvatarImageView;
 @property (nonatomic, strong, readwrite) UILabel     *_postNameLabelLabel;
+@property (nonatomic, strong) UIView                          *postListContent;
+@property (nonatomic, strong) NSArray<AGPostResponseDto *>    *cachedPosts;
 
 @end
 
@@ -202,140 +205,208 @@
         make.left.right.bottom.equalTo(card.contentView);
     }];
 
-    UIView *svContent = [UIView new];
-    [sv addSubview:svContent];
-    [svContent mas_makeConstraints:^(MASConstraintMaker *make) {
+    _postListContent = [UIView new];
+    [sv addSubview:_postListContent];
+    [_postListContent mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(sv);
         make.width.equalTo(sv);
-    }];
-
-    UIView *post = [self buildPostItem];
-    [svContent addSubview:post];
-    [post mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(svContent).offset(4);
-        make.left.equalTo(svContent).offset(16);
-        make.right.equalTo(svContent).offset(-16);
-        make.bottom.equalTo(svContent).offset(-80);
+        make.height.mas_greaterThanOrEqualTo(1);
     }];
 }
 
-#pragma mark - 帖子内容（Mock）
+#pragma mark - 我的帖子（真实数据）
 
-- (UIView *)buildPostItem {
+- (void)reloadPosts:(NSArray<AGPostResponseDto *> *)posts {
+    _cachedPosts = posts;
+    [_postListContent.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+    [_postListContent mas_remakeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(_postListContent.superview);
+        make.width.equalTo(_postListContent.superview);
+        make.height.mas_greaterThanOrEqualTo(1);
+    }];
+
+    if (posts.count == 0) {
+        UILabel *empty = [UILabel new];
+        empty.text      = @"还没有发布过帖子";
+        empty.font      = [UIFont systemFontOfSize:14];
+        empty.textColor = [UIColor colorWithRed:0.60 green:0.60 blue:0.60 alpha:1.0];
+        empty.textAlignment = NSTextAlignmentCenter;
+        [_postListContent addSubview:empty];
+        [empty mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.mas_equalTo(40);
+            make.centerX.equalTo(_postListContent);
+            make.bottom.equalTo(_postListContent).offset(-40);
+        }];
+        return;
+    }
+
+    UIView *prev = nil;
+    for (NSUInteger i = 0; i < posts.count; i++) {
+        AGPostResponseDto *post = posts[i];
+        UIView *item = [self buildPostItemWithPost:post isFirst:(i == 0)];
+        item.tag = (NSInteger)i;
+        item.userInteractionEnabled = YES;
+        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_postItemTapped:)];
+        [item addGestureRecognizer:tap];
+        [_postListContent addSubview:item];
+        [item mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(_postListContent).offset(16);
+            make.right.equalTo(_postListContent).offset(-16);
+            if (prev) {
+                make.top.equalTo(prev.mas_bottom).offset(20);
+            } else {
+                make.top.equalTo(_postListContent).offset(4);
+            }
+            if (i == posts.count - 1) {
+                make.bottom.equalTo(_postListContent).offset(-80);
+            }
+        }];
+        prev = item;
+    }
+}
+
+- (void)tl_postItemTapped:(UITapGestureRecognizer *)tap {
+    NSUInteger index = (NSUInteger)tap.view.tag;
+    if (index >= _cachedPosts.count) return;
+    AGPostResponseDto *post = _cachedPosts[index];
+    if (self.onPostTapped) {
+        self.onPostTapped(post._id);
+    }
+}
+
+- (UIView *)buildPostItemWithPost:(AGPostResponseDto *)post isFirst:(BOOL)isFirst {
     UIView *item = [UIView new];
 
-    _postAvatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
-    _postAvatarImageView.contentMode      = UIViewContentModeScaleAspectFill;
-    _postAvatarImageView.clipsToBounds    = YES;
-    _postAvatarImageView.layer.cornerRadius = 20;
-    [item addSubview:_postAvatarImageView];
-    [_postAvatarImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+    // 头像（第一个帖子同步到 postAvatarImageView）
+    UIImageView *avatarView = [[UIImageView alloc] init];
+    avatarView.contentMode      = UIViewContentModeScaleAspectFill;
+    avatarView.clipsToBounds    = YES;
+    avatarView.layer.cornerRadius = 20;
+    avatarView.image = [UIImage imageNamed:@"avatar"];
+    if (post.authorAvatar.length > 0) {
+        [avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar]
+                      placeholderImage:[UIImage imageNamed:@"avatar"]];
+    }
+    if (isFirst) {
+        _postAvatarImageView = avatarView;
+    }
+    [item addSubview:avatarView];
+    [avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.left.equalTo(item);
         make.width.height.mas_equalTo(40);
     }];
 
-    _postNameLabel = [UILabel new];
-    _postNameLabel.font      = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    _postNameLabel.textColor = [UIColor colorWithRed:0.13 green:0.13 blue:0.13 alpha:1.0];
-    [item addSubview:_postNameLabel];
-    [_postNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_postAvatarImageView).offset(2);
-        make.left.equalTo(_postAvatarImageView.mas_right).offset(10);
+    // 昵称
+    UILabel *nameLabel = [UILabel new];
+    nameLabel.text      = post.authorName ?: post.authorUsername ?: @"";
+    nameLabel.font      = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    nameLabel.textColor = [UIColor colorWithRed:0.13 green:0.13 blue:0.13 alpha:1.0];
+    if (isFirst) {
+        _postNameLabel = nameLabel;
+    }
+    [item addSubview:nameLabel];
+    [nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(avatarView).offset(2);
+        make.left.equalTo(avatarView.mas_right).offset(10);
     }];
 
-    UILabel *cropLabel = [UILabel new];
-    cropLabel.text      = @"关注作物：水稻、小麦";
-    cropLabel.font      = [UIFont systemFontOfSize:12];
-    cropLabel.textColor = [UIColor colorWithRed:0.60 green:0.60 blue:0.60 alpha:1.0];
-    [item addSubview:cropLabel];
-    [cropLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_postNameLabel.mas_bottom).offset(2);
-        make.left.equalTo(_postNameLabel);
-    }];
-
-    UIImageView *img1 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
-    img1.contentMode      = UIViewContentModeScaleAspectFill;
-    img1.clipsToBounds    = YES;
-    img1.layer.cornerRadius = 8;
-    [item addSubview:img1];
-    [img1 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_postAvatarImageView.mas_bottom).offset(14);
-        make.left.equalTo(item);
-        make.right.equalTo(item.mas_centerX).offset(-4);
-        make.height.mas_equalTo(148);
-    }];
-
-    UIImageView *img2 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
-    img2.contentMode      = UIViewContentModeScaleAspectFill;
-    img2.clipsToBounds    = YES;
-    img2.layer.cornerRadius = 8;
-    img2.backgroundColor  = [UIColor colorWithRed:0.55 green:0.68 blue:0.55 alpha:1.0];
-    [item addSubview:img2];
-    [img2 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.height.equalTo(img1);
-        make.left.equalTo(item.mas_centerX).offset(4);
+    // 时间（头像行右侧）
+    UILabel *timeLabel = [UILabel new];
+    timeLabel.font      = [UIFont systemFontOfSize:12];
+    timeLabel.textColor = [UIColor colorWithRed:0.60 green:0.60 blue:0.60 alpha:1.0];
+    timeLabel.text = [self tl_relativeTimeString:post.createdAt];
+    [item addSubview:timeLabel];
+    [timeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerY.equalTo(nameLabel);
         make.right.equalTo(item);
     }];
 
+    // 正文
     UILabel *bodyLabel = [UILabel new];
-    bodyLabel.text          = @"我家麦子上面有这样的橙黄色粉末，请广大农友帮我看看这是得了什么病？";
+    bodyLabel.text          = post.content ?: @"";
     bodyLabel.font          = [UIFont systemFontOfSize:15];
     bodyLabel.textColor     = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1.0];
-    bodyLabel.numberOfLines = 0;
+    bodyLabel.numberOfLines = 3;
     [item addSubview:bodyLabel];
     [bodyLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(img1.mas_bottom).offset(12);
+        make.top.equalTo(avatarView.mas_bottom).offset(10);
         make.left.right.equalTo(item);
     }];
 
-    UIImageView *fav1 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
-    fav1.contentMode      = UIViewContentModeScaleAspectFill;
-    fav1.clipsToBounds    = YES;
-    fav1.layer.cornerRadius = 12;
-    fav1.layer.borderWidth  = 1.5;
-    fav1.layer.borderColor  = UIColor.whiteColor.CGColor;
-    [item addSubview:fav1];
-    [fav1 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(bodyLabel.mas_bottom).offset(14);
+    // 图片（最多2张）
+    NSArray<NSString *> *images = post.images ?: @[];
+    UIView *lastContentView = bodyLabel;
+    if (images.count > 0) {
+        NSUInteger showCount = MIN(images.count, 2);
+        UIImageView *iv0 = [[UIImageView alloc] init];
+        iv0.contentMode = UIViewContentModeScaleAspectFill;
+        iv0.clipsToBounds = YES;
+        iv0.layer.cornerRadius = 8;
+        iv0.backgroundColor = [UIColor colorWithRed:0.90 green:0.90 blue:0.90 alpha:1.0];
+        [iv0 sd_setImageWithURL:[NSURL URLWithString:images[0]]];
+        [item addSubview:iv0];
+        [iv0 mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.top.equalTo(bodyLabel.mas_bottom).offset(10);
+            make.left.equalTo(item);
+            if (showCount == 1) {
+                make.right.equalTo(item);
+            } else {
+                make.right.equalTo(item.mas_centerX).offset(-4);
+            }
+            make.height.mas_equalTo(120);
+        }];
+        if (showCount == 2) {
+            UIImageView *iv1 = [[UIImageView alloc] init];
+            iv1.contentMode = UIViewContentModeScaleAspectFill;
+            iv1.clipsToBounds = YES;
+            iv1.layer.cornerRadius = 8;
+            iv1.backgroundColor = [UIColor colorWithRed:0.90 green:0.90 blue:0.90 alpha:1.0];
+            [iv1 sd_setImageWithURL:[NSURL URLWithString:images[1]]];
+            [item addSubview:iv1];
+            [iv1 mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.top.height.equalTo(iv0);
+                make.left.equalTo(item.mas_centerX).offset(4);
+                make.right.equalTo(item);
+            }];
+        }
+        lastContentView = iv0;
+    }
+
+    // 底部：收藏数
+    UILabel *favCountLabel = [UILabel new];
+    favCountLabel.text      = [NSString stringWithFormat:@"收藏 %@", post.favoriteCount ?: @(0)];
+    favCountLabel.font      = [UIFont systemFontOfSize:12];
+    favCountLabel.textColor = [UIColor colorWithRed:0.50 green:0.50 blue:0.50 alpha:1.0];
+    [item addSubview:favCountLabel];
+    [favCountLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(lastContentView.mas_bottom).offset(10);
         make.left.equalTo(item);
-        make.width.height.mas_equalTo(24);
         make.bottom.equalTo(item);
     }];
 
-    UIImageView *fav2 = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
-    fav2.contentMode      = UIViewContentModeScaleAspectFill;
-    fav2.clipsToBounds    = YES;
-    fav2.layer.cornerRadius = 12;
-    fav2.layer.borderWidth  = 1.5;
-    fav2.layer.borderColor  = UIColor.whiteColor.CGColor;
-    [item addSubview:fav2];
-    [fav2 mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerY.equalTo(fav1);
-        make.left.equalTo(fav1).offset(16);
-        make.width.height.mas_equalTo(24);
-    }];
-
-    UILabel *favLabel = [UILabel new];
-    favLabel.text      = @"+25收藏";
-    favLabel.font      = [UIFont systemFontOfSize:12];
-    favLabel.textColor = [UIColor colorWithRed:0.50 green:0.50 blue:0.50 alpha:1.0];
-    [item addSubview:favLabel];
-    [favLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerY.equalTo(fav1);
-        make.left.equalTo(fav2.mas_right).offset(6);
-    }];
-
-    UILabel *timeLabel = [UILabel new];
-    timeLabel.text      = @"3天前";
-    timeLabel.font      = [UIFont systemFontOfSize:12];
-    timeLabel.textColor = [UIColor colorWithRed:0.60 green:0.60 blue:0.60 alpha:1.0];
-    [item addSubview:timeLabel];
-    [timeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerY.equalTo(fav1);
-        make.right.equalTo(item);
+    UILabel *commentLabel = [UILabel new];
+    commentLabel.text      = [NSString stringWithFormat:@"评论 %@", post.commentCount ?: @(0)];
+    commentLabel.font      = [UIFont systemFontOfSize:12];
+    commentLabel.textColor = [UIColor colorWithRed:0.50 green:0.50 blue:0.50 alpha:1.0];
+    [item addSubview:commentLabel];
+    [commentLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerY.equalTo(favCountLabel);
+        make.left.equalTo(favCountLabel.mas_right).offset(16);
     }];
 
     return item;
+}
+
+- (NSString *)tl_relativeTimeString:(NSDate *)date {
+    if (!date) return @"";
+    NSTimeInterval diff = -[date timeIntervalSinceNow];
+    if (diff < 60) return @"刚刚";
+    if (diff < 3600) return [NSString stringWithFormat:@"%d分钟前", (int)(diff / 60)];
+    if (diff < 86400) return [NSString stringWithFormat:@"%d小时前", (int)(diff / 3600)];
+    if (diff < 86400 * 30) return [NSString stringWithFormat:@"%d天前", (int)(diff / 86400)];
+    NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
+    fmt.dateFormat = @"MM-dd";
+    return [fmt stringFromDate:date];
 }
 
 @end

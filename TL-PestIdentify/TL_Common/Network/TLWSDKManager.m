@@ -222,6 +222,10 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
   return [self.api addCommentWithId:_id commentRequest:req completionHandler:handler];
 }
 
+- (NSURLSessionTask *)getMyPostsWithPage:(NSNumber *)page size:(NSNumber *)size completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error))handler {
+  return [self.api getMyPostsWithPage:page size:size completionHandler:handler];
+}
+
 - (NSURLSessionTask *)getFavoritedPostsWithPage:(NSNumber *)page size:(NSNumber *)size completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error))handler {
   return [self.api getFavoritedPostsWithPage:page size:size completionHandler:handler];
 }
