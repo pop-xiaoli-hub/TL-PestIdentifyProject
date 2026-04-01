@@ -78,6 +78,10 @@ NS_ASSUME_NONNULL_BEGIN
                                      size:(NSNumber *)size
                         completionHandler:(void (^)(AGResultPageResultPostResponseDto * output, NSError * error)) handler;
 
+/// 获取搜索联想词
+- (NSURLSessionTask *)getSuggestionsWithQ:(NSString *)q
+                        completionHandler:(void (^)(AGResultListString * output, NSError * error))handler;
+
 /// 获取帖子详情
 - (NSURLSessionTask *)getPostDetailWithId:(NSNumber *)_id
                         completionHandler:(void (^)(AGResultPostResponseDto * output, NSError * error))handler;

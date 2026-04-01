@@ -13,6 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, readonly) UICollectionView *collectionView;
 @property (nonatomic, strong, readonly) UITextField *searchTextField;
+@property (nonatomic, strong, readonly) UITableView *suggestionTableView;
 @property (nonatomic, strong, readonly) UIButton *voiceButton;
 @property (nonatomic, strong, readonly) UIButton *uploadButton;
 @property (nonatomic, strong) UIButton *publishButton;
@@ -26,6 +27,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 设置「猜你想搜」标签（先横向填满再换行）；传 nil 或空数组即清空
 - (void)tl_setGuessYouWantToSearchItems:(nullable NSArray<NSString *> *)items;
+
+/// 控制联想词列表显示状态并同步高度
+- (void)tl_setSuggestionListHidden:(BOOL)hidden itemCount:(NSInteger)itemCount;
 
 @end
 

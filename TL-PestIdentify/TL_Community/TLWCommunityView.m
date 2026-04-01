@@ -23,10 +23,13 @@ static NSInteger const kTagItemsPerRow = 5;
 
 @property (nonatomic, strong, readwrite) UICollectionView *collectionView;
 @property (nonatomic, strong, readwrite) UITextField *searchTextField;
+@property (nonatomic, strong, readwrite) UITableView *suggestionTableView;
 @property (nonatomic, strong, readwrite) UIButton *voiceButton;
 @property (nonatomic, strong) UIView *searchContainer;
 /// 搜索时的毛玻璃覆盖层（含历史记录、猜你想搜）
 @property (nonatomic, strong) UIVisualEffectView *searchBlurPanel;
+@property (nonatomic, strong) UIView *defaultSearchContentView;
+@property (nonatomic, strong) MASConstraint *suggestionTableHeightConstraint;
 /// 历史记录行容器（垂直 StackView，每行一个水平 StackView）
 @property (nonatomic, strong) UIStackView *historyStackView;
 /// 猜你想搜行容器（垂直 StackView，每行一个水平 StackView）
@@ -264,6 +267,7 @@ static NSInteger const kTagItemsPerRow = 5;
   blurView.layer.masksToBounds = YES;
   blurView.layer.cornerRadius = 14.0;
   [overlay addSubview:blurView];
+  self.searchBlurPanel = blurView;
   UIView *contentView = blurView.contentView;
   UIView *glassLayer = [[UIView alloc] init];
   glassLayer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.32];
@@ -281,13 +285,36 @@ static NSInteger const kTagItemsPerRow = 5;
   [glassLayer mas_makeConstraints:^(MASConstraintMaker *make) {
     make.edges.equalTo(contentView);
   }];
+
+  UITableView *suggestionTableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
+  suggestionTableView.backgroundColor = [UIColor clearColor];
+  suggestionTableView.separatorInset = UIEdgeInsetsMake(0, 16, 0, 16);
+  suggestionTableView.rowHeight = 50.0;
+  suggestionTableView.scrollEnabled = NO;
+  suggestionTableView.hidden = YES;
+  suggestionTableView.tableFooterView = [UIView new];
+  suggestionTableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
+  [suggestionTableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"TLWCommunitySuggestionCell"];
+  if (@available(iOS 15.0, *)) {
+    suggestionTableView.sectionHeaderTopPadding = 0;
+  }
+  [contentView addSubview:suggestionTableView];
+  self.suggestionTableView = suggestionTableView;
+  [suggestionTableView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(contentView).offset(8);
+    make.left.right.equalTo(contentView);
+    self.suggestionTableHeightConstraint = make.height.mas_equalTo(0);
+  }];
   
   [self bringSubviewToFront:self.searchContainer];
+  UIView *defaultSearchContentView = [[UIView alloc] init];
+  [contentView addSubview:defaultSearchContentView];
+  self.defaultSearchContentView = defaultSearchContentView;
   UILabel *historyTitle = [[UILabel alloc] init];
   historyTitle.text = @"历史记录";
   historyTitle.textColor = [UIColor systemBlueColor];
   historyTitle.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-  [contentView addSubview:historyTitle];
+  [defaultSearchContentView addSubview:historyTitle];
 
   UIButton *clearButton = [UIButton buttonWithType:UIButtonTypeSystem];
   [clearButton setTitle:@"清除记录" forState:UIControlStateNormal];
@@ -296,14 +323,14 @@ static NSInteger const kTagItemsPerRow = 5;
   [clearButton addTarget:self
                   action:@selector(tl_clearHistoryTapped)
         forControlEvents:UIControlEventTouchUpInside];
-  [contentView addSubview:clearButton];
+  [defaultSearchContentView addSubview:clearButton];
 
   // 历史记录行容器（内容通过 tl_setSearchHistoryItems: 设置）
   UIStackView *historyRowsStack = [[UIStackView alloc] init];
   historyRowsStack.axis = UILayoutConstraintAxisVertical;
   historyRowsStack.alignment = UIStackViewAlignmentLeading;
   historyRowsStack.spacing = 8.0;
-  [contentView addSubview:historyRowsStack];
+  [defaultSearchContentView addSubview:historyRowsStack];
   self.historyStackView = historyRowsStack;
 
   UILabel *guessTitle = [[UILabel alloc] init];
@@ -322,29 +349,34 @@ static NSInteger const kTagItemsPerRow = 5;
   guessSectionStack.axis = UILayoutConstraintAxisVertical;
   guessSectionStack.alignment = UIStackViewAlignmentLeading;
   guessSectionStack.spacing = 8.0;
-  [contentView addSubview:guessSectionStack];
+  [defaultSearchContentView addSubview:guessSectionStack];
+
+  [defaultSearchContentView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.suggestionTableView.mas_bottom);
+    make.left.right.bottom.equalTo(contentView);
+  }];
 
   [historyTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(contentView).offset(14);
-    make.left.equalTo(contentView).offset(16);
+    make.top.equalTo(defaultSearchContentView).offset(14);
+    make.left.equalTo(defaultSearchContentView).offset(16);
   }];
 
   [clearButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerY.equalTo(historyTitle);
-    make.right.equalTo(contentView).offset(-16);
+    make.right.equalTo(defaultSearchContentView).offset(-16);
   }];
 
   [historyRowsStack mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(historyTitle.mas_bottom).offset(8);
-    make.left.equalTo(contentView).offset(16);
-    make.right.lessThanOrEqualTo(contentView).offset(-16);
+    make.left.equalTo(defaultSearchContentView).offset(16);
+    make.right.lessThanOrEqualTo(defaultSearchContentView).offset(-16);
   }];
 
   [guessSectionStack mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(historyRowsStack.mas_bottom).offset(16);
-    make.left.equalTo(contentView).offset(16);
-    make.right.lessThanOrEqualTo(contentView).offset(-16);
-    make.bottom.equalTo(contentView).offset(-16);
+    make.left.equalTo(defaultSearchContentView).offset(16);
+    make.right.lessThanOrEqualTo(defaultSearchContentView).offset(-16);
+    make.bottom.equalTo(defaultSearchContentView).offset(-16);
   }];
 
   // 默认展示数据，外部可通过接口覆盖
@@ -386,6 +418,16 @@ static NSInteger const kTagItemsPerRow = 5;
   [self tl_rebuildTagRowsInStackView:self.guessStackView withItems:items ?: @[]];
 }
 
+- (void)tl_setSuggestionListHidden:(BOOL)hidden itemCount:(NSInteger)itemCount {
+  NSInteger visibleCount = MAX(0, MIN(itemCount, 6));
+  CGFloat targetHeight = hidden ? 0.0 : visibleCount * self.suggestionTableView.rowHeight;
+  self.suggestionTableView.hidden = hidden;
+  self.suggestionTableView.scrollEnabled = itemCount > 6;
+  [self.suggestionTableHeightConstraint setOffset:targetHeight];
+  self.defaultSearchContentView.hidden = !hidden;
+  [self layoutIfNeeded];
+}
+
 - (void)tl_showSearchOverlay {
   if (!self.searchOverlay) {
     return;
@@ -416,6 +458,8 @@ static NSInteger const kTagItemsPerRow = 5;
 - (void)tl_searchSuggestionTapped:(UIButton *)sender {
   NSString *text = sender.currentTitle ?: @"";
   self.searchTextField.text = text;
+  [self.searchTextField sendActionsForControlEvents:UIControlEventEditingChanged];
+  [self.searchTextField becomeFirstResponder];
 }
 
 - (void)tl_dismissKeyboard {
@@ -447,4 +491,3 @@ static NSInteger const kTagItemsPerRow = 5;
 }
 
 @end
-

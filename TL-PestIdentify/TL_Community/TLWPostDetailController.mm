@@ -499,7 +499,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 }
 
 - (void)collectTapped:(UIButton *)sender {
-  sender.enabled = NO;
+  sender.enabled = NO;//防抖
   BOOL isCollected = self.headerView.isCollected;
   NSInteger previousCount = [self.headerView.collectedCountLabel.text integerValue];
   __weak typeof(self) weakSelf = self;

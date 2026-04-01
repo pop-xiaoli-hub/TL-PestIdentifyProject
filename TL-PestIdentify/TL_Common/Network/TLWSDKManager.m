@@ -191,6 +191,11 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
                completionHandler:handler];
 }
 
+- (NSURLSessionTask *)getSuggestionsWithQ:(NSString *)q
+                        completionHandler:(void (^)(AGResultListString * output, NSError * error))handler {
+  return [self.api getSuggestionsWithQ:q completionHandler:handler];
+}
+
 - (NSURLSessionTask *)getPostDetailWithId:(NSNumber *)_id
                         completionHandler:(void (^)(AGResultPostResponseDto * output, NSError * error))handler {
   return [self.api getPostDetailWithId:_id completionHandler:handler];
