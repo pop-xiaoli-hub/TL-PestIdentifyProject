@@ -186,12 +186,13 @@ static CGFloat const kHorizontalPad = 16.0;
   [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(self.avatarView.mas_bottom).offset(14);
     make.left.equalTo(self).offset(kHorizontalPad);
-    make.right.equalTo(self).offset(-kHorizontalPad);
+    // tableHeaderView 在个别布局阶段可能暂时宽度为 0，右侧约束降一档可避免日志刷屏
+    make.right.equalTo(self).offset(-kHorizontalPad).priority(999);
   }];
   [self.contentLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(self.titleLabel.mas_bottom).offset(10);
     make.left.equalTo(self).offset(kHorizontalPad);
-    make.right.equalTo(self).offset(-kHorizontalPad);
+    make.right.equalTo(self).offset(-kHorizontalPad).priority(999);
   }];
 }
 

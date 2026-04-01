@@ -52,6 +52,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
                  previousCount:(NSInteger)previousCount
                optimisticCount:(NSInteger)optimisticCount
                         sender:(UIButton *)sender;
+- (void)updateTableHeaderLayoutIfNeeded;
 
 @end
 
@@ -84,6 +85,12 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [super viewWillAppear:animated];
   // 详情页使用自定义导航栏，隐藏系统 navigationBar
   [self.navigationController setNavigationBarHidden:YES animated:NO];
+}
+
+- (void)viewDidLayoutSubviews {
+  [super viewDidLayoutSubviews];
+  // tableHeaderView 依赖 table 的最终宽度，避免出现 header width = 0 的约束冲突
+  [self updateTableHeaderLayoutIfNeeded];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -166,42 +173,53 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
     make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-56);
   }];
 
-  // Header view — tableHeaderView 必须用 frame 驱动，先设置正确尺寸再赋值
-  CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
-  CGFloat headerH = [TLWPostDetailHeaderView heightForPost:self.post];
-  self.headerView = [[TLWPostDetailHeaderView alloc] initWithFrame:CGRectMake(0, 0, screenW, headerH)];
-  self.headerView.translatesAutoresizingMaskIntoConstraints = YES;
+  // Header view：先创建，等 tableView 有有效宽度后再挂载
+  self.headerView = [[TLWPostDetailHeaderView alloc] initWithFrame:CGRectMake(0, 0, 1, 1)];
   if (self.post) {
-    [self refreshHeaderWithPost:self.post];
+    [self.headerView configureWithPost:self.post];
   }
-  self.tableView.tableHeaderView = self.headerView;
+  [self updateTableHeaderLayoutIfNeeded];
 }
 
 - (void)refreshHeaderWithPost:(TLWCommunityPost *)post {
   if (!self.headerView || !post) return;
 
-  CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
   [self.headerView configureWithPost:post];
+  [self updateTableHeaderLayoutIfNeeded];
+
   [self applyLikedUI:post.isLiked count:post.likeCount.integerValue];
-  CGFloat finalH = [TLWPostDetailHeaderView heightForPost:post];
-  self.headerView.frame = CGRectMake(0, 0, screenW, finalH);
-  self.tableView.tableHeaderView = self.headerView;
 
-  BOOL isLiked = post.isLiked.boolValue;
-  [self applyLikedUI:isLiked count:post.likeCount.integerValue];
-
-  BOOL hasFavoritedState = (post.isFavorited != nil);
-  BOOL isCollected = hasFavoritedState ? post.isFavorited.boolValue : NO;
-  if (!hasFavoritedState) {
+  BOOL isCollected = post.isCollected;
+  if (!isCollected) {
     for (AGPostResponseDto *dto in self.hasCollectedPosts) {
       if ([post._id isEqualToNumber:dto._id]) {
         isCollected = YES;
         break;
       }
     }
+    post.isCollected = isCollected;
   }
-  post.isFavorited = @(isCollected);
   [self applyCollectedUI:isCollected count:post.favoriteCount.integerValue];
+}
+
+- (void)updateTableHeaderLayoutIfNeeded {
+  if (!self.headerView || !self.tableView) return;
+
+  CGFloat tableWidth = CGRectGetWidth(self.tableView.bounds);
+  if (tableWidth <= 32.0) return;
+
+  TLWCommunityPost *postForHeight = self.post ?: [TLWCommunityPost new];
+  CGFloat headerHeight = [TLWPostDetailHeaderView heightForPost:postForHeight];
+  CGRect targetFrame = CGRectMake(0, 0, tableWidth, headerHeight);
+
+  BOOL sizeChanged = fabs(self.headerView.frame.size.width - targetFrame.size.width) > 0.5
+                  || fabs(self.headerView.frame.size.height - targetFrame.size.height) > 0.5;
+  if (sizeChanged) {
+    self.headerView.frame = targetFrame;
+  }
+  if (self.tableView.tableHeaderView != self.headerView || sizeChanged) {
+    self.tableView.tableHeaderView = self.headerView;
+  }
 }
 
 - (void)buildInputBar {
@@ -355,8 +373,6 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   post.isLiked = dto.isLiked.boolValue;
   post.isCollected = dto.isFavorited.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
-  post.isLiked = dto.isLiked;
-  post.isFavorited = dto.isFavorited;
   post.imageAspectRatio = self.post.imageAspectRatio > 0 ? self.post.imageAspectRatio : (4.0 / 3.0);
   return post;
 }
@@ -534,16 +550,6 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   : [UIColor colorWithWhite:0.45 alpha:1.0];
 }
 
-- (void)applyLikedUI:(BOOL)isLiked count:(NSInteger)count {
-  self.headerView.isLiked = isLiked;
-  NSString *imageName = isLiked ? @"cp_isLiked-2.png" : @"cp_isLiked-1.png";
-  [self.headerView.likeButton setImage:[UIImage imageNamed:imageName] forState:UIControlStateNormal];
-  self.headerView.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
-  self.headerView.likedCountLabel.textColor = isLiked
-  ? [UIColor colorWithRed:1.0 green:0.30 blue:0.30 alpha:1.0]
-  : [UIColor colorWithWhite:0.45 alpha:1.0];
-}
-
 - (void)collectTapped:(UIButton *)sender {
   NSNumber *postId = self.post._id ?: self._id;
   if (!postId) return;
@@ -572,64 +578,21 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 }
 
 - (void)likeTapped:(UIButton *)sender {
-  if (!self.post._id) {
-    return;
-  }
+  NSNumber *postId = self.post._id ?: self._id;
+  if (!postId) return;
 
-  sender.enabled = NO;
   BOOL isLiked = self.headerView.isLiked;
+  BOOL shouldLike = !isLiked;
   NSInteger previousCount = [self.headerView.likedCountLabel.text integerValue];
-  __weak typeof(self) weakSelf = self;
+  NSInteger optimisticCount = shouldLike ? previousCount + 1 : MAX(0, previousCount - 1);
+  [self applyLikedUI:shouldLike count:optimisticCount];
+  sender.enabled = NO;
 
-  if (!isLiked) {
-    NSInteger optimisticCount = previousCount + 1;
-    [self applyLikedUI:YES count:optimisticCount];
-    [[TLWSDKManager shared] likePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) return;
-        sender.enabled = YES;
-        if (error || !output || output.code.integerValue != 200) {
-          if (!error && output.code.integerValue == 401) {
-            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
-              [strongSelf likeTapped:strongSelf.headerView.likeButton];
-            }];
-            return;
-          }
-          NSLog(@"[Like] 点赞失败: %@", error.localizedDescription ?: output.message);
-          [strongSelf applyLikedUI:NO count:previousCount];
-          return;
-        }
-        strongSelf.post.isLiked = YES;
-        strongSelf.post.likeCount = @(optimisticCount);
-        strongSelf.reloadPosts(strongSelf.post._id);
-      });
-    }];
-  } else {
-    NSInteger optimisticCount = MAX(0, previousCount - 1);
-    [self applyLikedUI:NO count:optimisticCount];
-    [[TLWSDKManager shared] unlikePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) return;
-        sender.enabled = YES;
-        if (error || !output || output.code.integerValue != 200) {
-          if (!error && output.code.integerValue == 401) {
-            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
-              [strongSelf likeTapped:strongSelf.headerView.likeButton];
-            }];
-            return;
-          }
-          NSLog(@"[Like] 取消点赞失败: %@", error.localizedDescription ?: output.message);
-          [strongSelf applyLikedUI:YES count:previousCount];
-          return;
-        }
-        strongSelf.post.isLiked = NO;
-        strongSelf.post.likeCount = @(optimisticCount);
-        strongSelf.reloadPosts(strongSelf.post._id);
-      });
-    }];
-  }
+  [self submitLikeTargetState:shouldLike
+                previousState:isLiked
+                previousCount:previousCount
+              optimisticCount:optimisticCount
+                       sender:sender];
 
   [UIView animateWithDuration:0.12 animations:^{
     sender.transform = CGAffineTransformMakeScale(1.3, 1.3);
@@ -667,7 +630,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
         return;
       }
       strongSelf.post.favoriteCount = @(optimisticCount);
-      strongSelf.post.isFavorited = @(shouldCollect);
+      strongSelf.post.isCollected = shouldCollect;
     });
   };
 
@@ -712,7 +675,10 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
         return;
       }
       strongSelf.post.likeCount = @(optimisticCount);
-      strongSelf.post.isLiked = @(shouldLike);
+      strongSelf.post.isLiked = shouldLike;
+      if (strongSelf.reloadPosts && strongSelf.post._id) {
+        strongSelf.reloadPosts(strongSelf.post._id);
+      }
     });
   };
 
@@ -724,9 +690,9 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   }
 
   if (shouldLike) {
-    [[TLWSDKManager shared].api likePostWithId:postId completionHandler:completion];
+    [[TLWSDKManager shared] likePostWithId:postId completionHandler:completion];
   } else {
-    [[TLWSDKManager shared].api unlikePostWithId:postId completionHandler:completion];
+    [[TLWSDKManager shared] unlikePostWithId:postId completionHandler:completion];
   }
 }
 

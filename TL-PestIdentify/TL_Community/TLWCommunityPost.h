@@ -11,39 +11,35 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWCommunityPost : NSObject
-@property(nonatomic) NSNumber* _id;
-@property(nonatomic) NSString* content;
-@property(nonatomic) NSArray* images;
+@property (nonatomic, strong) NSNumber * _Nullable _id;
+@property (nonatomic, copy) NSString *content;
+@property (nonatomic, copy) NSArray *images;
 /* 标签列表 [optional]
  */
-@property(nonatomic) NSArray<NSString*>* tags;
+@property (nonatomic, copy) NSArray<NSString *> *tags;
 /* 作者用户名 [optional]
   */
- @property(nonatomic) NSString* authorName;
+ @property (nonatomic, copy) NSString *authorName;
  /* 作者头像 [optional]
   */
- @property(nonatomic) NSString* authorAvatar;
+ @property (nonatomic, copy) NSString *authorAvatar;
 /// 文本标题，如“菜心被蚜虫像蜂窝煤”
 @property (nonatomic, copy) NSString *title;
 /// 点赞数量
-@property (nonatomic, assign) NSNumber* likeCount;
+@property (nonatomic, strong) NSNumber *likeCount;
 /// 当前用户是否已点赞
 @property (nonatomic, assign) BOOL isLiked;
-
+/// 当前用户是否已收藏
 @property (nonatomic, assign) BOOL isCollected;
 
-@property (nonatomic, assign) NSNumber* favoriteCount;
-/// 当前用户是否已点赞
-@property (nonatomic, strong, nullable) NSNumber *isLiked;
-/// 当前用户是否已收藏
-@property (nonatomic, strong, nullable) NSNumber *isFavorited;
+@property (nonatomic, strong) NSNumber *favoriteCount;
 /// 图片纵横比（高度 / 宽度），用于计算瀑布流高度
 @property (nonatomic, assign) CGFloat imageAspectRatio;
 
 /// 是否为本地发布中（尚未上传成功）的帖子，显示毛玻璃遮罩
 @property (nonatomic, assign) BOOL isLocalPending;
 
-@property (nonatomic, strong) NSArray* picUrls;
+@property (nonatomic, copy) NSArray *picUrls;
 
 /// 根据给定宽度，返回 cell 的总高度（图片 + 文本 + 底部信息）
 - (CGFloat)cellHeightForWidth:(CGFloat)width;
