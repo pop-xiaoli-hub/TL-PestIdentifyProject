@@ -184,8 +184,8 @@ static NSString *const kMessageCellID = @"TLWMessageCell";
     TLWMessageItem *item = self.items[indexPath.row];
 
     if (item.type == TLWMessageItemTypeNotification) {
-        // 通知行 → 跳病害消息 tab (2)
-        TLWNotificationController *vc = [[TLWNotificationController alloc] initWithInitialTab:2];
+        // 通知行默认进入“全部”tab (0)
+        TLWNotificationController *vc = [[TLWNotificationController alloc] initWithInitialTab:0];
         vc.hidesBottomBarWhenPushed = YES;
         [self.navigationController pushViewController:vc animated:YES];
     } else if (item.type == TLWMessageItemTypeSystem) {
