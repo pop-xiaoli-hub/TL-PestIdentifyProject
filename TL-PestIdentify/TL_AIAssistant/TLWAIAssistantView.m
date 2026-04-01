@@ -105,7 +105,7 @@ static CGFloat const kVoicePanelHeight   = 180.0;  // 语音输入面板高度
     UIView *titleContainer = [[UIView alloc] init];
     [self addSubview:titleContainer];
 
-    UIImageView *aiIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"aiAssisstant"]];
+    UIImageView *aiIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"aiAssistant"]];
     aiIcon.contentMode = UIViewContentModeScaleAspectFit;
     [titleContainer addSubview:aiIcon];
 

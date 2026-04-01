@@ -51,7 +51,7 @@
     }];
 
     // 头像
-    self.avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_avator.png"]];
+    self.avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_avatar.png"]];
     self.avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
     self.avatarImageView.clipsToBounds = YES;
     self.avatarImageView.layer.cornerRadius = 30.0;
@@ -159,4 +159,3 @@
 }
 
 @end
-

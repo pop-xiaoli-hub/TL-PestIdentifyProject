@@ -81,9 +81,12 @@ TL-PestIdentify/
 │   ├── wechat/                   # 微信绑定
 │   └── guide/                    # 引导页、偏好选择、头像裁剪
 ├── TL_HomePage/                  # 首页
+│   ├── Models/                   # 首页模型
+│   └── Resources/Images/         # 首页图片资源
 ├── TL_PhotoIdentify/             # 拍照识别页
+│   └── Resources/Images/         # 识别页图片资源
 ├── TL_Community/                 # 社区
-│   └── cp_icon/                  # 社区相关图标资源
+│   └── Resources/Images/         # 社区图片资源
 ├── TL_Publish/                   # 发布帖子
 ├── TL_My/                        # 我的
 │   ├── Avatar/                   # 相册选图、头像裁剪
@@ -95,16 +98,22 @@ TL-PestIdentify/
 │   └── Setting/                  # 设置
 ├── TL_Record/                    # 识别记录列表
 │   └── TL_RecordDetail/          # 识别记录详情
-├── TL_AiAssisstant/              # AI 助手
+├── TL_AIAssistant/               # AI 助手
 ├── TL_Message/                   # 消息
+│   ├── Controllers/
+│   ├── Views/
+│   ├── Models/
+│   └── Components/
 ├── TL_Notification/              # 通知
+│   ├── Controllers/
+│   ├── Views/
+│   ├── Models/
+│   └── Components/
 └── TL_Common/                    # 公共工具
+    ├── UI/                       # Toast、PhotoCell 等通用 UI
+    ├── Media/                    # 相机、相册、语音
     ├── Network/                  # TLWSDKManager（统一 API 封装）
-    ├── TLWImagePickerManager     # 相册选图管理
-    ├── TLWPhotoCell              # 通用相册格子 Cell
-    ├── TLWCameraManager          # 相机权限与调用
-    ├── TLWToast                  # 统一 Toast 组件
-    └── TWLSpeechManager          # 语音识别
+    └── TLWWCDB/                  # 本地数据库
 ```
 
 ---

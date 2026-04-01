@@ -115,12 +115,12 @@ static CGFloat const kCardGap   = 22;
     [_filterButton setTitleColor:[UIColor colorWithWhite:1 alpha:0.9] forState:UIControlStateNormal];
     _filterButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
     // 图标缩小到 16x16
-    UIImage *fiterOrigin = [UIImage imageNamed:@"fiter"];
+    UIImage *filterOrigin = [UIImage imageNamed:@"filter"];
     UIGraphicsBeginImageContextWithOptions(CGSizeMake(16, 16), NO, 0);
-    [fiterOrigin drawInRect:CGRectMake(0, 0, 16, 16)];
-    UIImage *fiterSmall = UIGraphicsGetImageFromCurrentImageContext();
+    [filterOrigin drawInRect:CGRectMake(0, 0, 16, 16)];
+    UIImage *filterSmall = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
-    [_filterButton setImage:fiterSmall forState:UIControlStateNormal];
+    [_filterButton setImage:filterSmall forState:UIControlStateNormal];
     _filterButton.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
     _filterButton.imageEdgeInsets = UIEdgeInsetsMake(0, 6, 0, 0);
     [self addSubview:_filterButton];

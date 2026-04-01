@@ -87,7 +87,7 @@ static CGFloat const kHorizontalPad = 16.0;
   self.avatarView.clipsToBounds = YES;
   self.avatarView.layer.cornerRadius = 23.0;
   self.avatarView.backgroundColor = [UIColor colorWithWhite:0.88 alpha:1.0];
-  self.avatarView.image = [UIImage imageNamed:@"hp_avator.png"];
+  self.avatarView.image = [UIImage imageNamed:@"hp_avatar.png"];
   [self addSubview:self.avatarView];
 
   self.nameLabel = [[UILabel alloc] init];
@@ -237,7 +237,7 @@ static CGFloat const kHorizontalPad = 16.0;
   self.nameLabel.text = post.authorName.length > 0 ? post.authorName : @"匿名用户";
   if (post.authorAvatar.length > 0) {
     [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar]
-                       placeholderImage:[UIImage imageNamed:@"hp_avator.png"]];
+                       placeholderImage:[UIImage imageNamed:@"hp_avatar.png"]];
   }
   self.titleLabel.text = post.title.length > 0 ? post.title : @"";
   self.contentLabel.text = post.content.length > 0 ? post.content : @"";

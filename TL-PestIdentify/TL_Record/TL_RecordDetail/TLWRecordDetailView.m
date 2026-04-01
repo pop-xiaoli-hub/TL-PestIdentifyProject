@@ -306,7 +306,7 @@ static CGFloat const kCardGap   = 13;
     _aiButton.layer.shadowOpacity = 0.52;
     _aiButton.layer.shadowRadius = 5;
     _aiButton.layer.shadowOffset = CGSizeMake(0, 4);
-    [_aiButton setImage:[UIImage imageNamed:@"aiAssisstant"] forState:UIControlStateNormal];
+    [_aiButton setImage:[UIImage imageNamed:@"aiAssistant"] forState:UIControlStateNormal];
     _aiButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
     [aiContainer addSubview:_aiButton];
     [_aiButton mas_makeConstraints:^(MASConstraintMaker *make) {
