@@ -35,6 +35,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// 是否为本地发布中（尚未上传成功）的帖子，显示毛玻璃遮罩
 @property (nonatomic, assign) BOOL isLocalPending;
 
+@property (nonatomic, strong) NSArray* picUrls;
+
 /// 根据给定宽度，返回 cell 的总高度（图片 + 文本 + 底部信息）
 - (CGFloat)cellHeightForWidth:(CGFloat)width;
 

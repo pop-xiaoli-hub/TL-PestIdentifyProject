@@ -7,7 +7,7 @@
 #import "TLWVoiceInputView.h"
 #import "TWLSpeechManager.h"
 
-@interface TLWVoiceInputViewController ()
+@interface TLWVoiceInputViewController () <UITextFieldDelegate>
 
 @property (nonatomic, strong) TLWVoiceInputView *voiceView;
 
@@ -29,6 +29,8 @@
 - (void)viewDidLoad {
   [super viewDidLoad];
   [self.voiceView.backButton addTarget:self action:@selector(tl_backTapped) forControlEvents:UIControlEventTouchUpInside];
+  self.voiceView.searchTextField.delegate = self;
+  self.voiceView.searchTextField.text = self.initialSearchText ?: @"";
   [self tl_setupSpeechRecognition];
 }
 
@@ -44,11 +46,18 @@
 
   self.voiceView.onRecordingStart = ^{
     textBeforeRecording = weakSelf.voiceView.searchTextField.text ?: @"";
+    [weakSelf.voiceView.searchTextField resignFirstResponder];
     [[TWLSpeechManager sharedManager] startRecording];
   };
 
   [TWLSpeechManager sharedManager].resultHandler = ^(NSString *text, BOOL isFinal) {
-    weakSelf.voiceView.searchTextField.text = [textBeforeRecording stringByAppendingString:text];
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+    NSString *recognizedText = [textBeforeRecording stringByAppendingString:(text ?: @"")];
+    strongSelf.voiceView.searchTextField.text = recognizedText;
+    if (strongSelf.onSearchTextChanged) {
+      strongSelf.onSearchTextChanged(recognizedText);
+    }
   };
 
   self.voiceView.onRecordingEnd = ^{
@@ -56,7 +65,22 @@
   };
 }
 
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+  [[TWLSpeechManager sharedManager] stopRecording];
+  NSString *text = textField.text ?: @"";
+  if (self.onSearchTextChanged) {
+    self.onSearchTextChanged(text);
+  }
+  [textField resignFirstResponder];
+  [self dismissViewControllerAnimated:YES completion:nil];
+  return YES;
+}
+
 - (void)tl_backTapped {
+  [[TWLSpeechManager sharedManager] stopRecording];
+  if (self.onSearchTextChanged) {
+    self.onSearchTextChanged(self.voiceView.searchTextField.text ?: @"");
+  }
   [self dismissViewControllerAnimated:YES completion:nil];
 }
 

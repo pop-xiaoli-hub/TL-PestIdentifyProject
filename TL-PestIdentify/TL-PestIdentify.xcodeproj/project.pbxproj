@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0DE4F8BA2F7BDFF2003AB074 /* TLWDBCollectedModel.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0DE4F8B82F7BDFF2003AB074 /* TLWDBCollectedModel.mm */; };
+		0DE4F8BD2F7BE070003AB074 /* TLWDBManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = 0DE4F8BC2F7BE070003AB074 /* TLWDBManager.mm */; };
 		1D0DEAFCB336DAF43EC9E6EE /* libPods-TL-PestIdentify.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A6736E20E1CFCB3AE6A3FA7E /* libPods-TL-PestIdentify.a */; };
 		4C3599332F7B76A700D04744 /* TLWToast.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C3599322F7B76A700D04744 /* TLWToast.m */; };
 		4C8CF8FD2F74F9AF00EC6570 /* TLWImagePickerManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C8CF8FC2F74F9AF00EC6570 /* TLWImagePickerManager.m */; };
@@ -46,6 +48,11 @@
 		0DAAA8D62F59C0B800F327DC /* TL-PestIdentify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TL-PestIdentify.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8F12F59C0BB00F327DC /* TL-PestIdentifyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8FB2F59C0BB00F327DC /* TL-PestIdentifyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		0DE4F8B72F7BDFF2003AB074 /* TLWDBCollectedModel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWDBCollectedModel.h; sourceTree = "<group>"; };
+		0DE4F8B82F7BDFF2003AB074 /* TLWDBCollectedModel.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = TLWDBCollectedModel.mm; sourceTree = "<group>"; };
+		0DE4F8B92F7BDFF2003AB074 /* TLWDBCollectedModel+WCTTableCoding.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TLWDBCollectedModel+WCTTableCoding.h"; sourceTree = "<group>"; };
+		0DE4F8BB2F7BE070003AB074 /* TLWDBManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWDBManager.h; sourceTree = "<group>"; };
+		0DE4F8BC2F7BE070003AB074 /* TLWDBManager.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = TLWDBManager.mm; sourceTree = "<group>"; };
 		4C3599312F7B76A700D04744 /* TLWToast.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWToast.h; sourceTree = "<group>"; };
 		4C3599322F7B76A700D04744 /* TLWToast.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TLWToast.m; sourceTree = "<group>"; };
 		4C8CF8FB2F74F9AF00EC6570 /* TLWImagePickerManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TLWImagePickerManager.h; sourceTree = "<group>"; };
@@ -98,71 +105,51 @@
 		};
 		0DAAA8F42F59C0BB00F327DC /* TL-PestIdentifyTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "TL-PestIdentifyTests";
 			sourceTree = "<group>";
 		};
 		0DAAA8FE2F59C0BB00F327DC /* TL-PestIdentifyUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "TL-PestIdentifyUITests";
 			sourceTree = "<group>";
 		};
 		0DB0A9202F5FF6D3009E2E41 /* TL_HomePage */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_HomePage;
 			sourceTree = "<group>";
 		};
 		0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_PhotoIdentify;
 			sourceTree = "<group>";
 		};
 		0DCE63482F63EEAD00965017 /* TL_Community */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Community;
 			sourceTree = "<group>";
 		};
 		0DE04CC92F68235300856C11 /* TL_Publish */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Publish;
 			sourceTree = "<group>";
 		};
 		4C9B4E8D2F5F040700016E29 /* TL_Login */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Login;
 			sourceTree = "<group>";
 		};
 		4CA891122F63A7A900928BBF /* TL_Record */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Record;
 			sourceTree = "<group>";
 		};
 		4CA894EF2F63FDF700928BBF /* TL_AiAssisstant */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_AiAssisstant;
 			sourceTree = "<group>";
 		};
 		7D5BEC0BE2664D74B5CF37A0 /* TL_My */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_My;
 			sourceTree = "<group>";
 		};
@@ -227,11 +214,24 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		0DE4F8B62F7BDFBF003AB074 /* TLWWCDB */ = {
+			isa = PBXGroup;
+			children = (
+				0DE4F8B72F7BDFF2003AB074 /* TLWDBCollectedModel.h */,
+				0DE4F8B82F7BDFF2003AB074 /* TLWDBCollectedModel.mm */,
+				0DE4F8B92F7BDFF2003AB074 /* TLWDBCollectedModel+WCTTableCoding.h */,
+				0DE4F8BB2F7BE070003AB074 /* TLWDBManager.h */,
+				0DE4F8BC2F7BE070003AB074 /* TLWDBManager.mm */,
+			);
+			path = TLWWCDB;
+			sourceTree = "<group>";
+		};
 		4CA894FE2F64577500928BBF /* TL_Common */ = {
 			isa = PBXGroup;
 			children = (
 				4C3599312F7B76A700D04744 /* TLWToast.h */,
 				4C3599322F7B76A700D04744 /* TLWToast.m */,
+				0DE4F8B62F7BDFBF003AB074 /* TLWWCDB */,
 				4CA8BB0A2F6E8B0100928BBF /* Network */,
 				4CA894FC2F64577500928BBF /* TLWCameraManager.h */,
 				4CA894FD2F64577500928BBF /* TLWCameraManager.m */,
@@ -493,6 +493,8 @@
 			files = (
 				4CA8AAAC2F67B32A00928BBF /* TWLSpeechManager.m in Sources */,
 				4C8CF8FD2F74F9AF00EC6570 /* TLWImagePickerManager.m in Sources */,
+				0DE4F8BD2F7BE070003AB074 /* TLWDBManager.mm in Sources */,
+				0DE4F8BA2F7BDFF2003AB074 /* TLWDBCollectedModel.mm in Sources */,
 				4CA8A5902F66F9E100928BBF /* TLWMessageView.m in Sources */,
 				4CA8A5912F66F9E100928BBF /* TLWMessageItem.m in Sources */,
 				4CA8A5B92F66FA3300928BBF /* TLWNotificationCell.m in Sources */,

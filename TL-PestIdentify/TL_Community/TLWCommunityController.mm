@@ -14,18 +14,23 @@
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
 #import <Masonry/Masonry.h>
-
+#import "TLWDBManager.h"
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
-@interface TLWCommunityController () <UICollectionViewDataSource, UICollectionViewDelegate, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate>
+@interface TLWCommunityController () <UICollectionViewDataSource, UICollectionViewDelegate, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate, UITableViewDataSource, UITableViewDelegate>
 
 @property (nonatomic, strong) TLWCommunityView *myView;
 @property (nonatomic, strong) NSMutableArray *posts;
 @property (nonatomic, assign) BOOL tl_isFetchingFeed;
-
+@property (nonatomic, strong) NSMutableArray* collectePosts;
+@property (nonatomic, strong) NSMutableArray<NSString *> *searchSuggestions;
+@property (nonatomic, strong, nullable) NSURLSessionTask *suggestionTask;
+@property (nonatomic, copy) NSString *pendingSuggestionQuery;
+@property (nonatomic, assign) NSInteger suggestionRequestToken;
 @end
 
 @implementation TLWCommunityController
+
 
 
 - (void)viewDidLoad {
@@ -48,16 +53,38 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
   [self.myView bringSubviewToFront:self.myView.publishButton];
   self.myView.searchTextField.delegate = self;
+  [self.myView.searchTextField addTarget:self action:@selector(tl_searchTextChanged:) forControlEvents:UIControlEventEditingChanged];
+  self.myView.suggestionTableView.dataSource = self;
+  self.myView.suggestionTableView.delegate = self;
   [self.myView.voiceButton addTarget:self action:@selector(tl_voiceButtonTapped) forControlEvents:UIControlEventTouchUpInside];
   self.posts = [NSMutableArray array];
+  self.searchSuggestions = [NSMutableArray array];
+  self.pendingSuggestionQuery = @"";
   self.tl_isFetchingFeed = NO;
   [self tl_fetchCommunityFeed];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
 }
 
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+  [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(tl_fetchSuggestionsNow:) object:nil];
+  [self.suggestionTask cancel];
+}
+
+
+
+- (void)loadCollectedPosts {
+  TLWSDKManager* manager = [TLWSDKManager shared];
+  __weak typeof(self) weakSelf = self;
+  [manager fetchAllFavoritedPostsWithCompletion:^(NSArray<AGPostResponseDto *> * _Nullable posts, NSError * _Nullable error) {
+    NSLog(@"获取到所有收藏的帖子数位：%ld", posts.count);
+    weakSelf.collectePosts = [NSMutableArray arrayWithArray:posts];
+  }];
+}
+
 - (void)viewDidAppear:(BOOL)animated {
   [super viewDidAppear:animated];
-
+  [self loadCollectedPosts];
 }
 
 
@@ -203,10 +230,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
   TLWCommunityCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:kCommunityCellID forIndexPath:indexPath];
   TLWCommunityPost *post = self.posts[indexPath.item];
-  // 本地发布帖子的高度不要再依赖真实宽高比计算，统一使用固定比例
-//  if (post.imageAspectRatio <= 0.0) {
-//    post.imageAspectRatio = 0.65;
-//  }
+
   if (indexPath.row == 0) {
     post.imageAspectRatio = 0.60;
   } else {
@@ -227,7 +251,8 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
   TLWPostDetailController *detailVC = [[TLWPostDetailController alloc] init];
   NSLog(@"post:%@", post.content);
   NSLog(@"post.favcount = %@", post.favoriteCount);
-  detailVC.post = post;
+  detailVC._id = post._id;
+  detailVC.hasCollectedPosts = self.collectePosts;
   detailVC.hidesBottomBarWhenPushed = YES;
   [self.navigationController pushViewController:detailVC animated:YES];
 }
@@ -256,6 +281,14 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 
 - (void)tl_voiceButtonTapped {
   TLWVoiceInputViewController *vc = [[TLWVoiceInputViewController alloc] init];
+  vc.initialSearchText = self.myView.searchTextField.text;
+  __weak typeof(self) weakSelf = self;
+  vc.onSearchTextChanged = ^(NSString *text) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+    strongSelf.myView.searchTextField.text = text;
+    [strongSelf.myView.searchTextField sendActionsForControlEvents:UIControlEventEditingChanged];
+  };
   vc.modalPresentationStyle = UIModalPresentationFullScreen;
   [self presentViewController:vc animated:YES completion:nil];
 }
@@ -304,13 +337,130 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 - (void)textFieldDidBeginEditing:(UITextField *)textField {
   // 直接点击输入框时，同样展示毛玻璃搜索面板
   [self.myView tl_showSearchOverlay];
+  [self tl_requestSuggestionsForQuery:textField.text ?: @""];
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
   // 这里可以触发真正的搜索事件，暂时只收起页面
   [textField resignFirstResponder];
+  [self tl_clearSuggestionList];
   [self.myView tl_hideSearchOverlay];
   return YES;
+}
+
+#pragma mark - Search Suggestions
+
+- (void)tl_searchTextChanged:(UITextField *)textField {
+  [self tl_requestSuggestionsForQuery:textField.text ?: @""];
+}
+
+- (void)tl_requestSuggestionsForQuery:(NSString *)query {
+  NSString *trimmedQuery = [query stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  self.pendingSuggestionQuery = trimmedQuery ?: @"";
+  [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(tl_fetchSuggestionsNow:) object:nil];
+
+  if (self.pendingSuggestionQuery.length == 0) {
+    [self.suggestionTask cancel];
+    self.suggestionTask = nil;
+    [self tl_clearSuggestionList];
+    return;
+  }
+
+  [self performSelector:@selector(tl_fetchSuggestionsNow:) withObject:self.pendingSuggestionQuery afterDelay:0.2];
+}
+
+- (void)tl_fetchSuggestionsNow:(NSString *)query {
+  NSLog(@"之行词条搜索");
+
+  if (query.length == 0) {
+    [self tl_clearSuggestionList];
+    return;
+  }
+
+  self.suggestionRequestToken += 1;
+  NSInteger requestToken = self.suggestionRequestToken;
+  [self.suggestionTask cancel];
+
+  __weak typeof(self) weakSelf = self;
+  self.suggestionTask = [[TLWSDKManager shared] getSuggestionsWithQ:query completionHandler:^(AGResultListString *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf || requestToken != strongSelf.suggestionRequestToken) {
+        return;
+      }
+
+      if ([error.domain isEqualToString:NSURLErrorDomain] && error.code == NSURLErrorCancelled) {
+        return;
+      }
+
+      if (error || !output || output.code.integerValue != 200) {
+        if (!error && output.code.integerValue == 401) {
+          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [strongSelf tl_requestSuggestionsForQuery:query];
+          }];
+          return;
+        }
+        [strongSelf tl_clearSuggestionList];
+        return;
+      }
+
+      NSString *currentQuery = [strongSelf.myView.searchTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+      if (![currentQuery isEqualToString:query]) {
+        return;
+      }
+
+      NSArray<NSString *> *rawItems = output.data ?: @[];
+      NSMutableOrderedSet<NSString *> *dedupedItems = [NSMutableOrderedSet orderedSet];
+      for (NSString *item in rawItems) {
+        if (![item isKindOfClass:[NSString class]]) {
+          continue;
+        }
+        NSString *trimmedItem = [item stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (trimmedItem.length > 0) {
+          [dedupedItems addObject:trimmedItem];
+        }
+      }
+
+      strongSelf.searchSuggestions = [[dedupedItems array] mutableCopy];
+      [strongSelf.myView.suggestionTableView reloadData];
+      [strongSelf.myView tl_setSuggestionListHidden:(strongSelf.searchSuggestions.count == 0) itemCount:strongSelf.searchSuggestions.count];
+    });
+  }];
+}
+
+- (void)tl_clearSuggestionList {
+  [self.searchSuggestions removeAllObjects];
+  [self.myView.suggestionTableView reloadData];
+  [self.myView tl_setSuggestionListHidden:YES itemCount:0];
+}
+
+#pragma mark - UITableViewDataSource
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+  return self.searchSuggestions.count;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+  UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"TLWCommunitySuggestionCell" forIndexPath:indexPath];
+  cell.backgroundColor = [UIColor clearColor];
+  cell.selectionStyle = UITableViewCellSelectionStyleNone;
+  cell.textLabel.text = self.searchSuggestions[indexPath.row];
+  cell.textLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+  cell.textLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+  return cell;
+}
+
+#pragma mark - UITableViewDelegate
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+  if (indexPath.row >= self.searchSuggestions.count) {
+    return;
+  }
+  NSString *text = self.searchSuggestions[indexPath.row];
+  self.myView.searchTextField.text = text;
+  [self tl_clearSuggestionList];
+  [self.myView.searchTextField resignFirstResponder];
+  [self.myView tl_hideSearchOverlay];
 }
 
 - (void)tl_updatePost:(NSNotification* )notification {
@@ -371,6 +521,7 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
                 if (p.isLocalPending) {
                   p.isLocalPending = NO;
                   p._id = dto._id;
+                  p.images = urls;
                   p.likeCount = @0;
                   p.favoriteCount = @0;
                   pendingIndex = i;
@@ -457,4 +608,3 @@ static NSString *const kCommunityCellID = @"TLWCommunityCell";
 }
 
 @end
-

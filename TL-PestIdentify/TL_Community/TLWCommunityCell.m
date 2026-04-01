@@ -226,6 +226,7 @@
   self.titleLabel.text = post.title.length > 0 ? post.title : post.content;
   self.userLabel.text = post.authorName;
   self.likeLabel.text = [NSString stringWithFormat:@"%@", post.likeCount];
+  
 
   // 本地发布中：显示毛玻璃遮罩；上传完成后隐藏
   self.pendingBlurView.hidden = !post.isLocalPending;
