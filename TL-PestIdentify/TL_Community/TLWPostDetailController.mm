@@ -182,6 +182,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
   CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
   [self.headerView configureWithPost:post];
+  [self applyLikedUI:post.isLiked count:post.likeCount.integerValue];
   CGFloat finalH = [TLWPostDetailHeaderView heightForPost:post];
   self.headerView.frame = CGRectMake(0, 0, screenW, finalH);
   self.tableView.tableHeaderView = self.headerView;
@@ -351,6 +352,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   post.authorName = dto.authorName ?: @"";
   post.authorAvatar = dto.authorAvatar ?: @"";
   post.likeCount = dto.likeCount ?: @0;
+  post.isLiked = dto.isLiked.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
   post.isLiked = dto.isLiked;
   post.isFavorited = dto.isFavorited;
@@ -531,6 +533,16 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   : [UIColor colorWithWhite:0.45 alpha:1.0];
 }
 
+- (void)applyLikedUI:(BOOL)isLiked count:(NSInteger)count {
+  self.headerView.isLiked = isLiked;
+  NSString *imageName = isLiked ? @"cp_isLiked-2.png" : @"cp_isLiked-1.png";
+  [self.headerView.likeButton setImage:[UIImage imageNamed:imageName] forState:UIControlStateNormal];
+  self.headerView.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
+  self.headerView.likedCountLabel.textColor = isLiked
+  ? [UIColor colorWithRed:1.0 green:0.30 blue:0.30 alpha:1.0]
+  : [UIColor colorWithWhite:0.45 alpha:1.0];
+}
+
 - (void)collectTapped:(UIButton *)sender {
   NSNumber *postId = self.post._id ?: self._id;
   if (!postId) return;
@@ -559,21 +571,64 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 }
 
 - (void)likeTapped:(UIButton *)sender {
-  NSNumber *postId = self.post._id ?: self._id;
-  if (!postId) return;
+  if (!self.post._id) {
+    return;
+  }
 
-  BOOL isLiked = self.headerView.isLiked;
-  BOOL shouldLike = !isLiked;
-  NSInteger previousCount = [self.headerView.likedCountLabel.text integerValue];
-  NSInteger optimisticCount = shouldLike ? previousCount + 1 : MAX(0, previousCount - 1);
-  [self applyLikedUI:shouldLike count:optimisticCount];
   sender.enabled = NO;
+  BOOL isLiked = self.headerView.isLiked;
+  NSInteger previousCount = [self.headerView.likedCountLabel.text integerValue];
+  __weak typeof(self) weakSelf = self;
 
-  [self submitLikeTargetState:shouldLike
-                previousState:isLiked
-                previousCount:previousCount
-              optimisticCount:optimisticCount
-                       sender:sender];
+  if (!isLiked) {
+    NSInteger optimisticCount = previousCount + 1;
+    [self applyLikedUI:YES count:optimisticCount];
+    [[TLWSDKManager shared] likePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        sender.enabled = YES;
+        if (error || !output || output.code.integerValue != 200) {
+          if (!error && output.code.integerValue == 401) {
+            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+              [strongSelf likeTapped:strongSelf.headerView.likeButton];
+            }];
+            return;
+          }
+          NSLog(@"[Like] 点赞失败: %@", error.localizedDescription ?: output.message);
+          [strongSelf applyLikedUI:NO count:previousCount];
+          return;
+        }
+        strongSelf.post.isLiked = YES;
+        strongSelf.post.likeCount = @(optimisticCount);
+        strongSelf.reloadPosts(strongSelf.post._id);
+      });
+    }];
+  } else {
+    NSInteger optimisticCount = MAX(0, previousCount - 1);
+    [self applyLikedUI:NO count:optimisticCount];
+    [[TLWSDKManager shared] unlikePostWithId:self.post._id completionHandler:^(AGResultVoid *output, NSError *error) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        sender.enabled = YES;
+        if (error || !output || output.code.integerValue != 200) {
+          if (!error && output.code.integerValue == 401) {
+            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+              [strongSelf likeTapped:strongSelf.headerView.likeButton];
+            }];
+            return;
+          }
+          NSLog(@"[Like] 取消点赞失败: %@", error.localizedDescription ?: output.message);
+          [strongSelf applyLikedUI:YES count:previousCount];
+          return;
+        }
+        strongSelf.post.isLiked = NO;
+        strongSelf.post.likeCount = @(optimisticCount);
+        strongSelf.reloadPosts(strongSelf.post._id);
+      });
+    }];
+  }
 
   [UIView animateWithDuration:0.12 animations:^{
     sender.transform = CGAffineTransformMakeScale(1.3, 1.3);

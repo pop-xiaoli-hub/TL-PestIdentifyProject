@@ -27,6 +27,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *title;
 /// 点赞数量
 @property (nonatomic, assign) NSNumber* likeCount;
+/// 当前用户是否已点赞
+@property (nonatomic, assign) BOOL isLiked;
 
 @property (nonatomic, assign) NSNumber* favoriteCount;
 /// 当前用户是否已点赞

@@ -11,128 +11,14 @@
 #import "TLWVoiceInputViewController.h"
 #import "TLWPublishController.h"
 #import "TLWPostDetailController.h"
+#import "TL_SearchResult/TLWSearchResultController.h"
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
 #import <Masonry/Masonry.h>
 #import "TLWDBManager.h"
+#import "TLWCommunitySuggestionCell.h"
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
 static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell";
-
-@interface TLWCommunitySuggestionCell : UITableViewCell
-
-- (void)tl_configureWithText:(NSString *)text showsDivider:(BOOL)showsDivider;
-
-@end
-
-@implementation TLWCommunitySuggestionCell {
-  UIView *_cardView;
-  UIView *_highlightView;
-  UIView *_dividerView;
-  UIImageView *_iconView;
-  UILabel *_titleLabel;
-}
-
-- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
-  self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
-  if (self) {
-    self.backgroundColor = [UIColor clearColor];
-    self.selectionStyle = UITableViewCellSelectionStyleNone;
-
-    UIView *selectedBackground = [[UIView alloc] init];
-    selectedBackground.backgroundColor = [UIColor clearColor];
-    self.selectedBackgroundView = selectedBackground;
-
-    UIView *cardView = [[UIView alloc] init];
-    cardView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.18];
-    cardView.layer.cornerRadius = 16.0;
-    cardView.layer.borderWidth = 1.0;
-    cardView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.36].CGColor;
-    cardView.layer.shadowColor = [UIColor colorWithRed:0.12 green:0.18 blue:0.31 alpha:0.14].CGColor;
-    cardView.layer.shadowOpacity = 1.0;
-    cardView.layer.shadowRadius = 12.0;
-    cardView.layer.shadowOffset = CGSizeMake(0, 6);
-    [self.contentView addSubview:cardView];
-    _cardView = cardView;
-
-    UIView *highlightView = [[UIView alloc] init];
-    highlightView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12];
-    highlightView.userInteractionEnabled = NO;
-    highlightView.layer.cornerRadius = 16.0;
-    [cardView addSubview:highlightView];
-    _highlightView = highlightView;
-
-    UIImage *iconImage = nil;
-    if (@available(iOS 13.0, *)) {
-      UIImageSymbolConfiguration *symbolConfig = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightSemibold];
-      iconImage = [UIImage systemImageNamed:@"magnifyingglass" withConfiguration:symbolConfig];
-    }
-    UIImageView *iconView = [[UIImageView alloc] initWithImage:iconImage];
-    iconView.tintColor = [UIColor colorWithRed:0.20 green:0.42 blue:0.94 alpha:0.95];
-    iconView.contentMode = UIViewContentModeScaleAspectFit;
-    [cardView addSubview:iconView];
-    _iconView = iconView;
-
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    titleLabel.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
-    [cardView addSubview:titleLabel];
-    _titleLabel = titleLabel;
-
-    UIView *dividerView = [[UIView alloc] init];
-    dividerView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.26];
-    [cardView addSubview:dividerView];
-    _dividerView = dividerView;
-
-    [_cardView mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.top.equalTo(self.contentView).offset(4);
-      make.bottom.equalTo(self.contentView).offset(-4);
-      make.left.right.equalTo(self.contentView);
-    }];
-
-    [_highlightView mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.top.left.right.equalTo(_cardView);
-      make.height.mas_equalTo(24);
-    }];
-
-    [_iconView mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.left.equalTo(_cardView).offset(14);
-      make.centerY.equalTo(_cardView);
-      make.width.height.mas_equalTo(16);
-    }];
-
-    [_titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.left.equalTo(_iconView.mas_right).offset(10);
-      make.centerY.equalTo(_cardView);
-      make.right.equalTo(_cardView).offset(-14);
-    }];
-
-    [_dividerView mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.left.equalTo(_titleLabel);
-      make.right.equalTo(_cardView).offset(-14);
-      make.bottom.equalTo(_cardView);
-      make.height.mas_equalTo(1);
-    }];
-  }
-  return self;
-}
-
-- (void)tl_configureWithText:(NSString *)text showsDivider:(BOOL)showsDivider {
-  _titleLabel.text = text;
-  _dividerView.hidden = !showsDivider;
-}
-
-- (void)setHighlighted:(BOOL)highlighted animated:(BOOL)animated {
-  [super setHighlighted:highlighted animated:animated];
-
-  CGFloat targetAlpha = highlighted ? 0.30 : 0.18;
-  UIColor *targetBorderColor = [UIColor colorWithWhite:1 alpha:(highlighted ? 0.52 : 0.36)];
-  [UIView animateWithDuration:(animated ? 0.18 : 0.0) animations:^{
-    _cardView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:targetAlpha];
-    _cardView.layer.borderColor = targetBorderColor.CGColor;
-  }];
-}
-
-@end
 
 @interface TLWCommunityController () <UICollectionViewDataSource, UICollectionViewDelegate, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate, UITableViewDataSource, UITableViewDelegate>
 
@@ -144,6 +30,10 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
 @property (nonatomic, strong, nullable) NSURLSessionTask *suggestionTask;
 @property (nonatomic, copy) NSString *pendingSuggestionQuery;
 @property (nonatomic, assign) NSInteger suggestionRequestToken;
+@property (nonatomic, copy) NSString *activeSearchQuery;
+@property (nonatomic, strong) NSArray<TLWCommunityPost *> *searchRecommendations;
+@property (nonatomic, strong) NSArray<NSString *> *searchKeywordSuggestions;
+@property (nonatomic, assign) BOOL isSearchingPosts;
 @end
 
 @implementation TLWCommunityController
@@ -178,6 +68,9 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
   self.posts = [NSMutableArray array];
   self.searchSuggestions = [NSMutableArray array];
   self.pendingSuggestionQuery = @"";
+  self.activeSearchQuery = @"";
+  self.searchRecommendations = @[];
+  self.searchKeywordSuggestions = @[];
   self.tl_isFetchingFeed = NO;
   [self tl_fetchCommunityFeed];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
@@ -260,10 +153,10 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
     if (!strongSelf) return;
 
     [sdk getAllPostsWithTag:nil
-                           q:nil
-                         page:@(pageIndex)
-                         size:@(pageSize)
-            completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
+                          q:nil
+                       page:@(pageIndex)
+                       size:@(pageSize)
+          completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
       __strong typeof(weakSelf) s = weakSelf;
       if (!s) return;
 
@@ -290,18 +183,7 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
       }
 
       for (AGPostResponseDto *dto in output.data.list) {
-        TLWCommunityPost *post = [TLWCommunityPost new];
-        post._id = dto._id;
-        post.title = dto.title ?: @"";
-        post.content = dto.content ?: @"";
-        post.images = dto.images ?: @[];
-        post.tags = dto.tags ?: @[];
-        post.authorName = dto.authorName ?: @"";
-        post.authorAvatar = dto.authorAvatar ?: @"";
-        post.likeCount = dto.likeCount ?: @0;
-        post.favoriteCount = dto.favoriteCount ?: @0;
-        post.isLiked = dto.isLiked;
-        post.isFavorited = dto.isFavorited;
+        TLWCommunityPost *post = [s tl_postFromDto:dto];
         NSLog(@"点赞数 : %@", post.likeCount);
         NSLog(@"收藏数 : %@", post.likeCount);
         // imageAspectRatio 由瀑布流代理方法按行规则统一设置
@@ -345,6 +227,159 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
   fetchPageBlock(0);
 }
 
+- (TLWCommunityPost *)tl_postFromDto:(AGPostResponseDto *)dto {
+  if (!dto) {
+    return nil;
+  }
+
+  TLWCommunityPost *post = [TLWCommunityPost new];
+  post._id = dto._id;
+  post.title = dto.title ?: @"";
+  post.content = dto.content ?: @"";
+  post.images = dto.images ?: @[];
+  post.tags = dto.tags ?: @[];
+  post.authorName = dto.authorName ?: @"";
+  post.authorAvatar = dto.authorAvatar ?: @"";
+  post.likeCount = dto.likeCount ?: @0;
+  post.isLiked = dto.isLiked.boolValue;
+  post.favoriteCount = dto.favoriteCount ?: @0;
+  return post;
+}
+
+- (NSArray<TLWCommunityPost *> *)tl_postsFromDtoList:(NSArray<AGPostResponseDto *> *)dtoList {
+  NSMutableArray<TLWCommunityPost *> *posts = [NSMutableArray array];
+  for (AGPostResponseDto *dto in dtoList ?: @[]) {
+    TLWCommunityPost *post = [self tl_postFromDto:dto];
+    if (post) {
+      [posts addObject:post];
+    }
+  }
+  return [posts copy];
+}
+
+- (void)tl_reloadPostWithId:(NSNumber *)postId {
+  if (postId == nil) {
+    return;
+  }
+
+  __weak typeof(self) weakSelf = self;
+  [[TLWSDKManager shared] getPostDetailWithId:postId completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) return;
+
+      if (error || !output || output.code.integerValue != 200 || !output.data) {
+        if (!error && output.code.integerValue == 401) {
+          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [strongSelf tl_reloadPostWithId:postId];
+          }];
+          return;
+        }
+        NSLog(@"[Community] 回刷帖子失败: %@", error.localizedDescription ?: output.message);
+        return;
+      }
+
+      NSInteger targetIndex = NSNotFound;
+      for (NSInteger i = 0; i < strongSelf.posts.count; i++) {
+        TLWCommunityPost *post = strongSelf.posts[i];
+        if ([post._id isEqualToNumber:postId]) {
+          targetIndex = i;
+          break;
+        }
+      }
+
+      if (targetIndex == NSNotFound) {
+        return;
+      }
+
+      TLWCommunityPost *updatedPost = [strongSelf tl_postFromDto:output.data];
+      TLWCommunityPost *oldPost = strongSelf.posts[targetIndex];
+      updatedPost.imageAspectRatio = oldPost.imageAspectRatio;
+      updatedPost.isLocalPending = oldPost.isLocalPending;
+      strongSelf.posts[targetIndex] = updatedPost;
+
+      NSIndexPath *indexPath = [NSIndexPath indexPathForItem:targetIndex inSection:0];
+      if ([[strongSelf.myView.collectionView indexPathsForVisibleItems] containsObject:indexPath]) {
+        [strongSelf.myView.collectionView reloadItemsAtIndexPaths:@[ indexPath ]];
+      } else {
+        [strongSelf.myView.collectionView reloadData];
+      }
+    });
+  }];
+}
+
+- (void)tl_executeSearchWithQuery:(NSString *)query {
+  NSString *trimmedQuery = [query stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  self.myView.searchTextField.text = trimmedQuery;
+
+  if (trimmedQuery.length == 0) {
+    self.activeSearchQuery = @"";
+    self.searchRecommendations = @[];
+    self.searchKeywordSuggestions = @[];
+    [self tl_clearSuggestionList];
+    [self.myView.searchTextField resignFirstResponder];
+    [self.myView tl_hideSearchOverlay];
+    [self tl_fetchCommunityFeed];
+    return;
+  }
+
+  if (self.isSearchingPosts) {
+    return;
+  }
+
+  self.isSearchingPosts = YES;
+  self.activeSearchQuery = trimmedQuery;
+  [self.suggestionTask cancel];
+  self.suggestionTask = nil;
+  [self tl_clearSuggestionList];
+
+  __weak typeof(self) weakSelf = self;
+  [[TLWSDKManager shared] searchPostsWithQ:trimmedQuery page:@0 size:@20 completionHandler:^(AGResultSearchResultResponse *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) return;
+      strongSelf.isSearchingPosts = NO;
+
+      if (error || !output || output.code.integerValue != 200 || !output.data) {
+        if (!error && output.code.integerValue == 401) {
+          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [strongSelf tl_executeSearchWithQuery:trimmedQuery];
+          }];
+          return;
+        }
+        NSLog(@"[Community] 搜索失败: %@", error.localizedDescription ?: output.message);
+        [TLWToast show:(output.message.length > 0 ? output.message : @"搜索失败，请稍后重试")];
+        return;
+      }
+
+      NSString *currentQuery = [strongSelf.myView.searchTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+      if (![currentQuery isEqualToString:trimmedQuery]) {
+        return;
+      }
+
+      strongSelf.activeSearchQuery = trimmedQuery;
+      strongSelf.searchRecommendations = [strongSelf tl_postsFromDtoList:output.data.recommendations];
+      strongSelf.searchKeywordSuggestions = output.data.suggestions ?: @[];
+
+      NSArray<TLWCommunityPost *> *matchedPosts = [strongSelf tl_postsFromDtoList:output.data.matches.list];
+      [strongSelf.myView.searchTextField resignFirstResponder];
+      [strongSelf.myView tl_hideSearchOverlay];
+
+      TLWSearchResultController *resultVC = [[TLWSearchResultController alloc] init];
+      resultVC.queryText = trimmedQuery;
+      resultVC.posts = [matchedPosts mutableCopy];
+      resultVC.recommendations = strongSelf.searchRecommendations;
+      resultVC.keywordSuggestions = strongSelf.searchKeywordSuggestions;
+      resultVC.hasCollectedPosts = strongSelf.collectePosts;
+
+      UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:resultVC];
+      nav.modalPresentationStyle = UIModalPresentationFullScreen;
+      nav.navigationBarHidden = YES;
+      [strongSelf presentViewController:nav animated:YES completion:nil];
+    });
+  }];
+}
+
 #pragma mark - UICollectionViewDataSource
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
@@ -376,6 +411,14 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
   NSLog(@"post:%@", post.content);
   NSLog(@"post.favcount = %@", post.favoriteCount);
   detailVC._id = post._id;
+  detailVC.post = post;
+  __weak typeof(self) weakSelf = self;
+  detailVC.reloadPosts = ^(NSNumber * _Nonnull postId) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+    NSLog(@"重新拉取帖子详情并刷新社区页: %@", postId);
+    [strongSelf tl_reloadPostWithId:postId];
+  };
   detailVC.hasCollectedPosts = self.collectePosts;
   detailVC.hidesBottomBarWhenPushed = YES;
   [self.navigationController pushViewController:detailVC animated:YES];
@@ -449,8 +492,8 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
       [strongSelf.myView.collectionView insertItemsAtIndexPaths:@[indexPath]];
     } completion:^(BOOL finished) {
       [strongSelf.myView.collectionView scrollToItemAtIndexPath:indexPath
-                                              atScrollPosition:UICollectionViewScrollPositionTop
-                                                      animated:YES];
+                                               atScrollPosition:UICollectionViewScrollPositionTop
+                                                       animated:YES];
     }];
   };
   [self presentViewController:vc animated:YES completion:nil];
@@ -465,10 +508,7 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
-  // 这里可以触发真正的搜索事件，暂时只收起页面
-  [textField resignFirstResponder];
-  [self tl_clearSuggestionList];
-  [self.myView tl_hideSearchOverlay];
+  [self tl_executeSearchWithQuery:textField.text ?: @""];
   return YES;
 }
 
@@ -494,7 +534,7 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
 }
 
 - (void)tl_fetchSuggestionsNow:(NSString *)query {
-  NSLog(@"之行词条搜索");
+  NSLog(@"执行词条搜索");
 
   if (query.length == 0) {
     [self tl_clearSuggestionList];
@@ -573,15 +613,32 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
 
 #pragma mark - UITableViewDelegate
 
+/*
+ TLWCommunityPost *post = self.posts[indexPath.item];
+ TLWPostDetailController *detailVC = [[TLWPostDetailController alloc] init];
+ NSLog(@"post:%@", post.content);
+ NSLog(@"post.favcount = %@", post.favoriteCount);
+ detailVC._id = post._id;
+ detailVC.post = post;
+ __weak typeof(self) weakSelf = self;
+ detailVC.reloadPosts = ^(NSNumber * _Nonnull postId) {
+   __strong typeof(weakSelf) strongSelf = weakSelf;
+   if (!strongSelf) return;
+   NSLog(@"重新拉取帖子详情并刷新社区页: %@", postId);
+   [strongSelf tl_reloadPostWithId:postId];
+ };
+ detailVC.hasCollectedPosts = self.collectePosts;
+ detailVC.hidesBottomBarWhenPushed = YES;
+ [self.navigationController pushViewController:detailVC animated:YES];
+
+ */
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
   if (indexPath.row >= self.searchSuggestions.count) {
     return;
   }
   NSString *text = self.searchSuggestions[indexPath.row];
-  self.myView.searchTextField.text = text;
-  [self tl_clearSuggestionList];
-  [self.myView.searchTextField resignFirstResponder];
-  [self.myView tl_hideSearchOverlay];
+  [self tl_executeSearchWithQuery:text];
 }
 
 - (void)tl_updatePost:(NSNotification* )notification {
@@ -592,68 +649,68 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
   [manager uploadImages:dict[@"images"] prefix:@"post" completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable error) {
     __strong typeof(weakSelf) strongSelf = weakSelf;
     NSLog(@"1");
-      if (!strongSelf) {
-        NSLog(@"2");
-        return;
-      }
-      if (error) {
-        NSLog(@"3");
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"上传图片失败" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-        [strongSelf presentViewController:alert animated:YES completion:nil];
-        return;
-      }
+    if (!strongSelf) {
+      NSLog(@"2");
+      return;
+    }
+    if (error) {
+      NSLog(@"3");
+      UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"上传图片失败" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
+      [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+      [strongSelf presentViewController:alert animated:YES completion:nil];
+      return;
+    }
     NSLog(@"4");
-      AGPostCreateRequest* request = [[AGPostCreateRequest alloc] init];
-      request.title = content.length > 12 ? [content substringToIndex:12] : content;
-      request.content = [content copy];
-      request.images = urls ?: @[];
-      request.tags = [dict[@"crops"] copy] ?: @[];
-      NSLog(@"图片url已获取");
+    AGPostCreateRequest* request = [[AGPostCreateRequest alloc] init];
+    request.title = content.length > 12 ? [content substringToIndex:12] : content;
+    request.content = [content copy];
+    request.images = urls ?: @[];
+    request.tags = [dict[@"crops"] copy] ?: @[];
+    NSLog(@"图片url已获取");
     NSLog(@"strongSelf: %@", strongSelf);
     [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-              NSLog(@"5");
-              if (output.code.integerValue != 200) {
-                if (output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
-                        [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *r, NSError *e) {
-                            dispatch_async(dispatch_get_main_queue(), ^{
-                                [TLWToast show:(r.code.integerValue == 200) ? @"帖子发布成功" : @"帖子发送失败"];
-                            });
-                        }];
-                    }];
-                    return;
-                }
-                NSLog(@"6");
-                [TLWToast show:@"帖子发送失败"];
-                NSLog(@"帖子发布失败");
-                return;
-              }
-              NSLog(@"7");
-              NSLog(@"帖子发布成功");
-              NSLog(@"strongSelf:%@", strongSelf);
-              [strongSelf tl_showTopToast:@"帖子发布成功"];
-              // 上传成功：找到本地发布中的帖子，清除 pending 标记并刷新对应 cell
-              NSInteger pendingIndex = NSNotFound;
-              AGPostResponseDto* dto = output.data;
-              for (NSInteger i = 0; i < (NSInteger)strongSelf.posts.count; i++) {
-                TLWCommunityPost *p = strongSelf.posts[i];
-                if (p.isLocalPending) {
-                  p.isLocalPending = NO;
-                  p._id = dto._id;
-                  p.images = urls;
-                  p.likeCount = @0;
-                  p.favoriteCount = @0;
-                  pendingIndex = i;
-                  break;
-                }
-              }
-              if (pendingIndex != NSNotFound) {
-                NSIndexPath *ip = [NSIndexPath indexPathForItem:pendingIndex inSection:0];
-                [strongSelf.myView.collectionView reloadItemsAtIndexPaths:@[ip]];
-              }
-            });
+      dispatch_async(dispatch_get_main_queue(), ^{
+        NSLog(@"5");
+        if (output.code.integerValue != 200) {
+          if (output.code.integerValue == 401) {
+            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+              [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *r, NSError *e) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  [TLWToast show:(r.code.integerValue == 200) ? @"帖子发布成功" : @"帖子发送失败"];
+                });
+              }];
+            }];
+            return;
+          }
+          NSLog(@"6");
+          [TLWToast show:@"帖子发送失败"];
+          NSLog(@"帖子发布失败");
+          return;
+        }
+        NSLog(@"7");
+        NSLog(@"帖子发布成功");
+        NSLog(@"strongSelf:%@", strongSelf);
+        [strongSelf tl_showTopToast:@"帖子发布成功"];
+        // 上传成功：找到本地发布中的帖子，清除 pending 标记并刷新对应 cell
+        NSInteger pendingIndex = NSNotFound;
+        AGPostResponseDto* dto = output.data;
+        for (NSInteger i = 0; i < (NSInteger)strongSelf.posts.count; i++) {
+          TLWCommunityPost *p = strongSelf.posts[i];
+          if (p.isLocalPending) {
+            p.isLocalPending = NO;
+            p._id = dto._id;
+            p.images = urls;
+            p.likeCount = @0;
+            p.favoriteCount = @0;
+            pendingIndex = i;
+            break;
+          }
+        }
+        if (pendingIndex != NSNotFound) {
+          NSIndexPath *ip = [NSIndexPath indexPathForItem:pendingIndex inSection:0];
+          [strongSelf.myView.collectionView reloadItemsAtIndexPaths:@[ip]];
+        }
+      });
     }];
   }];
   NSLog(@"8");

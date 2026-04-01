@@ -202,6 +202,13 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
   return [self.api getSuggestionsWithQ:q completionHandler:handler];
 }
 
+- (NSURLSessionTask *)searchPostsWithQ:(NSString *)q
+                                  page:(NSNumber *)page
+                                  size:(NSNumber *)size
+                     completionHandler:(void (^)(AGResultSearchResultResponse * output, NSError * error))handler {
+  return [self.api searchPostsWithQ:q page:page size:size completionHandler:handler];
+}
+
 - (NSURLSessionTask *)getPostDetailWithId:(NSNumber *)_id
                         completionHandler:(void (^)(AGResultPostResponseDto * output, NSError * error))handler {
   return [self.api getPostDetailWithId:_id completionHandler:handler];
@@ -297,6 +304,14 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 - (NSURLSessionTask *)unfavoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
   return [self.api unfavoritePostWithId:_id completionHandler:handler];
+}
+
+- (NSURLSessionTask *)likePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
+  return [self.api likePostWithId:_id completionHandler:handler];
+}
+
+- (NSURLSessionTask *)unlikePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
+  return [self.api unlikePostWithId:_id completionHandler:handler];
 }
 
 - (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock {
