@@ -175,14 +175,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   CGFloat finalH = [TLWPostDetailHeaderView heightForPost:post];
   self.headerView.frame = CGRectMake(0, 0, screenW, finalH);
   self.tableView.tableHeaderView = self.headerView;
-  
-  for (AGPostResponseDto* dto in self.hasCollectedPosts) {
-    if ([post._id isEqualToNumber:dto._id]) {
-      [self applyCollectedUI:YES count:post.favoriteCount.integerValue];
-      return;
-    }
-  }
-  [self applyCollectedUI:NO count:post.favoriteCount.integerValue];
+  [self applyCollectedUI:post.isCollected count:post.favoriteCount.integerValue];
 }
 
 - (void)buildInputBar {
@@ -334,6 +327,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   post.authorAvatar = dto.authorAvatar ?: @"";
   post.likeCount = dto.likeCount ?: @0;
   post.isLiked = dto.isLiked.boolValue;
+  post.isCollected = dto.isFavorited.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
   post.imageAspectRatio = self.post.imageAspectRatio > 0 ? self.post.imageAspectRatio : (4.0 / 3.0);
   return post;
