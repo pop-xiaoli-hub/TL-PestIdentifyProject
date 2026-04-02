@@ -58,6 +58,9 @@
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
   // 点击在输入框/图片列表时，不触发“收起键盘”的 tap，避免吞掉子控件事件
+  if (touch.view == self.myView.titleTextField || [touch.view isDescendantOfView:self.myView.titleTextField]) {
+    return NO;
+  }
   if (touch.view == self.myView.contentTextView || [touch.view isDescendantOfView:self.myView.contentTextView]) {
     return NO;
   }
@@ -310,8 +313,9 @@
 
 #pragma mark-点击发布
 - (void)tl_confirmPublishTapped {
+  NSString *title = [self.myView.titleTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
   NSString* content = [self.myView.contentTextView.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-  if (!content.length && !self.selectedImages.count) {
+  if (!title.length || (!content.length && !self.selectedImages.count)) {
     UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"提示" message:@"请输入完整信息" preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
@@ -323,8 +327,8 @@
   AGUserProfileDto* userData = manager.cachedProfile;
   post.images = [NSArray arrayWithArray:self.selectedImages];
   post.authorName = [userData.username copy];
+  post.title = [title copy];
   post.content = [content copy];
-  post.title = content.length > 12 ? [content substringToIndex:12] : [content copy];
   post.authorAvatar = [userData.avatarUrl copy];
 
   if (self.clickPublish) {
@@ -333,6 +337,7 @@
   NSDictionary* userInfo = @{
     @"images" : self.selectedImages,
     @"crops" : self.selectedCrops,
+    @"title" : title,
     @"content" : content
   };
   [[NSNotificationCenter defaultCenter] postNotificationName:@"updatePost" object:self userInfo:userInfo];
