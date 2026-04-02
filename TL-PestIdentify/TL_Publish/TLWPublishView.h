@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIButton *backButton;
 @property (nonatomic, strong, readonly) UIButton *cropSelectButton;
 @property (nonatomic, strong, readonly) UICollectionView *cropsCollectionView;
+@property (nonatomic, strong, readonly) UITextField *titleTextField;
 @property (nonatomic, strong, readonly) UITextView *contentTextView;
 @property (nonatomic, strong, readonly) UIButton *addImageButton;
 @property (nonatomic, strong, readonly) UIButton *confirmPublishButton;
@@ -26,4 +27,3 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 NS_ASSUME_NONNULL_END
-

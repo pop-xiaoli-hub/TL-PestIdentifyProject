@@ -19,12 +19,18 @@
 #import "TLWCommunitySuggestionCell.h"
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
 static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell";
+static NSInteger const kCommunityFeedPageSize = 20;
+static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
 @interface TLWCommunityController () <UICollectionViewDataSource, UICollectionViewDelegate, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate, UITableViewDataSource, UITableViewDelegate>
 
 @property (nonatomic, strong) TLWCommunityView *myView;
 @property (nonatomic, strong) NSMutableArray *posts;
 @property (nonatomic, assign) BOOL tl_isFetchingFeed;
+@property (nonatomic, assign) NSInteger currentFeedPage;
+@property (nonatomic, assign) BOOL hasMoreFeed;
+@property (nonatomic, strong) UIRefreshControl *refreshControl;
+@property (nonatomic, assign) NSInteger feedRequestToken;
 @property (nonatomic, strong) NSMutableArray* collectePosts;
 @property (nonatomic, strong) NSMutableArray<NSString *> *searchSuggestions;
 @property (nonatomic, strong, nullable) NSURLSessionTask *suggestionTask;
@@ -65,6 +71,10 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
   self.myView.suggestionTableView.delegate = self;
   [self.myView.suggestionTableView registerClass:[TLWCommunitySuggestionCell class] forCellReuseIdentifier:kCommunitySuggestionCellID];
   [self.myView.voiceButton addTarget:self action:@selector(tl_voiceButtonTapped) forControlEvents:UIControlEventTouchUpInside];
+  UIRefreshControl *refreshControl = [[UIRefreshControl alloc] init];
+  [refreshControl addTarget:self action:@selector(tl_handlePullToRefresh) forControlEvents:UIControlEventValueChanged];
+  self.myView.collectionView.refreshControl = refreshControl;
+  self.refreshControl = refreshControl;
   self.posts = [NSMutableArray array];
   self.searchSuggestions = [NSMutableArray array];
   self.pendingSuggestionQuery = @"";
@@ -72,6 +82,9 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
   self.searchRecommendations = @[];
   self.searchKeywordSuggestions = @[];
   self.tl_isFetchingFeed = NO;
+  self.currentFeedPage = -1;
+  self.hasMoreFeed = YES;
+  self.feedRequestToken = 0;
   [self tl_fetchCommunityFeed];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
 }
@@ -129,102 +142,85 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
 
 /// TODO: 接口接入后替换内部实现，保持方法签名不变，方便全局调用
 - (void)tl_fetchCommunityFeed {
+  self.currentFeedPage = -1;
+  self.hasMoreFeed = YES;
+  [self tl_fetchNextCommunityPage];
+}
+
+- (void)tl_fetchNextCommunityPage {
   if (self.tl_isFetchingFeed) {
+    return;
+  }
+  if (!self.hasMoreFeed) {
     return;
   }
   self.tl_isFetchingFeed = YES;
 
-  // 先清空，让用户立刻看到刷新反馈
-  self.posts = [NSMutableArray array];
-  dispatch_async(dispatch_get_main_queue(), ^{
-    [self.myView.collectionView reloadData];
-  });
-
   TLWSDKManager *sdk = [TLWSDKManager shared];
-  NSInteger pageSize = 20; // 一次拉取多少条
-  NSInteger maxPages = 50; // 安全兜底：避免 hasNext 异常导致无限请求
-
-  NSMutableArray<TLWCommunityPost *> *accumulator = [NSMutableArray array];
+  NSInteger nextPage = self.currentFeedPage + 1;
+  self.feedRequestToken += 1;
+  NSInteger requestToken = self.feedRequestToken;
   __weak typeof(self) weakSelf = self;
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kCommunityRefreshTimeout * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+    if (requestToken != strongSelf.feedRequestToken) return;
+    if (!strongSelf.tl_isFetchingFeed) return;
 
-  __block void (^fetchPageBlock)(NSInteger pageIndex);
-  fetchPageBlock = ^(NSInteger pageIndex) {
+    strongSelf.feedRequestToken += 1;
+    strongSelf.tl_isFetchingFeed = NO;
+    [strongSelf.refreshControl endRefreshing];
+    NSLog(@"[Community] page=%ld 请求超时，保持当前帖子列表不变", (long)nextPage);
+  });
+  [sdk getAllPostsWithTag:nil
+                        q:nil
+                     page:@(nextPage)
+                     size:@(kCommunityFeedPageSize)
+        completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf) return;
 
-    [sdk getAllPostsWithTag:nil
-                          q:nil
-                       page:@(pageIndex)
-                       size:@(pageSize)
-          completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
-      __strong typeof(weakSelf) s = weakSelf;
-      if (!s) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (requestToken != strongSelf.feedRequestToken) {
+        return;
+      }
+      strongSelf.tl_isFetchingFeed = NO;
+      [strongSelf.refreshControl endRefreshing];
 
       NSLog(@"[Community] page=%ld error=%@ code=%@ message=%@ listCount=%lu",
-            (long)pageIndex, error, output.code, output.message,
+            (long)nextPage, error, output.code, output.message,
             (unsigned long)output.data.list.count);
 
       if (error || !output || !output.data.list) {
         NSLog(@"[Community] 拉取失败: error=%@, output=%@", error, output);
-        fetchPageBlock = nil; // 打破 block 循环引用
-        dispatch_async(dispatch_get_main_queue(), ^{
-          s.tl_isFetchingFeed = NO;
-          // 合并本地发布的 item，避免分页完成时覆盖掉刚发布的帖子
-          NSMutableArray<TLWCommunityPost *> *merged = [accumulator mutableCopy];
-          for (TLWCommunityPost *localPost in s.posts) {
-            if (![accumulator containsObject:localPost]) {
-              [merged addObject:localPost];
-            }
-          }
-          s.posts = merged;
-          [s.myView.collectionView reloadData];
-        });
         return;
       }
 
-      for (AGPostResponseDto *dto in output.data.list) {
-        TLWCommunityPost *post = [s tl_postFromDto:dto];
-        NSLog(@"点赞数 : %@", post.likeCount);
-        NSLog(@"收藏数 : %@", post.likeCount);
-        // imageAspectRatio 由瀑布流代理方法按行规则统一设置
-        [accumulator addObject:post];
-      }
-
-      // 逐页渲染，减少“空白等待”感
-      dispatch_async(dispatch_get_main_queue(), ^{
-        // 合并本地发布的 item，避免分页刷新覆盖掉刚发布的帖子
-        NSMutableArray<TLWCommunityPost *> *merged = [accumulator mutableCopy];
-        for (TLWCommunityPost *localPost in s.posts) {
-          if (![accumulator containsObject:localPost]) {
-            [merged addObject:localPost];
-          }
+      NSArray<TLWCommunityPost *> *newPosts = [strongSelf tl_postsFromDtoList:output.data.list];
+      NSMutableArray<TLWCommunityPost *> *localPendingPosts = [NSMutableArray array];
+      for (TLWCommunityPost *post in strongSelf.posts) {
+        if (post.isLocalPending) {
+          [localPendingPosts addObject:post];
         }
-        s.posts = merged;
-        [s.myView.collectionView reloadData];
-      });
-
-      BOOL hasNext = output.data.hasNext.boolValue;
-      if (hasNext && pageIndex + 1 < maxPages) {
-        fetchPageBlock(pageIndex + 1);
-      } else {
-        fetchPageBlock = nil; // 打破 block 循环引用
-        dispatch_async(dispatch_get_main_queue(), ^{
-          s.tl_isFetchingFeed = NO;
-          // 合并本地发布的 item，避免最终结果覆盖掉刚发布的帖子
-          NSMutableArray<TLWCommunityPost *> *merged = [accumulator mutableCopy];
-          for (TLWCommunityPost *localPost in s.posts) {
-            if (![accumulator containsObject:localPost]) {
-              [merged addObject:localPost];
-            }
-          }
-          s.posts = merged;
-          [s.myView.collectionView reloadData];
-        });
       }
-    }];
-  };
 
-  fetchPageBlock(0);
+      if (nextPage == 0) {
+        strongSelf.posts = [NSMutableArray arrayWithArray:localPendingPosts];
+      }
+      [strongSelf.posts addObjectsFromArray:newPosts];
+      strongSelf.currentFeedPage = nextPage;
+      strongSelf.hasMoreFeed = output.data.hasNext.boolValue;
+      [strongSelf.myView.collectionView reloadData];
+    });
+  }];
+}
+
+- (void)tl_handlePullToRefresh {
+  if (self.activeSearchQuery.length > 0 || self.tl_isFetchingFeed) {
+    [self.refreshControl endRefreshing];
+    return;
+  }
+  [self tl_fetchCommunityFeed];
 }
 
 - (TLWCommunityPost *)tl_postFromDto:(AGPostResponseDto *)dto {
@@ -310,10 +306,10 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
 }
 
 - (void)tl_executeSearchWithQuery:(NSString *)query {
-  NSString *trimmedQuery = [query stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-  self.myView.searchTextField.text = trimmedQuery;
+  NSString *trimmedQuery = [query stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];//取出输入前后的空格、换行
+  self.myView.searchTextField.text = trimmedQuery;//将清理后的值重新写回输入框
 
-  if (trimmedQuery.length == 0) {
+  if (trimmedQuery.length == 0) {//用户没有输入有效的词汇，推出搜索态
     self.activeSearchQuery = @"";
     self.searchRecommendations = @[];
     self.searchKeywordSuggestions = @[];
@@ -324,11 +320,12 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
     return;
   }
 
+  //防止重复的进行请求搜索
   if (self.isSearchingPosts) {
     return;
   }
 
-  self.isSearchingPosts = YES;
+  self.isSearchingPosts = YES;//进入请求态
   self.activeSearchQuery = trimmedQuery;
   [self.suggestionTask cancel];
   self.suggestionTask = nil;
@@ -343,6 +340,7 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
 
       if (error || !output || output.code.integerValue != 200 || !output.data) {
         if (!error && output.code.integerValue == 401) {
+          //鉴权过期失败重试
           [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
             [strongSelf tl_executeSearchWithQuery:trimmedQuery];
           }];
@@ -353,6 +351,7 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
         return;
       }
 
+      //如果发现用户当前搜索框的keyword与网申返回结果的keyword不同的话，判断无效，异步结果防干扰
       NSString *currentQuery = [strongSelf.myView.searchTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
       if (![currentQuery isEqualToString:trimmedQuery]) {
         return;
@@ -436,6 +435,26 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
     post.imageAspectRatio = 0.75;
   }
   return [post cellHeightForWidth:width];
+}
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+  if (scrollView != self.myView.collectionView) {
+    return;
+  }
+  if (self.activeSearchQuery.length > 0) {
+    return;
+  }
+
+  CGFloat contentHeight = scrollView.contentSize.height;
+  CGFloat visibleHeight = CGRectGetHeight(scrollView.bounds);
+  CGFloat offsetY = scrollView.contentOffset.y;
+  if (contentHeight <= 0 || visibleHeight <= 0) {
+    return;
+  }
+
+  if (offsetY > contentHeight - visibleHeight - 120.0) {
+    [self tl_fetchNextCommunityPage];
+  }
 }
 
 #pragma mark - Lazy
@@ -646,6 +665,7 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
   __weak typeof(self) weakSelf = self;
   TLWSDKManager* manager = [TLWSDKManager shared];
   NSDictionary* dict = notification.userInfo;
+  NSString* title = dict[@"title"];
   NSString* content = dict[@"content"];
   [manager uploadImages:dict[@"images"] prefix:@"post" completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable error) {
     __strong typeof(weakSelf) strongSelf = weakSelf;
@@ -663,7 +683,7 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
     }
     NSLog(@"4");
     AGPostCreateRequest* request = [[AGPostCreateRequest alloc] init];
-    request.title = content.length > 12 ? [content substringToIndex:12] : content;
+    request.title = [title copy];
     request.content = [content copy];
     request.images = urls ?: @[];
     request.tags = [dict[@"crops"] copy] ?: @[];

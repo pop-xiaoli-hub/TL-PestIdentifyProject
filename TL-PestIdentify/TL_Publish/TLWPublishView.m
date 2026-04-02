@@ -13,12 +13,14 @@ static CGFloat const kCardCornerRadius = 14.0;
 @property (nonatomic, strong, readwrite) UIButton *backButton;
 @property (nonatomic, strong, readwrite) UIButton *cropSelectButton;
 @property (nonatomic, strong, readwrite) UICollectionView *cropsCollectionView;
+@property (nonatomic, strong, readwrite) UITextField *titleTextField;
 @property (nonatomic, strong, readwrite) UITextView *contentTextView;
 @property (nonatomic, strong, readwrite) UIButton *addImageButton;
 @property (nonatomic, strong, readwrite) UIButton *confirmPublishButton;
 @property (nonatomic, strong, readwrite) UICollectionView *imagesCollectionView;
 
 @property (nonatomic, strong) UIView *topCardView;
+@property (nonatomic, strong) UIView *titleCardView;
 @property (nonatomic, strong) UILabel *cropPlaceholderLabel;
 @property (nonatomic, strong) UIButton *cropArrowButton;
 
@@ -99,10 +101,13 @@ static CGFloat const kCardCornerRadius = 14.0;
 
 - (void)tl_setupCards {
   UIView *topCard = [self tl_cardContainer];
+  UIView *titleCard = [self tl_cardContainer];
   UIView *middleCard = [self tl_cardContainer];
   [self addSubview:topCard];
+  [self addSubview:titleCard];
   [self addSubview:middleCard];
   self.topCardView = topCard;
+  self.titleCardView = titleCard;
   self.middleCardView = middleCard;
 
   [topCard mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -112,8 +117,14 @@ static CGFloat const kCardCornerRadius = 14.0;
     make.height.mas_equalTo(72);
   }];
 
-  [middleCard mas_makeConstraints:^(MASConstraintMaker *make) {
+  [titleCard mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(topCard.mas_bottom).offset(16);
+    make.left.right.equalTo(topCard);
+    make.height.mas_equalTo(112);
+  }];
+
+  [middleCard mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(titleCard.mas_bottom).offset(16);
     make.left.right.equalTo(topCard);
     make.height.mas_equalTo(500);
   }];
@@ -168,6 +179,38 @@ static CGFloat const kCardCornerRadius = 14.0;
 
   [cropsCollectionView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.edges.equalTo(topCard);
+  }];
+
+  UILabel *titleCardLabel = [[UILabel alloc] init];
+  titleCardLabel.text = @"请填写帖子标题";
+  titleCardLabel.font = [UIFont systemFontOfSize:20];
+  titleCardLabel.textColor = [UIColor darkTextColor];
+  [titleCard addSubview:titleCardLabel];
+
+  UITextField *titleTextField = [[UITextField alloc] init];
+  titleTextField.placeholder = @"请输入一个简洁明确的标题";
+  titleTextField.font = [UIFont systemFontOfSize:17];
+  titleTextField.textColor = [UIColor darkTextColor];
+  titleTextField.clearButtonMode = UITextFieldViewModeWhileEditing;
+  titleTextField.backgroundColor = [[UIColor lightGrayColor] colorWithAlphaComponent:0.18];
+  titleTextField.layer.cornerRadius = 10.0;
+  titleTextField.layer.masksToBounds = YES;
+  UIView *paddingView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 14, 1)];
+  titleTextField.leftView = paddingView;
+  titleTextField.leftViewMode = UITextFieldViewModeAlways;
+  [titleCard addSubview:titleTextField];
+  self.titleTextField = titleTextField;
+
+  [titleCardLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(titleCard).offset(22);
+    make.left.equalTo(titleCard).offset(12);
+  }];
+
+  [titleTextField mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(titleCardLabel.mas_bottom).offset(18);
+    make.left.equalTo(titleCard).offset(12);
+    make.right.equalTo(titleCard).offset(-12);
+    make.height.mas_equalTo(42);
   }];
 
   // 中间卡片：发布内容 + 上传图片（统一悬浮在一个卡片上）
@@ -328,4 +371,3 @@ static CGFloat const kCardCornerRadius = 14.0;
 }
 
 @end
-
