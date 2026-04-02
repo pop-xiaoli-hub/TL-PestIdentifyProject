@@ -7,6 +7,10 @@
 
 #import "SceneDelegate.h"
 #import "TLWPasswordLoginController.h"
+#import "TLWMainTabBarController.h"
+#import "TLWGuideController.h"
+#import "TLWPreferenceController.h"
+#import "TLWSDKManager.h"
 
 @interface SceneDelegate ()
 
@@ -19,11 +23,44 @@
   UIWindowScene *windowScene = (UIWindowScene *)scene;
   self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
 
-  TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
-  UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
-  nav.navigationBarHidden = YES;
-  self.window.rootViewController = nav;
-  [self.window makeKeyAndVisible];
+  if ([[TLWSDKManager shared] isLoggedIn]) {
+      // 有登录态，拉取用户资料后决定进哪个页面
+      TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
+      self.window.rootViewController = tabBar;
+      [self.window makeKeyAndVisible];
+
+      // 异步拉取资料，检查引导/偏好是否完成
+      [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+          // 拉取失败（网络异常/token过期）时不做引导跳转，留在主页
+          if (!profile) return;
+
+          BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
+          BOOL hasCrops = (profile.followedCrops.count > 0);
+
+          if (hasElderSetting && hasCrops) {
+              return;
+          }
+
+          dispatch_async(dispatch_get_main_queue(), ^{
+              if (!hasElderSetting) {
+                  TLWGuideController *guideVC = [[TLWGuideController alloc] init];
+                  guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                  [self.window.rootViewController presentViewController:guideVC animated:YES completion:nil];
+              } else {
+                  TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
+                  prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                  [self.window.rootViewController presentViewController:prefVC animated:YES completion:nil];
+              }
+          });
+      }];
+  } else {
+      // 没有登录态，进登录页
+      TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
+      UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+      nav.navigationBarHidden = YES;
+      self.window.rootViewController = nav;
+      [self.window makeKeyAndVisible];
+  }
 }
 
 
