@@ -27,6 +27,9 @@ PODS:
   - SDWebImage (5.21.5):
     - SDWebImage/Core (= 5.21.5)
   - SDWebImage/Core (5.21.5)
+  - SocketRocket (0.6.1)
+  - SpeechEngineToB (0.0.14.2-bugfix):
+    - SocketRocket
   - WCDB.objc (2.1.16):
     - WCDBOptimizedSQLCipher (= 1.4.8)
   - WCDBOptimizedSQLCipher (1.4.8)
@@ -37,10 +40,16 @@ DEPENDENCIES:
   - LookinServer
   - Masonry
   - SDWebImage (~> 5.0)
+  - SocketRocket (= 0.6.1)
+  - SpeechEngineToB (= 0.0.14.2-bugfix)
   - WCDB.objc (from `https://github.com/Tencent/wcdb.git`, branch `master`)
   - YYModel
 
 SPEC REPOS:
+  https://github.com/CocoaPods/Specs.git:
+    - SocketRocket
+  https://github.com/volcengine/volcengine-specs.git:
+    - SpeechEngineToB
   trunk:
     - AFNetworking
     - ISO8601
@@ -75,10 +84,12 @@ SPEC CHECKSUMS:
   LookinServer: 1b2b61c6402ae29fa22182d48f5cd067b4e99e80
   Masonry: 678fab65091a9290e40e2832a55e7ab731aad201
   SDWebImage: e9c98383c7572d713c1a0d7dd2783b10599b9838
+  SocketRocket: f32cd54efbe0f095c4d7594881e52619cfe80b17
+  SpeechEngineToB: 9fc39cb57e4614a727bf6e80287cb3ee861915a4
   WCDB.objc: d88dd9184fc7797b10890efadd593b8ce1d062dc
   WCDBOptimizedSQLCipher: 871994f7f620302fdf87a2729c099a1efa2223da
   YYModel: 2a7fdd96aaa4b86a824e26d0c517de8928c04b30
 
-PODFILE CHECKSUM: 485110cad2cc52755197adbfecdee56266fc88e3
+PODFILE CHECKSUM: 23d97f3654c2a77e6eec4ae99e44a749e754477d
 
 COCOAPODS: 1.16.2

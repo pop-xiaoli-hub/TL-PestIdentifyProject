@@ -5,8 +5,12 @@
 
 #import <UIKit/UIKit.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 @interface TLWAIAssistantController : UIViewController
 
 - (instancetype)initWithInitialQuestion:(nullable NSString *)question;
 
 @end
+
+NS_ASSUME_NONNULL_END

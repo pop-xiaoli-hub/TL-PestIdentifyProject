@@ -9,11 +9,11 @@
 
 
 @interface TWLSpeechManager ()
-@property (nonatomic, strong) SFSpeechRecognizer *speechRecognizer;// 语音识别引擎
-@property (nonatomic, strong) SFSpeechAudioBufferRecognitionRequest *request;// 把音频数据发送给识别引擎
-// 流程是麦克风->PCM音频buffer->request->识别引擎
-@property (nonatomic, strong) SFSpeechRecognitionTask *task;    //管理一次性识别任务，任务负责实时返回识别结果
-@property (nonatomic, strong) AVAudioEngine *audioEngine;   //采集麦克风音频
+@property (nonatomic, strong) SFSpeechRecognizer *speechRecognizer;
+@property (nonatomic, strong) SFSpeechAudioBufferRecognitionRequest *request;
+@property (nonatomic, strong) SFSpeechRecognitionTask *task;
+@property (nonatomic, strong) AVAudioEngine *audioEngine;
+@property (nonatomic, assign, readwrite) BOOL isRecording;
 @end
 
 @implementation TWLSpeechManager
@@ -27,35 +27,45 @@
     return manager;
 }
 
-- (instancetype) init {
+- (instancetype)init {
     self = [super init];
     if (self) {
         NSLocale *locale = [[NSLocale alloc] initWithLocaleIdentifier:@"zh-CN"];
-
         _speechRecognizer = [[SFSpeechRecognizer alloc] initWithLocale:locale];
         _audioEngine = [[AVAudioEngine alloc] init];
     }
     return self;
 }
 
-- (void) startRecording {
+- (void)startRecording {
+    self.isRecording = YES;
+
     [[AVAudioSession sharedInstance] requestRecordPermission:^(BOOL granted) {
-        if (!granted) return;
-        [SFSpeechRecognizer requestAuthorization:^(SFSpeechRecognizerAuthorizationStatus status) {
-            if (status != SFSpeechRecognizerAuthorizationStatusAuthorized) return;
+        if (!granted) {
             dispatch_async(dispatch_get_main_queue(), ^{
+                self.isRecording = NO;
+                [self tl_reportError:@"麦克风权限未开启，请在系统设置中允许访问麦克风"];
+            });
+            return;
+        }
+        [SFSpeechRecognizer requestAuthorization:^(SFSpeechRecognizerAuthorizationStatus status) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (status != SFSpeechRecognizerAuthorizationStatusAuthorized) {
+                    self.isRecording = NO;
+                    [self tl_reportError:@"语音识别权限未开启，请在系统设置中允许语音识别"];
+                    return;
+                }
+                // 权限通过后检查：如果用户已松手（stopRecording 被调用），不再启动
+                if (!self.isRecording) return;
                 [self startAudio];
             });
         }];
     }];
 }
 
-
 - (void)startAudio {
-    // 防重入
     if (self.audioEngine.isRunning) return;
 
-    // 配置 AVAudioSession
     AVAudioSession *session = [AVAudioSession sharedInstance];
     NSError *sessionError;
     [session setCategory:AVAudioSessionCategoryRecord error:&sessionError];
@@ -66,6 +76,8 @@
 
     if (sessionError) {
         NSLog(@"AVAudioSession error: %@", sessionError);
+        self.isRecording = NO;
+        [self tl_reportError:@"音频会话启动失败，请重试"];
         return;
     }
 
@@ -88,6 +100,8 @@
     [self.audioEngine startAndReturnError:&error];
     if (error) {
         NSLog(@"audio start error: %@", error);
+        self.isRecording = NO;
+        [self tl_reportError:@"录音启动失败，请重试"];
         return;
     }
 
@@ -104,7 +118,15 @@
             }
         }
 
-        if (error || result.isFinal) {
+        if (error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                // 用户主动停止导致的 cancel 错误不提示
+                if (error.code != 216 && error.code != 209) {
+                    [weakSelf tl_reportError:[NSString stringWithFormat:@"语音识别出错: %@", error.localizedDescription]];
+                }
+                [weakSelf stopRecording];
+            });
+        } else if (result.isFinal) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 [weakSelf stopRecording];
             });
@@ -115,6 +137,8 @@
 #pragma mark - 停止录音
 
 - (void)stopRecording {
+    self.isRecording = NO;
+
     if (self.audioEngine.isRunning) {
         [self.audioEngine stop];
         [self.request endAudio];
@@ -125,5 +149,14 @@
 
     [self.task cancel];
     self.task = nil;
-}                              
+}
+
+#pragma mark - Private
+
+- (void)tl_reportError:(NSString *)message {
+    if (self.errorHandler) {
+        self.errorHandler(message);
+    }
+}
+
 @end

@@ -6,6 +6,7 @@
 //
 
 #import "AppDelegate.h"
+#import <SpeechEngineToB/SpeechEngine.h>
 
 @interface AppDelegate ()
 
@@ -15,7 +16,8 @@
 
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-  // Override point for customization after application launch.
+  // 初始化火山引擎 Dialog 语音 SDK 环境
+  [SpeechEngine prepareEnvironment];
   return YES;
 }
 
