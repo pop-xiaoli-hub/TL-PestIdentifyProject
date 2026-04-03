@@ -11,7 +11,6 @@ static CGFloat const kTLNotifNavHeight  = 48.0;
 
 @interface TLWNotificationView ()
 
-@property (nonatomic, strong, readwrite) UIButton            *backButton;
 @property (nonatomic, strong, readwrite) UITableView         *tableView;
 @property (nonatomic, strong, readwrite) NSArray<UIButton *> *tabButtons;
 
@@ -28,7 +27,6 @@ static CGFloat const kTLNotifNavHeight  = 48.0;
         CGFloat cardTop  = navTop  + kTLNotifNavHeight + 8.0;
 
         [self tl_setupBackground];
-        [self tl_setupNavBarWithTop:navTop];
         [self tl_setupCardWithTop:cardTop];
     }
     return self;
@@ -39,48 +37,6 @@ static CGFloat const kTLNotifNavHeight  = 48.0;
 - (void)tl_setupBackground {
     UIImage *bg = [UIImage imageNamed:@"hp_backView"];
     self.layer.contents = (__bridge id)bg.CGImage;
-}
-
-#pragma mark - Nav Bar
-
-- (void)tl_setupNavBarWithTop:(CGFloat)navTop {
-    // Back button
-    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
-    [self addSubview:_backButton];
-    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.mas_equalTo(16);
-        make.top.mas_equalTo(navTop);
-        make.width.height.mas_equalTo(kTLNotifNavHeight);
-    }];
-
-    // Title container: "通知" label + bell icon
-    UIView *titleContainer = [[UIView alloc] init];
-    [self addSubview:titleContainer];
-
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.text      = @"通知";
-    titleLabel.textColor = [UIColor whiteColor];
-    titleLabel.font      = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
-    [titleContainer addSubview:titleLabel];
-
-    UIImageView *bellIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconNotification2"]];
-    bellIcon.contentMode = UIViewContentModeScaleAspectFit;
-    [titleContainer addSubview:bellIcon];
-
-    [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.top.bottom.equalTo(titleContainer);
-    }];
-    [bellIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(titleLabel.mas_right).offset(6);
-        make.right.equalTo(titleContainer);
-        make.centerY.equalTo(titleLabel);
-        make.width.height.mas_equalTo(22);
-    }];
-    [titleContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self);
-        make.centerY.equalTo(_backButton);
-    }];
 }
 
 #pragma mark - Content Card

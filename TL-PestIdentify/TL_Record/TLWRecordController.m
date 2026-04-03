@@ -23,12 +23,18 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 
 @implementation TLWRecordController
 
+- (NSString *)navTitle { return @"识别记录"; }
+- (NSString *)navTitleIconName { return @"records"; }
+
 - (void)viewDidLoad {
     [super viewDidLoad];
+    [self.navBar setRightButtonTitle:@"筛选" iconName:@"筛选"];
+
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
+    [self.view bringSubviewToFront:self.navBar];
 
     UICollectionView *cv = self.myView.collectionView;
     cv.dataSource = self;
@@ -39,21 +45,14 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
         forSupplementaryViewOfKind:UICollectionElementKindSectionHeader
                withReuseIdentifier:kHeaderID];
 
-    [self.myView.backButton addTarget:self
-                               action:@selector(tl_back)
-                     forControlEvents:UIControlEventTouchUpInside];
-    [self.myView.filterButton addTarget:self
-                                 action:@selector(tl_filter)
-                       forControlEvents:UIControlEventTouchUpInside];
+    [self.navBar.rightButton addTarget:self
+                                action:@selector(tl_filter)
+                      forControlEvents:UIControlEventTouchUpInside];
 
     [self tl_fetchRecords];
 }
 
 #pragma mark - Actions
-
-- (void)tl_back {
-    [self.navigationController popViewControllerAnimated:YES];
-}
 
 - (void)tl_filter {
     // TODO: 展示筛选面板（按日期/病虫害类型过滤）
@@ -179,13 +178,6 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
         _myView = [[TLWRecordView alloc] initWithFrame:CGRectZero];
     }
     return _myView;
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    // 隐藏系统导航栏后手动恢复右滑返回手势
-    self.navigationController.interactivePopGestureRecognizer.enabled = YES;
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
 }
 
 @end

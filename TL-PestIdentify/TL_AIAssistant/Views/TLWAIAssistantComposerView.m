@@ -17,6 +17,7 @@ static CGFloat const kVoicePanelHeight = 180.0;
 @property (nonatomic, strong) UIView *inputBar;
 @property (nonatomic, strong) UIView *voicePanel;
 @property (nonatomic, strong) UIView *roundContainer;
+@property (nonatomic, strong) UIView *sendButtonWrapper;
 @property (nonatomic, strong) UIView *previewRow;
 @property (nonatomic, strong) UIScrollView *previewScrollView;
 @property (nonatomic, strong) NSMutableArray<UIImage *> *previewImages;
@@ -66,19 +67,28 @@ static CGFloat const kVoicePanelHeight = 180.0;
         make.edges.equalTo(self->_inputBar);
     }];
 
-    _sendButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_sendButton setImage:[UIImage imageNamed:@"iconSend"] forState:UIControlStateNormal];
-    _sendButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
-    _sendButton.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
-    _sendButton.imageView.contentMode = UIViewContentModeCenter;
-    _sendButton.backgroundColor = [UIColor whiteColor];
-    _sendButton.layer.masksToBounds = YES;
-    _sendButton.hidden = YES;
-    [_inputBar addSubview:_sendButton];
-    [_sendButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    _sendButtonWrapper = [[UIView alloc] init];
+    _sendButtonWrapper.backgroundColor = [UIColor whiteColor];
+    _sendButtonWrapper.layer.cornerRadius = kInputBoxHeight / 2.0;
+    _sendButtonWrapper.layer.masksToBounds = YES;
+    _sendButtonWrapper.hidden = YES;
+    _sendButtonWrapper.userInteractionEnabled = YES;
+    [_inputBar addSubview:_sendButtonWrapper];
+    UIView *sendButtonWrapper = _sendButtonWrapper;
+    [sendButtonWrapper mas_makeConstraints:^(MASConstraintMaker *make) {
         make.right.equalTo(self->_inputBar).offset(-16);
         make.centerY.equalTo(self->_inputBar);
-        make.width.height.mas_equalTo(40);
+        make.width.height.mas_equalTo(kInputBoxHeight);
+    }];
+
+    _sendButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_sendButton setImage:[UIImage imageNamed:@"iconSend"] forState:UIControlStateNormal];
+    _sendButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
+    _sendButton.clipsToBounds = YES;
+    [sendButtonWrapper addSubview:_sendButton];
+    [_sendButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(sendButtonWrapper);
+        make.width.height.mas_equalTo(30);
     }];
 
     _roundContainer = [[UIView alloc] init];
@@ -203,7 +213,6 @@ static CGFloat const kVoicePanelHeight = 180.0;
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    self.sendButton.layer.cornerRadius = CGRectGetWidth(self.sendButton.bounds) / 2.0;
 }
 
 - (void)setInputText:(NSString *)text {
@@ -290,8 +299,8 @@ static CGFloat const kVoicePanelHeight = 180.0;
     if (hasContent) {
         self.micButton.hidden = YES;
         self.galleryButton.hidden = YES;
-        self.sendButton.hidden = NO;
-        self.roundContainerRightConstraint.offset = -(16 + 40 + 8);
+        self.sendButtonWrapper.hidden = NO;
+        self.roundContainerRightConstraint.offset = -(16 + kInputBoxHeight + 8);
         [self.textViewRightConstraint uninstall];
         [self.inputTextField mas_updateConstraints:^(MASConstraintMaker *make) {
             self.textViewRightConstraint = make.right.equalTo(self.roundContainer).offset(-14);
@@ -299,7 +308,7 @@ static CGFloat const kVoicePanelHeight = 180.0;
     } else {
         self.micButton.hidden = NO;
         self.galleryButton.hidden = NO;
-        self.sendButton.hidden = YES;
+        self.sendButtonWrapper.hidden = YES;
         self.roundContainerRightConstraint.offset = -16;
         [self.textViewRightConstraint uninstall];
         [self.inputTextField mas_updateConstraints:^(MASConstraintMaker *make) {

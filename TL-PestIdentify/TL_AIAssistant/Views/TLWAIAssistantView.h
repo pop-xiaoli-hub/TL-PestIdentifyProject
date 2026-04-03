@@ -11,7 +11,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWAIAssistantView : UIView
 
-@property (nonatomic, strong, readonly) UIButton    *backButton;
 @property (nonatomic, strong, readonly) UITextView  *inputTextField;
 @property (nonatomic, strong, readonly) UIButton    *cameraButton;
 @property (nonatomic, strong, readonly) UIButton    *micButton;

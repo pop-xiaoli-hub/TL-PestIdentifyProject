@@ -8,7 +8,6 @@
 
 @interface TLWSettingView ()
 
-@property (nonatomic, strong, readwrite) UIButton *backButton;
 @property (nonatomic, strong, readwrite) UISwitch *notificationSwitch;
 @property (nonatomic, strong, readwrite) UIButton *aboutRowButton;
 @property (nonatomic, strong, readwrite) UIButton *feedbackRowButton;
@@ -34,37 +33,8 @@
     CGFloat safeTop = window.safeAreaInsets.top;
     CGFloat navTop  = safeTop + 12;
 
-    [self setupNavBarAtTop:navTop];
-
     CGFloat cardTop = navTop + 44 + 12;
     [self setupCardAtTop:cardTop];
-}
-
-#pragma mark - Nav Bar
-
-- (void)setupNavBarAtTop:(CGFloat)navTop {
-    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
-    _backButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
-    _backButton.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.3];
-    _backButton.layer.cornerRadius = 20;
-    _backButton.layer.masksToBounds = YES;
-    [self addSubview:_backButton];
-    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.mas_equalTo(16);
-        make.top.mas_equalTo(navTop);
-        make.width.height.mas_equalTo(40);
-    }];
-
-    UILabel *titleLabel = [UILabel new];
-    titleLabel.text      = @"设置";
-    titleLabel.font      = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
-    titleLabel.textColor = UIColor.whiteColor;
-    [self addSubview:titleLabel];
-    [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self);
-        make.centerY.equalTo(_backButton);
-    }];
 }
 
 #pragma mark - Card

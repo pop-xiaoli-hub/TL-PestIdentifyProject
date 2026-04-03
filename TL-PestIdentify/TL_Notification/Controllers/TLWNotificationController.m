@@ -35,6 +35,9 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
     return self;
 }
 
+- (NSString *)navTitle { return @"通知"; }
+- (NSString *)navTitleIconName { return @"iconNotification2"; }
+
 - (void)viewDidLoad {
     [super viewDidLoad];
 
@@ -42,8 +45,7 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
-
-    [self.myView.backButton addTarget:self action:@selector(tl_back) forControlEvents:UIControlEventTouchUpInside];
+    [self.view bringSubviewToFront:self.navBar];
 
     for (UIButton *btn in self.myView.tabButtons) {
         [btn addTarget:self action:@selector(tl_tabTapped:) forControlEvents:UIControlEventTouchUpInside];
@@ -61,12 +63,6 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
 
     [self tl_applyTabColor];
     [self fetchMessages];
-}
-
-- (void)viewDidAppear:(BOOL)animated {
-    [super viewDidAppear:animated];
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
-    self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
 }
 
 #pragma mark - Fetch
@@ -145,10 +141,6 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
 }
 
 #pragma mark - Actions
-
-- (void)tl_back {
-    [self.navigationController popViewControllerAnimated:YES];
-}
 
 #pragma mark - UITableViewDataSource
 

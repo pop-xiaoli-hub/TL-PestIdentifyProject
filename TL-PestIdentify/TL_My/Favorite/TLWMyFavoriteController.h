@@ -3,11 +3,11 @@
 //  TL-PestIdentify
 //
 
-#import <UIKit/UIKit.h>
+#import "TLWBaseViewController.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TLWMyFavoriteController : UIViewController
+@interface TLWMyFavoriteController : TLWBaseViewController
 
 @end
 

@@ -9,7 +9,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWEditProfileView : UIView
 
-@property (nonatomic, strong, readonly) UIButton    *backButton;
 @property (nonatomic, strong, readonly) UIButton    *avatarRowButton;
 @property (nonatomic, strong, readonly) UIButton    *nicknameRowButton;
 @property (nonatomic, strong, readonly) UIImageView *avatarImageView;

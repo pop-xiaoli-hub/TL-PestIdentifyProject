@@ -26,27 +26,17 @@ extern NSString * const TLWProfileDidUpdateNotification;
     return self;
 }
 
+- (NSString *)navTitle { return @"修改昵称"; }
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
+    [self.view bringSubviewToFront:self.navBar];
     _myView.nicknameTextField.text = _currentNickname;
-    [_myView.backButton    addTarget:self action:@selector(onBack)    forControlEvents:UIControlEventTouchUpInside];
     [_myView.confirmButton addTarget:self action:@selector(onConfirm) forControlEvents:UIControlEventTouchUpInside];
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    [self.navigationController setNavigationBarHidden:YES animated:animated];
-    self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
-}
-
-- (void)viewWillDisappear:(BOOL)animated {
-    [super viewWillDisappear:animated];
-    [self.navigationController setNavigationBarHidden:YES animated:animated];
 }
 
 - (TLWEditNicknameView *)myView {
@@ -55,10 +45,6 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 #pragma mark - Actions
-
-- (void)onBack {
-    [self.navigationController popViewControllerAnimated:YES];
-}
 
 - (void)onConfirm {
     NSString *newName = [_myView.nicknameTextField.text stringByTrimmingCharactersInSet:

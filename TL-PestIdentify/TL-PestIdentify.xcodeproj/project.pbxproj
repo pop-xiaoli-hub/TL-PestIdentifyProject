@@ -59,92 +59,66 @@
 		};
 		0DAAA8F42F59C0BB00F327DC /* TL-PestIdentifyTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "TL-PestIdentifyTests";
 			sourceTree = "<group>";
 		};
 		0DAAA8FE2F59C0BB00F327DC /* TL-PestIdentifyUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "TL-PestIdentifyUITests";
 			sourceTree = "<group>";
 		};
 		0DB0A9202F5FF6D3009E2E41 /* TL_HomePage */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_HomePage;
 			sourceTree = "<group>";
 		};
 		0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_PhotoIdentify;
 			sourceTree = "<group>";
 		};
 		0DCE63482F63EEAD00965017 /* TL_Community */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Community;
 			sourceTree = "<group>";
 		};
 		0DE04CC92F68235300856C11 /* TL_Publish */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Publish;
 			sourceTree = "<group>";
 		};
 		4C9B4E8D2F5F040700016E29 /* TL_Login */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Login;
 			sourceTree = "<group>";
 		};
 		4CA891122F63A7A900928BBF /* TL_Record */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Record;
 			sourceTree = "<group>";
 		};
 		4CA894EF2F63FDF700928BBF /* TL_AIAssistant */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_AIAssistant;
 			sourceTree = "<group>";
 		};
 		4CA894FE2F64577500928BBF /* TL_Common */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Common;
 			sourceTree = "<group>";
 		};
 		4CA8A58F2F66F9E100928BBF /* TL_Message */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Message;
 			sourceTree = "<group>";
 		};
 		4CA8A5B82F66FA3300928BBF /* TL_Notification */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_Notification;
 			sourceTree = "<group>";
 		};
 		7D5BEC0BE2664D74B5CF37A0 /* TL_My */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = TL_My;
 			sourceTree = "<group>";
 		};
@@ -405,9 +379,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

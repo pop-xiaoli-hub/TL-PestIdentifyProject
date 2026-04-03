@@ -32,6 +32,8 @@
     return self;
 }
 
+- (NSString *)navTitle { return @"AI助手"; }
+
 - (void)viewDidLoad {
     [super viewDidLoad];
 
@@ -40,10 +42,8 @@
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
+    [self.view bringSubviewToFront:self.navBar];
 
-    [self.myView.backButton addTarget:self
-                               action:@selector(tl_back)
-                     forControlEvents:UIControlEventTouchUpInside];
     [self.myView.cameraButton addTarget:self
                                  action:@selector(tl_camera)
                        forControlEvents:UIControlEventTouchUpInside];
@@ -102,18 +102,12 @@
     }
 }
 
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    self.navigationController.navigationBarHidden = YES;
-    self.navigationController.interactivePopGestureRecognizer.enabled = YES;
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [[TWLSpeechManager sharedManager] stopRecording];
 }
 
 #pragma mark - Actions
-
-- (void)tl_back {
-    [self.navigationController popViewControllerAnimated:YES];
-}
 
 - (void)tl_camera {
     TLWImagePickerManager *picker = [[TLWImagePickerManager alloc] init];
@@ -178,6 +172,9 @@
 }
 
 - (void)dealloc {
+    [[TWLSpeechManager sharedManager] stopRecording];
+    [TWLSpeechManager sharedManager].resultHandler = nil;
+    [TWLSpeechManager sharedManager].errorHandler = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
@@ -221,6 +218,19 @@
                                                                 localImages:self.pendingImages.copy
                                                             remoteImageURLs:nil];
     [self.session appendMessage:message];
+
+    // 发送后立刻把消息里的原图替换为缩略图，释放大图内存
+    if (message.localImages.count > 0) {
+        NSMutableArray<UIImage *> *thumbnails = [NSMutableArray arrayWithCapacity:message.localImages.count];
+        for (UIImage *img in message.localImages) {
+            [thumbnails addObject:[self tl_thumbnailFromImage:img maxEdge:120]];
+        }
+        message.localImages = thumbnails.copy;
+    }
+
+    // 会话过长时裁剪早期消息的图片
+    [self.session trimImageMemoryIfNeeded];
+
     [self.myView displayMessages:self.session.messages];
     [self.myView scrollMessagesToBottomAnimated:YES];
 
@@ -262,6 +272,20 @@
     UIGraphicsEndImageContext();
     NSData *data = UIImageJPEGRepresentation(resized, 0.7);
     return data ? [UIImage imageWithData:data] : resized;
+}
+
+/// 生成缩略图，最大边不超过 maxEdge
+- (UIImage *)tl_thumbnailFromImage:(UIImage *)image maxEdge:(CGFloat)maxEdge {
+    CGFloat w = image.size.width;
+    CGFloat h = image.size.height;
+    if (w <= maxEdge && h <= maxEdge) return image;
+    CGFloat scale = (w > h) ? (maxEdge / w) : (maxEdge / h);
+    CGSize newSize = CGSizeMake(floor(w * scale), floor(h * scale));
+    UIGraphicsBeginImageContextWithOptions(newSize, YES, 1.0);
+    [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+    UIImage *thumb = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return thumb ?: image;
 }
 
 - (void)tl_uploadImageToAI:(UIImage *)image {

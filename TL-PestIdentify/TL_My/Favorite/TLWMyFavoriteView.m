@@ -12,8 +12,6 @@ static CGFloat const kCardGap   = 22;
 
 @interface TLWMyFavoriteView ()
 
-@property (nonatomic, strong, readwrite) UIButton         *backButton;
-@property (nonatomic, strong, readwrite) UIButton         *filterButton;
 @property (nonatomic, strong, readwrite) UICollectionView *collectionView;
 
 @property (nonatomic, strong) UIImageView *emptyImageView;
@@ -32,7 +30,6 @@ static CGFloat const kCardGap   = 22;
 
         [self setupBackground];
         [self setupCardWithTop:cardTop];
-        [self setupNavBarWithTop:navTop];
         [self setupCollectionViewWithTop:cardTop];
         [self setupEmptyStateWithTop:cardTop];
     }
@@ -65,69 +62,6 @@ static CGFloat const kCardGap   = 22;
     [cardView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.right.bottom.equalTo(self);
         make.top.equalTo(self).offset(cardTop);
-    }];
-}
-
-#pragma mark - 自定义导航栏
-
-- (void)setupNavBarWithTop:(CGFloat)navTop {
-    // 返回按钮
-    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
-    [self addSubview:_backButton];
-    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self).offset(16);
-        make.top.equalTo(self).offset(navTop);
-        make.width.height.mas_equalTo(kNavHeight);
-    }];
-
-    // 标题容器：文字 + liked 图标
-    UIView *titleContainer = [UIView new];
-    [self addSubview:titleContainer];
-
-    UILabel *titleLabel = [UILabel new];
-    titleLabel.text      = @"我的收藏";
-    titleLabel.textColor = UIColor.whiteColor;
-    titleLabel.font      = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
-    [titleContainer addSubview:titleLabel];
-
-    UIImageView *starIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"liked"]];
-    starIcon.contentMode = UIViewContentModeScaleAspectFit;
-    [titleContainer addSubview:starIcon];
-
-    [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.top.bottom.equalTo(titleContainer);
-    }];
-    [starIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(titleLabel.mas_right).offset(5);
-        make.right.equalTo(titleContainer);
-        make.centerY.equalTo(titleLabel);
-        make.width.height.mas_equalTo(20);
-    }];
-    [titleContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self);
-        make.centerY.equalTo(_backButton);
-    }];
-
-    // 筛选按钮
-    _filterButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_filterButton setTitle:@"筛选" forState:UIControlStateNormal];
-    [_filterButton setTitleColor:[UIColor colorWithWhite:1 alpha:0.9] forState:UIControlStateNormal];
-    _filterButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-    // 图标缩小到 16x16
-    UIImage *filterOrigin = [UIImage imageNamed:@"filter"];
-    UIGraphicsBeginImageContextWithOptions(CGSizeMake(16, 16), NO, 0);
-    [filterOrigin drawInRect:CGRectMake(0, 0, 16, 16)];
-    UIImage *filterSmall = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    [_filterButton setImage:filterSmall forState:UIControlStateNormal];
-    _filterButton.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
-    _filterButton.imageEdgeInsets = UIEdgeInsetsMake(0, 6, 0, 0);
-    [self addSubview:_filterButton];
-    [_filterButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.equalTo(self).offset(-16);
-        make.centerY.equalTo(_backButton);
-        make.height.mas_equalTo(44);
     }];
 }
 

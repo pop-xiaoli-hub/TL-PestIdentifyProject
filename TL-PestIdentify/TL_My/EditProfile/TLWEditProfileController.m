@@ -26,13 +26,16 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 @implementation TLWEditProfileController
 
+- (NSString *)navTitle { return @"编辑资料"; }
+
 - (void)viewDidLoad {
-    [super viewDidLoad];
     self.hidesBottomBarWhenPushed = YES;
+    [super viewDidLoad];
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
+    [self.view bringSubviewToFront:self.navBar];
     [self setupActions];
     [self loadAvatar];
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -67,15 +70,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [self.navigationController setNavigationBarHidden:YES animated:animated];
-    self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
     [self applyProfile];
-}
-
-- (void)viewWillDisappear:(BOOL)animated {
-    [super viewWillDisappear:animated];
-    [self.navigationController setNavigationBarHidden:YES animated:animated];
 }
 
 #pragma mark - Setup
@@ -90,7 +85,6 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)setupActions {
-    [_myView.backButton        addTarget:self action:@selector(onBack)         forControlEvents:UIControlEventTouchUpInside];
     [_myView.avatarRowButton   addTarget:self action:@selector(onAvatarTap)    forControlEvents:UIControlEventTouchUpInside];
     [_myView.nicknameRowButton addTarget:self action:@selector(onNicknameTap)  forControlEvents:UIControlEventTouchUpInside];
     [_myView.phoneRowButton    addTarget:self action:@selector(onPhoneTap)     forControlEvents:UIControlEventTouchUpInside];
@@ -103,10 +97,6 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 #pragma mark - Actions
-
-- (void)onBack {
-    [self.navigationController popViewControllerAnimated:YES];
-}
 
 - (void)onAvatarTap {
     TLWImagePickerManager *picker = [[TLWImagePickerManager alloc] init];

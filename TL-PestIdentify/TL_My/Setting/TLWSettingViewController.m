@@ -21,36 +21,32 @@
     return self;
 }
 
+- (NSString *)navTitle { return @"设置"; }
+
 - (void)viewDidLoad {
     [super viewDidLoad];
+    // 设置页返回按钮有特殊的圆形白底样式
+    self.navBar.backButton.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.3];
+    self.navBar.backButton.layer.cornerRadius = 20;
+    self.navBar.backButton.layer.masksToBounds = YES;
+
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
+    [self.view bringSubviewToFront:self.navBar];
     [self setupActions];
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    [self.navigationController setNavigationBarHidden:YES animated:animated];
-    self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
 }
 
 #pragma mark - Actions
 
 - (void)setupActions {
-    [_myView.backButton          addTarget:self action:@selector(onBack)        forControlEvents:UIControlEventTouchUpInside];
     [_myView.aboutRowButton      addTarget:self action:@selector(onAbout)       forControlEvents:UIControlEventTouchUpInside];
     [_myView.feedbackRowButton   addTarget:self action:@selector(onFeedback)    forControlEvents:UIControlEventTouchUpInside];
     [_myView.permissionRowButton addTarget:self action:@selector(onPermission)  forControlEvents:UIControlEventTouchUpInside];
     [_myView.agreementRowButton  addTarget:self action:@selector(onAgreement)   forControlEvents:UIControlEventTouchUpInside];
     [_myView.privacyRowButton    addTarget:self action:@selector(onPrivacy)     forControlEvents:UIControlEventTouchUpInside];
     [_myView.logoutButton        addTarget:self action:@selector(onLogout)      forControlEvents:UIControlEventTouchUpInside];
-}
-
-- (void)onBack {
-    [self.navigationController popViewControllerAnimated:YES];
 }
 
 - (void)onAbout       { /* TODO: 关于我们 */ }

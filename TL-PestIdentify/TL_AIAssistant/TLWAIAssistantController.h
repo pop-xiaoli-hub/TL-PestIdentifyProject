@@ -3,11 +3,11 @@
 //  TL-PestIdentify
 //
 
-#import <UIKit/UIKit.h>
+#import "TLWBaseViewController.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TLWAIAssistantController : UIViewController
+@interface TLWAIAssistantController : TLWBaseViewController
 
 - (instancetype)initWithInitialQuestion:(nullable NSString *)question;
 

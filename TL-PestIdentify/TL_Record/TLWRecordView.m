@@ -16,8 +16,6 @@ static CGFloat const kNavHeight  = 48;
 static CGFloat const kCardGap    = 22;
 
 @interface TLWRecordView ()
-@property (nonatomic, strong) UIButton *backButton;
-@property (nonatomic, strong) UIButton *filterButton;
 @property (nonatomic, strong) UICollectionView *collectionView;
 @property (nonatomic, strong) UILabel *emptyLabel;
 @end
@@ -34,7 +32,6 @@ static CGFloat const kCardGap    = 22;
 
         [self tl_setupBackground];
         [self tl_setupCardWithTop:cardTop];
-        [self tl_setupNavBarWithTop:navTop];
         [self tl_setupCollectionViewWithTop:cardTop];
         [self tl_setupEmptyLabelWithTop:cardTop];
     }
@@ -66,62 +63,6 @@ static CGFloat const kCardGap    = 22;
     [cardView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.right.bottom.equalTo(self);
         make.top.equalTo(self).offset(cardTop);
-    }];
-}
-
-- (void)tl_setupNavBarWithTop:(CGFloat)navTop {
-    // 返回按钮
-    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
-    [self addSubview:_backButton];
-    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self).offset(16);
-        make.top.equalTo(self).offset(navTop);
-        make.width.height.mas_equalTo(kNavHeight);
-    }];
-
-    // 标题容器：文字 + 时钟图标水平排列，整体居中
-    UIView *titleContainer = [[UIView alloc] init];
-    [self addSubview:titleContainer];
-
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.text = @"识别记录";
-    titleLabel.textColor = [UIColor whiteColor];
-    titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
-    [titleContainer addSubview:titleLabel];
-
-    UIImageView *clockIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"records"]];
-    clockIcon.contentMode = UIViewContentModeScaleAspectFit;
-    [titleContainer addSubview:clockIcon];
-
-    [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.top.bottom.equalTo(titleContainer);
-    }];
-    [clockIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(titleLabel.mas_right).offset(5);
-        make.right.equalTo(titleContainer);
-        make.centerY.equalTo(titleLabel);
-        make.width.height.mas_equalTo(20);
-    }];
-    [titleContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self);
-        make.centerY.equalTo(_backButton);
-    }];
-
-    // 筛选按钮：图标在文字右侧
-    _filterButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_filterButton setTitle:@"筛选" forState:UIControlStateNormal];
-    [_filterButton setTitleColor:[UIColor colorWithWhite:1 alpha:0.9] forState:UIControlStateNormal];
-    _filterButton.titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
-    [_filterButton setImage:[UIImage imageNamed:@"筛选"] forState:UIControlStateNormal];
-    // ForceRightToLeft 让图标出现在文字右侧
-    _filterButton.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;
-    _filterButton.imageEdgeInsets = UIEdgeInsetsMake(0, 6, 0, 0);
-    [self addSubview:_filterButton];
-    [_filterButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.equalTo(self).offset(-16);
-        make.centerY.equalTo(_backButton);
-        make.height.mas_equalTo(44);
     }];
 }
 

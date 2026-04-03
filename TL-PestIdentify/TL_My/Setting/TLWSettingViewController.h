@@ -3,8 +3,8 @@
 //  TL-PestIdentify
 //
 
-#import <UIKit/UIKit.h>
+#import "TLWBaseViewController.h"
 
-@interface TLWSettingViewController : UIViewController
+@interface TLWSettingViewController : TLWBaseViewController
 
 @end

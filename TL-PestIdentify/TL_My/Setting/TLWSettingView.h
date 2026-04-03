@@ -7,7 +7,6 @@
 
 @interface TLWSettingView : UIView
 
-@property (nonatomic, strong, readonly) UIButton *backButton;
 @property (nonatomic, strong, readonly) UISwitch *notificationSwitch;
 @property (nonatomic, strong, readonly) UIButton *aboutRowButton;
 @property (nonatomic, strong, readonly) UIButton *feedbackRowButton;

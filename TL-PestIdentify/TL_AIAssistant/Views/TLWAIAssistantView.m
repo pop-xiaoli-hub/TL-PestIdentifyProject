@@ -13,7 +13,6 @@ static CGFloat const kNavOffset = 8.0;
 static CGFloat const kNavHeight = 48.0;
 
 @interface TLWAIAssistantView ()
-@property (nonatomic, strong, readwrite) UIButton *backButton;
 // 主 view 自己不渲染消息和输入细节，只负责把两个子组件拼成完整页面。
 @property (nonatomic, strong) TLWAIAssistantMessageListView *messageListView;
 @property (nonatomic, strong) TLWAIAssistantComposerView *composerView;
@@ -33,7 +32,6 @@ static CGFloat const kNavHeight = 48.0;
 
         [self tl_setupBackground];
         [self tl_setupCardWithTop:contentTop];
-        [self tl_setupNavBarWithTop:navTop];
         [self tl_setupContentWithTop:contentTop];
         [self tl_bindComposerHeight];
     }
@@ -137,44 +135,6 @@ static CGFloat const kNavHeight = 48.0;
     [cardView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.right.bottom.equalTo(self);
         make.top.equalTo(self).offset(cardTop);
-    }];
-}
-
-- (void)tl_setupNavBarWithTop:(CGFloat)navTop {
-    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
-    [self addSubview:_backButton];
-    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.mas_equalTo(16);
-        make.top.mas_equalTo(navTop);
-        make.width.height.mas_equalTo(kNavHeight);
-    }];
-
-    UIView *titleContainer = [[UIView alloc] init];
-    [self addSubview:titleContainer];
-
-    UIImageView *aiIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"aiAssistant"]];
-    aiIcon.contentMode = UIViewContentModeScaleAspectFit;
-    [titleContainer addSubview:aiIcon];
-
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.text = @"AI助手";
-    titleLabel.textColor = [UIColor whiteColor];
-    titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
-    [titleContainer addSubview:titleLabel];
-
-    [aiIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.top.bottom.equalTo(titleContainer);
-        make.width.height.mas_equalTo(50);
-    }];
-    [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(aiIcon.mas_right).offset(8);
-        make.right.equalTo(titleContainer);
-        make.centerY.equalTo(aiIcon);
-    }];
-    [titleContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self);
-        make.centerY.equalTo(self.backButton);
     }];
 }
 

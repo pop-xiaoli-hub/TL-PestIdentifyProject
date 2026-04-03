@@ -29,12 +29,16 @@
     return self;
 }
 
+- (NSString *)navTitle { return @"识别记录"; }
+- (NSString *)navTitleIconName { return @"records"; }
+
 - (void)viewDidLoad {
     [super viewDidLoad];
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
+    [self.view bringSubviewToFront:self.navBar];
 
     [self tl_bindActions];
     [self tl_configureView];
@@ -43,10 +47,6 @@
 #pragma mark - Setup
 
 - (void)tl_bindActions {
-    [self.myView.backButton addTarget:self
-                               action:@selector(tl_back)
-                     forControlEvents:UIControlEventTouchUpInside];
-
     [self.myView.aiButton addTarget:self
                              action:@selector(tl_openAIAssistant)
                    forControlEvents:UIControlEventTouchUpInside];
@@ -89,10 +89,6 @@
 }
 
 #pragma mark - Actions
-
-- (void)tl_back {
-    [self.navigationController popViewControllerAnimated:YES];
-}
 
 - (void)tl_tabTapped:(UIButton *)sender {
     [self tl_showResultAtIndex:sender.tag animated:YES];

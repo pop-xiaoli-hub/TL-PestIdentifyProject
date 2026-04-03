@@ -13,6 +13,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)removeAllMessages;
 - (BOOL)hasMessages;
 
+/// 当消息超过上限时，清除早期消息的本地图片以释放内存
+- (void)trimImageMemoryIfNeeded;
+
 @end
 
 NS_ASSUME_NONNULL_END
