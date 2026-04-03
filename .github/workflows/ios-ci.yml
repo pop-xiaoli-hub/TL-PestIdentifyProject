@@ -1,0 +1,56 @@
+name: iOS CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cocoapods/repos
+            TL-PestIdentify/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('TL-PestIdentify/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Install Dependencies
+        working-directory: TL-PestIdentify
+        run: |
+          gem install cocoapods --no-document
+          pod install
+
+      - name: Build (Debug, iOS Simulator)
+        run: |
+          xcodebuild \
+            -workspace TL-PestIdentify/TL-PestIdentify.xcworkspace \
+            -scheme TL-PestIdentify \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
