@@ -12,6 +12,10 @@
 #import "TLWImagePickerManager.h"
 #import "TWLSpeechManager.h"
 #import "TLWToast.h"
+#import "TLWSDKManager.h"
+#import <AgriPestClient/AGChatRequest.h>
+#import <AgriPestClient/AGResultChatProfileResponse.h>
+#import <AgriPestClient/AGChatProfileResponse.h>
 #import <Masonry/Masonry.h>
 
 @interface TLWAIAssistantController () <TLWImagePickerDelegate, UIGestureRecognizerDelegate>
@@ -195,7 +199,7 @@
 - (void)tl_gallery {
     TLWImagePickerManager *picker = [[TLWImagePickerManager alloc] init];
     picker.delegate = self;
-    picker.maxCount = 9;
+    picker.maxCount = 1; // 后端 AI 接口暂只支持单张图片
     [picker openAlbumFrom:self];
 }
 
@@ -206,7 +210,6 @@
         [self.pendingImages removeAllObjects];
         [self.pendingImages addObjectsFromArray:results];
         [self.myView showSelectedImage:results.firstObject];
-        [self tl_uploadImageToAI:results.firstObject];
     }];
 }
 
@@ -216,13 +219,11 @@
         [self.pendingImages removeAllObjects];
         [self.pendingImages addObjectsFromArray:results];
         [self.myView showSelectedImages:self.pendingImages];
-        for (UIImage *img in self.pendingImages) {
-            [self tl_uploadImageToAI:img];
-        }
     }];
 }
 
 - (void)tl_send {
+    // 先确认中文输入法的候选词
     UITextRange *markedRange = self.myView.inputTextField.markedTextRange;
     if (markedRange) {
         UITextPosition *start = markedRange.start;
@@ -237,21 +238,28 @@
     NSString *text = [self.myView.inputTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (text.length == 0 && self.pendingImages.count == 0) return;
 
-    // 发送动作先把草稿态固化成一条本地用户消息，远端请求链路后续再接进来。
-    TLWAIAssistantMessage *message = [TLWAIAssistantMessage messageWithRole:TLWAIAssistantMessageRoleUser
-                                                                       text:text
-                                                                localImages:self.pendingImages.copy
-                                                            remoteImageURLs:nil];
-    [self.session appendMessage:message];
+    // 1. 把草稿态固化成一条本地用户消息
+    NSArray<UIImage *> *imagesToSend = self.pendingImages.copy;
+    TLWAIAssistantMessage *userMessage = [TLWAIAssistantMessage messageWithRole:TLWAIAssistantMessageRoleUser
+                                                                           text:text
+                                                                    localImages:imagesToSend
+                                                                remoteImageURLs:nil];
+    [self.session appendMessage:userMessage];
 
     // 发送后立刻把消息里的原图替换为缩略图，释放大图内存
-    if (message.localImages.count > 0) {
-        NSMutableArray<UIImage *> *thumbnails = [NSMutableArray arrayWithCapacity:message.localImages.count];
-        for (UIImage *img in message.localImages) {
+    if (userMessage.localImages.count > 0) {
+        NSMutableArray<UIImage *> *thumbnails = [NSMutableArray arrayWithCapacity:userMessage.localImages.count];
+        for (UIImage *img in userMessage.localImages) {
             [thumbnails addObject:[self tl_thumbnailFromImage:img maxEdge:120]];
         }
-        message.localImages = thumbnails.copy;
+        userMessage.localImages = thumbnails.copy;
     }
+
+    // 2. 追加一条 AI 占位消息（"思考中..."）
+    TLWAIAssistantMessage *aiMessage = [TLWAIAssistantMessage messageWithRole:TLWAIAssistantMessageRoleAssistant
+                                                                         text:@"正在思考中..."];
+    aiMessage.status = TLWAIAssistantMessageStatusSending;
+    [self.session appendMessage:aiMessage];
 
     // 会话过长时裁剪早期消息的图片
     [self.session trimImageMemoryIfNeeded];
@@ -259,9 +267,80 @@
     [self.myView displayMessages:self.session.messages];
     [self.myView scrollMessagesToBottomAnimated:YES];
 
+    // 清空输入区
     [self.myView setInputText:@""];
     [self.pendingImages removeAllObjects];
     [self.myView hideSelectedImage];
+
+    // 3. 构建 SDK 请求
+    AGChatRequest *request = [[AGChatRequest alloc] init];
+    request.text = text;
+
+    // 如果有图片，取第一张转 Base64 传给后端（SDK 只支持单张 imageUrl）
+    if (imagesToSend.count > 0) {
+        NSData *imageData = UIImageJPEGRepresentation(imagesToSend.firstObject, 0.8);
+        if (imageData) {
+            request.imageUrl = [imageData base64EncodedStringWithOptions:0];
+        }
+    }
+
+    // 4. 发起请求
+    __weak typeof(self) weakSelf = self;
+    [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+
+            if (error) {
+                aiMessage.status = TLWAIAssistantMessageStatusFailed;
+                aiMessage.text = @"网络请求失败，请稍后重试";
+                aiMessage.errorMessage = error.localizedDescription;
+                [strongSelf.myView displayMessages:strongSelf.session.messages];
+                [TLWToast show:@"请求失败，请检查网络"];
+                return;
+            }
+
+            // 401 token 过期，自动续期后重试
+            if (output.code && output.code.integerValue == 401) {
+                [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                    [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *retryOutput, NSError *retryError) {
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            __strong typeof(weakSelf) strongSelf2 = weakSelf;
+                            if (!strongSelf2) return;
+                            [strongSelf2 tl_handleChatResponse:retryOutput error:retryError forMessage:aiMessage];
+                        });
+                    }];
+                }];
+                return;
+            }
+
+            [strongSelf tl_handleChatResponse:output error:nil forMessage:aiMessage];
+        });
+    }];
+}
+
+/// 统一处理 AI 对话响应
+- (void)tl_handleChatResponse:(AGResultChatProfileResponse *)output
+                         error:(NSError *)error
+                    forMessage:(TLWAIAssistantMessage *)aiMessage {
+    if (error || !output || !output.code || output.code.integerValue != 200) {
+        aiMessage.status = TLWAIAssistantMessageStatusFailed;
+        NSString *serverMsg = output.message ?: @"服务异常";
+        aiMessage.text = [NSString stringWithFormat:@"请求失败：%@", serverMsg];
+        aiMessage.errorMessage = error.localizedDescription ?: serverMsg;
+        [self.myView displayMessages:self.session.messages];
+        [TLWToast show:@"AI 回复失败，请重试"];
+        return;
+    }
+
+    NSString *answer = output.data.answer;
+    if (answer.length == 0) {
+        answer = @"AI 暂时无法给出回复，请换个描述再试试。";
+    }
+    aiMessage.text = answer;
+    aiMessage.status = TLWAIAssistantMessageStatusIdle;
+    [self.myView displayMessages:self.session.messages];
+    [self.myView scrollMessagesToBottomAnimated:YES];
 }
 
 /// 异步批量压缩图片，完成后回到主线程
@@ -311,12 +390,6 @@
     UIImage *thumb = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     return thumb ?: image;
-}
-
-- (void)tl_uploadImageToAI:(UIImage *)image {
-    // TODO: POST /api/ai/chat，参数为 image（转 Base64 或 multipart）
-    //   成功回调：将 AI 返回的文字结果追加到对话列表
-    //   失败回调：弹 toast 提示用户重试
 }
 
 - (void)tl_seedConversation {
