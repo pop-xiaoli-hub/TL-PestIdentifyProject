@@ -134,6 +134,11 @@ NS_ASSUME_NONNULL_BEGIN
 /// 若 refreshToken 也已过期则强制跳回登录页。多个并发 401 只发一次刷新请求，其余排队等结果。
 - (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock;
 
+
+/// 上传单张图片/文件，返回服务器 URL
+- (NSURLSessionTask *)uploadFileWithFile:(NSURL *)file
+                                  prefix:(NSString *)prefix
+                       completionHandler:(void (^)(AGResultString * output, NSError * error))handler;
 @end
 
 NS_ASSUME_NONNULL_END
