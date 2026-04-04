@@ -1,3 +1,10 @@
+//
+//  TLWAIAssistantMessageCell.m
+//  TL-PestIdentify
+//
+//  Created by Northern Lights on 2026/4/3.
+//  职责：实现AI助手消息单元视图。
+//
 #import "TLWAIAssistantMessageCell.h"
 #import "TLWAIAssistantMessage.h"
 #import "TLWSDKManager.h"

@@ -2,7 +2,9 @@
 //  TLWMessageCell.m
 //  TL-PestIdentify
 //
-
+//  Created by Tommy-MrWu on 2026/3/15.
+//  职责：实现消息列表单元组件。
+//
 #import "TLWMessageCell.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>

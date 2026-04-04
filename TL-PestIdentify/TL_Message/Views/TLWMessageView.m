@@ -2,7 +2,9 @@
 //  TLWMessageView.m
 //  TL-PestIdentify
 //
-
+//  Created by Tommy-MrWu on 2026/3/15.
+//  职责：实现消息页面主视图组件。
+//
 #import "TLWMessageView.h"
 #import <Masonry/Masonry.h>
 

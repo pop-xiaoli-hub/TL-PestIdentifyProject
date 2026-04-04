@@ -1,3 +1,10 @@
+//
+//  TLWAIAssistantComposerView.m
+//  TL-PestIdentify
+//
+//  Created by Northern Lights on 2026/4/3.
+//  职责：实现AI助手页面视图组件。
+//
 #import "TLWAIAssistantComposerView.h"
 #import <Masonry/Masonry.h>
 

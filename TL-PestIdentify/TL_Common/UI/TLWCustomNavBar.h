@@ -2,10 +2,9 @@
 //  TLWCustomNavBar.h
 //  TL-PestIdentify
 //
-//  通用自定义导航栏组件
-//  支持：返回按钮 + 标题(可带图标) + 右侧按钮(可选)
+//  Created by Northern Lights on 2026/4/4.
+//  职责：声明组件化顶部导航栏接口。
 //
-
 #import <UIKit/UIKit.h>
 
 NS_ASSUME_NONNULL_BEGIN

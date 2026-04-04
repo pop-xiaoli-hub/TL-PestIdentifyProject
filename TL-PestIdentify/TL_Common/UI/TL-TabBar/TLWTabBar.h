@@ -2,9 +2,9 @@
 //  TLWTabBar.h
 //  TL-PestIdentify
 //
-//  Created by xiaoli pop on 2026/3/11.
+//  Created by TommyWu on 2026/4/4.
+//  职责：声明组件化底部导航栏接口。
 //
-
 #import <UIKit/UIKit.h>
 #import "TLWTabBarItemView.h"
 NS_ASSUME_NONNULL_BEGIN

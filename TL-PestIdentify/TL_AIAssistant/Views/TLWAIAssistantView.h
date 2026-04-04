@@ -2,7 +2,9 @@
 //  TLWAIAssistantView.h
 //  TL-PestIdentify
 //
-
+//  Created by Tommy-MrWu on 2026/3/15.
+//  职责：实现AI助手页面视图组件。
+//
 #import <UIKit/UIKit.h>
 
 @class TLWAIAssistantMessage;

@@ -2,7 +2,9 @@
 //  TLWMessageItem.h
 //  TL-PestIdentify
 //
-
+//  Created by Tommy-MrWu on 2026/3/15.
+//  职责：定义消息模块数据模型。
+//
 #import <Foundation/Foundation.h>
 
 NS_ASSUME_NONNULL_BEGIN

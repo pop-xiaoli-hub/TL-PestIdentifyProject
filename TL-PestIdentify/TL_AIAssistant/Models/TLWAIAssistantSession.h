@@ -1,3 +1,10 @@
+//
+//  TLWAIAssistantSession.h
+//  TL-PestIdentify
+//
+//  Created by Northern Lights on 2026/4/3.
+//  职责：定义AI助手数据模型。
+//
 #import <Foundation/Foundation.h>
 
 @class TLWAIAssistantMessage;

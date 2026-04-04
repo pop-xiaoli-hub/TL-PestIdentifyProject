@@ -2,7 +2,9 @@
 //  TLWCustomNavBar.m
 //  TL-PestIdentify
 //
-
+//  Created by Northern Lights on 2026/4/4.
+//  职责：实现组件化顶部导航栏视图。
+//
 #import "TLWCustomNavBar.h"
 #import <Masonry/Masonry.h>
 
