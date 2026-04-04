@@ -14,7 +14,7 @@
 #import "TLWToast.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWAIAssistantController () <TLWImagePickerDelegate>
+@interface TLWAIAssistantController () <TLWImagePickerDelegate, UIGestureRecognizerDelegate>
 @property (nonatomic, strong) TLWAIAssistantView *myView;
 @property (nonatomic, copy)   NSString           *initialQuestion;
 @property (nonatomic, assign) BOOL                showVoicePanelAfterKeyboardHide;
@@ -80,6 +80,7 @@
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self
                                                                           action:@selector(tl_dismissKeyboard)];
     tap.cancelsTouchesInView = NO;
+    tap.delegate = self;
     [self.myView addGestureRecognizer:tap];
 
     // 删除预览图回调
@@ -148,6 +149,17 @@
 
 - (void)tl_dismissKeyboard {
     [self.myView endEditing:YES];
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+    UIView *view = touch.view;
+    if (!view) return YES;
+    if ([view isDescendantOfView:self.myView.sendButton]) return NO;
+    if ([view isDescendantOfView:self.myView.cameraButton]) return NO;
+    if ([view isDescendantOfView:self.myView.micButton]) return NO;
+    if ([view isDescendantOfView:self.myView.galleryButton]) return NO;
+    if ([view isDescendantOfView:self.myView.inputTextField]) return NO;
+    return YES;
 }
 
 #pragma mark - Keyboard
