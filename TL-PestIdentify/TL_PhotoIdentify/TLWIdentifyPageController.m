@@ -9,6 +9,9 @@
 #import "TLWIdentifyPageView.h"
 #import "TLWRecordController.h"
 #import <AVFoundation/AVFoundation.h>
+#import "TLWIdentifyResultController.h"
+#import "TLWSDKManager.h"
+#import <AgriPestClient/AGChatRequest.h>
 
 @interface TLWIdentifyPageController ()<UIImagePickerControllerDelegate, UINavigationControllerDelegate, AVCapturePhotoCaptureDelegate>
 @property (nonatomic, strong) TLWIdentifyPageView *myView;
@@ -234,11 +237,158 @@
 }
 
 - (void)tl_identifyFromAI {
-  // 待识别图片：self.capturedImage
-  // TODO: POST /api/identify，参数为 self.capturedImage（转 Base64 或 multipart）
-  //   成功回调：[self tl_stopLoadingIndicator]; 跳转结果页，传入识别结果 model
-  //   失败回调：[self tl_stopLoadingIndicator]; 弹 toast 提示
-  [self tl_showLoadingIndicator];
+  [self tl_showLoadingIndicator];//展示加载动画
+  UIImage *image = self.capturedImage;
+  if (![image isKindOfClass:[UIImage class]]) {
+    [self tl_stopLoadingIndicator];
+    return;
+  }
+
+  NSData *imageData = UIImageJPEGRepresentation(image, 0.9);//压缩
+  if (imageData.length == 0) {
+    [self tl_stopLoadingIndicator];
+    return;
+  }
+
+  NSString *fileName = [NSString stringWithFormat:@"identify_%@.jpg", [[NSUUID UUID] UUIDString]];//生成一个全局唯一的标识符，避免文件命名冲突
+  NSString *tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];//拼接一个临时的完整路径
+  NSURL *fileURL = [NSURL fileURLWithPath:tempPath];//将字符串路径改为file://类型的本地文件URL
+  BOOL writeSuccess = [imageData writeToURL:fileURL atomically:YES];
+  if (!writeSuccess) {
+    [self tl_stopLoadingIndicator];
+    return;
+  }
+
+  TLWSDKManager *manager = [TLWSDKManager shared];
+  __weak typeof(self) weakSelf = self;
+  NSLog(@"开始上传图片");
+  [manager uploadFileWithFile:fileURL prefix:@"uploads/identify/" completionHandler:^(AGResultString *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      NSLog(@"AI识别：进入回调");
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        NSLog(@"AI识别：传入空对象");
+        [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+        return;
+      }
+
+      if (error || !output || output.code.integerValue != 200 || output.data.length == 0) {
+        NSLog(@"AI识别：分析失败 %@", output.code);
+        [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+        [strongSelf tl_stopLoadingIndicator];
+        NSString *message = error.localizedDescription ?: output.message ?: @"图片上传失败";
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:message preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+        [strongSelf presentViewController:alert animated:YES completion:nil];
+        return;
+      }
+      NSLog(@"AI识别：图片正确返回");
+      NSString *imageURLString = output.data;
+      AGChatRequest *request = [[AGChatRequest alloc] init];
+      request.text = @"请根据图片识别结果，返回3个最可能的病害，并严格使用JSON格式输出，不要输出任何额外文字。每个结果只返回1个病害名称，并按结果一、结果二、结果三对应3个结果。格式为：{\"results\":[{\"title\":\"结果一\",\"name\":\"病害名称\",\"confidence\":\"百分比\",\"reason\":\"判断依据\",\"advice\":\"处理建议\"},{\"title\":\"结果二\",\"name\":\"病害名称\",\"confidence\":\"百分比\",\"reason\":\"判断依据\",\"advice\":\"处理建议\"},{\"title\":\"结果三\",\"name\":\"病害名称\",\"confidence\":\"百分比\",\"reason\":\"判断依据\",\"advice\":\"处理建议\"}]}";
+      request.imageUrl = imageURLString;
+      request.useSingleModel = @(YES);
+      NSLog(@"AI识别：开始识别病害");
+      [manager.api chatWithChatRequest:request completionHandler:^(AGResultString *chatOutput, NSError *chatError) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          NSLog(@"AI识别：进入识别回调");
+          [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
+          [strongSelf tl_stopLoadingIndicator];
+
+          if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.length == 0) {
+            NSLog(@"AI识别：识别失败");
+            NSString *message = chatError.localizedDescription ?: chatOutput.message ?: @"AI识别失败";
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:message preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+            [strongSelf presentViewController:alert animated:YES completion:nil];
+            return;
+          }
+          NSLog(@"AI识别：识别成功");
+          NSLog(@"[IdentifyAI] %@", chatOutput.data);
+          NSArray<NSDictionary *> *parsedResults = [strongSelf tl_parseIdentifyResultsFromJSONString:chatOutput.data];
+          TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
+          vc.image = strongSelf.capturedImage;
+          vc.identifyResults = parsedResults;
+          vc.hidesBottomBarWhenPushed = YES;
+          [strongSelf.navigationController pushViewController:vc animated:YES];
+        });
+      }];
+    });
+  }];
+}
+
+- (NSArray<NSDictionary *> *)tl_parseIdentifyResultsFromJSONString:(NSString *)jsonString {
+  if (![jsonString isKindOfClass:[NSString class]] || jsonString.length == 0) {
+    return @[];
+  }
+
+  NSString *normalized = [jsonString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  if ([normalized hasPrefix:@"```"]) {
+    NSRange firstBraceRange = [normalized rangeOfString:@"{"];
+    NSRange lastBraceRange = [normalized rangeOfString:@"}" options:NSBackwardsSearch];
+    if (firstBraceRange.location != NSNotFound && lastBraceRange.location != NSNotFound && lastBraceRange.location > firstBraceRange.location) {
+      normalized = [normalized substringWithRange:NSMakeRange(firstBraceRange.location, lastBraceRange.location - firstBraceRange.location + 1)];
+    }
+  }
+
+  NSData *data = [normalized dataUsingEncoding:NSUTF8StringEncoding];
+  if (!data) {
+    return @[];
+  }
+
+  NSError *jsonError = nil;
+  id jsonObject = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+  if (jsonError || ![jsonObject isKindOfClass:[NSDictionary class]]) {
+    NSLog(@"AI识别：JSON解析失败 %@", jsonError.localizedDescription);
+    return @[];
+  }
+
+  id resultsObject = ((NSDictionary *)jsonObject)[@"results"];
+  if (![resultsObject isKindOfClass:[NSArray class]]) {
+    return @[];
+  }
+
+  NSMutableArray<NSDictionary *> *parsedResults = [NSMutableArray array];
+  NSArray *rawResults = (NSArray *)resultsObject;
+  for (NSUInteger idx = 0; idx < rawResults.count; idx++) {
+    id item = rawResults[idx];
+    if (![item isKindOfClass:[NSDictionary class]]) {
+      continue;
+    }
+
+    NSDictionary *result = (NSDictionary *)item;
+    NSString *title = [result[@"title"] isKindOfClass:[NSString class]] ? result[@"title"] : [NSString stringWithFormat:@"结果%lu", (unsigned long)(idx + 1)];
+
+    NSString *name = nil;
+    if ([result[@"name"] isKindOfClass:[NSString class]] && [result[@"name"] length] > 0) {
+      name = result[@"name"];
+    } else if ([result[@"names"] isKindOfClass:[NSArray class]]) {
+      for (id nameItem in result[@"names"]) {
+        if ([nameItem isKindOfClass:[NSString class]] && [((NSString *)nameItem) length] > 0) {
+          name = nameItem;
+          break;
+        }
+      }
+    }
+
+    NSString *confidence = [result[@"confidence"] isKindOfClass:[NSString class]] ? result[@"confidence"] : @"--";
+    NSString *advice = [result[@"advice"] isKindOfClass:[NSString class]] ? result[@"advice"] : @"";
+    NSString *reason = [result[@"reason"] isKindOfClass:[NSString class]] ? result[@"reason"] : @"";
+    if (advice.length == 0 && reason.length > 0) {
+      advice = reason;
+    }
+
+    [parsedResults addObject:@{
+      @"title": title ?: @"",
+      @"name": name ?: @"",
+      @"names": name.length > 0 ? @[name] : @[],
+      @"confidence": confidence ?: @"--",
+      @"reason": reason ?: @"",
+      @"advice": advice ?: @""
+    }];
+  }
+
+  return [parsedResults copy];
 }
 
 

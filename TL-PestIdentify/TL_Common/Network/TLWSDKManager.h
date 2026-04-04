@@ -73,6 +73,11 @@ NS_ASSUME_NONNULL_BEGIN
                                      prefix:(NSString *)prefix
                                  completion:(void(^)(NSArray<NSString *> * _Nullable urls, NSError * _Nullable error))completion;
 
+/// 上传单张图片/文件，返回服务器 URL
+- (NSURLSessionTask *)uploadFileWithFile:(NSURL *)file
+                                  prefix:(NSString *)prefix
+                       completionHandler:(void (^)(AGResultString * output, NSError * error))handler;
+
 /// 获取所有帖子列表（分页）
 - (NSURLSessionTask *)getAllPostsWithTag:(nullable NSString *)tag
                                        q:(nullable NSString *)q

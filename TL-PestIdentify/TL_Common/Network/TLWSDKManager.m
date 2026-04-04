@@ -185,6 +185,13 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
   }];
 }
 
+- (NSURLSessionTask *)uploadFileWithFile:(NSURL *)file
+                                  prefix:(NSString *)prefix
+                       completionHandler:(void (^)(AGResultString * output, NSError * error))handler {
+  NSString *uploadPrefix = prefix.length > 0 ? prefix : @"uploads/";
+  return [self.api uploadFileWithFile:file prefix:uploadPrefix completionHandler:handler];
+}
+
 - (NSURLSessionTask *)getAllPostsWithTag:(nullable NSString *)tag
                                        q:(nullable NSString *)q
                                      page:(NSNumber *)page
