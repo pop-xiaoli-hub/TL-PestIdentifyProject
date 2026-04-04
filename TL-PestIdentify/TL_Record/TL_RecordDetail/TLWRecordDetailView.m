@@ -13,7 +13,6 @@ static CGFloat const kNavHeight = 48;
 static CGFloat const kCardGap   = 13;
 
 @interface TLWRecordDetailView ()
-@property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UIImageView *photoView;
 @property (nonatomic, strong) NSArray<UIButton *> *tabButtons;
 @property (nonatomic, strong) UILabel *pestNameLabel;
@@ -42,7 +41,6 @@ static CGFloat const kCardGap   = 13;
 
         [self tl_setupBackground];
         [self tl_setupCardWithTop:cardTop];
-        [self tl_setupNavBarWithTop:navTop];
     }
     return self;
 }
@@ -51,45 +49,6 @@ static CGFloat const kCardGap   = 13;
 
 - (void)tl_setupBackground {
     self.layer.contents = (__bridge id)[UIImage imageNamed:@"hp_backView.png"].CGImage;
-}
-
-- (void)tl_setupNavBarWithTop:(CGFloat)navTop {
-    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
-    [self addSubview:_backButton];
-    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self).offset(16);
-        make.top.equalTo(self).offset(navTop);
-        make.width.height.mas_equalTo(kNavHeight);
-    }];
-
-    // 标题："识别记录" + 时钟图标
-    UIView *titleContainer = [[UIView alloc] init];
-    [self addSubview:titleContainer];
-
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.text = @"识别记录";
-    titleLabel.textColor = [UIColor whiteColor];
-    titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
-    [titleContainer addSubview:titleLabel];
-
-    UIImageView *clockIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"records"]];
-    clockIcon.contentMode = UIViewContentModeScaleAspectFit;
-    [titleContainer addSubview:clockIcon];
-
-    [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.top.bottom.equalTo(titleContainer);
-    }];
-    [clockIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(titleLabel.mas_right).offset(5);
-        make.right.equalTo(titleContainer);
-        make.centerY.equalTo(titleLabel);
-        make.width.height.mas_equalTo(20);
-    }];
-    [titleContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self);
-        make.centerY.equalTo(_backButton);
-    }];
 }
 
 - (void)tl_setupCardWithTop:(CGFloat)cardTop {

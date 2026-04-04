@@ -2,7 +2,9 @@
 //  TLWMessageView.m
 //  TL-PestIdentify
 //
-
+//  Created by Tommy-MrWu on 2026/3/15.
+//  职责：实现消息页面主视图组件。
+//
 #import "TLWMessageView.h"
 #import <Masonry/Masonry.h>
 
@@ -67,7 +69,7 @@
     _tableView.separatorColor = [UIColor colorWithWhite:0.88 alpha:1];
     _tableView.separatorInset = UIEdgeInsetsMake(0, 78, 0, 0);
     _tableView.rowHeight = 72;
-    _tableView.scrollEnabled = NO;
+    _tableView.scrollEnabled = YES;
     _tableView.tableFooterView = [[UIView alloc] init];
     [card addSubview:_tableView];
 

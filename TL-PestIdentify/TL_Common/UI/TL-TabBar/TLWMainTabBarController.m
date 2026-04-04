@@ -2,18 +2,24 @@
 //  TLWMainTabBarController.m
 //  TL-PestIdentify
 //
-//  Created by xiaoli pop on 2026/3/11.
+//  Created by TommyWu on 2026/4/4.
+//
 //
 
+/*
+ 为了规避 iOS 26 的 Liquid Glass 效果，没有用 UITabBarController，而是让 TLWMainTabBarController 继承
+   UIViewController，手动管理 4 个 UINavigationController 子 VC。TabBar 作为普通子视图加到 view 上。
+ */
 #import "TLWMainTabBarController.h"
 #import "TLWTabBar.h"
 #import "TLWHomePageController.h"
 #import "TLWCommunityController.h"
 #import "TLWMessageController.h"
 #import "TLWMyController.h"
-#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
-#import "TLWDBManager.h"
+
+static CGFloat const kTabBarBottomOffset = 10.0;
+static CGFloat const kDefaultTabBarHeight = 96.0;
 @interface TLWMainTabBarController () <UINavigationControllerDelegate>
 
 // 存放四个模块的 NavigationController
@@ -33,9 +39,12 @@
 
 @implementation TLWMainTabBarController
 
+/*
+ 系统自带的tabBar是懒加载，而我们这里一次性全量加载
+ */
+
 - (void)viewDidLoad {
     [super viewDidLoad];
-
     // ── 1. 初始化四个子模块 ──────────────────────────────────────
     // 首页：有真实实现
     TLWHomePageController *homeVC = [TLWHomePageController new];
@@ -102,13 +111,11 @@
     _whiteBg.layer.mask = _whiteBgMask;
     [_mainTabBar insertSubview:_whiteBg atIndex:0];
 
-    // TabBar 贴底部，左右撑满，高度由 sizeThatFits 决定（含安全区）
-    // offset(10) 让胶囊稍微往下沉一点，视觉上更贴底
-    CGFloat tabHeight = [_mainTabBar sizeThatFits:self.view.bounds.size].height;
+    // 初始布局先用默认高度，后续在 viewDidLayoutSubviews 按 safeArea 实时更新
     [_mainTabBar mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.right.equalTo(self.view);
-        make.bottom.equalTo(self.view).offset(10);
-        make.height.mas_equalTo(tabHeight);
+        make.bottom.equalTo(self.view).offset(kTabBarBottomOffset);
+        make.height.mas_equalTo(kDefaultTabBarHeight);
     }];
 }
 
@@ -116,6 +123,11 @@
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+
+    CGFloat tabHeight = [_mainTabBar sizeThatFits:self.view.bounds.size].height;
+    [_mainTabBar mas_updateConstraints:^(MASConstraintMaker *make) {
+        make.height.mas_equalTo(tabHeight);
+    }];
 
     if (!_whiteBgMask || !_mainTabBar.pillView) return;
 
@@ -133,7 +145,7 @@
     _whiteBgMask.frame = _whiteBg.bounds;
 }
 
-#pragma mark - UINavigationControllerDelegate
+#pragma mark - UINavigationControllerDelegate   模拟系统推栈行为
 
 - (void)navigationController:(UINavigationController *)navigationController
       willShowViewController:(UIViewController *)viewController
@@ -146,9 +158,15 @@
     _mainTabBar.userInteractionEnabled = !hide;
 }
 
+// 明确告诉 UIKit：我自己全权接管子 VC 的生命周期分发，你别插手
+- (BOOL)shouldAutomaticallyForwardAppearanceMethods {
+    return NO;
+}
+
 #pragma mark - Tab 切换
 
 - (void)switchToIndex:(NSInteger)idx {
+    if (idx < 0 || idx >= _childVCs.count) return;
     if (idx == _selectedIndex) return;
 
     UIViewController *fromVC = _childVCs[_selectedIndex];
@@ -161,8 +179,8 @@
     fromVC.view.hidden = YES;
     toVC.view.hidden   = NO;
 
-    [fromVC endAppearanceTransition];
-    [toVC   endAppearanceTransition];
+    [fromVC endAppearanceTransition];// 触发 viewDidDisappear
+    [toVC   endAppearanceTransition];// 触发 viewDidAppear
 
     _selectedIndex = idx;
     [_mainTabBar tl_setSelectedIndex:idx];

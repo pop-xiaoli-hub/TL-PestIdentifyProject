@@ -3,7 +3,7 @@
 //  TL-PestIdentify
 //
 
-#import <UIKit/UIKit.h>
+#import "TLWBaseViewController.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -13,7 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)editNicknameController:(TLWEditNicknameController *)vc didSaveNickname:(NSString *)nickname;
 @end
 
-@interface TLWEditNicknameController : UIViewController
+@interface TLWEditNicknameController : TLWBaseViewController
 
 @property (nonatomic, weak) id<TLWEditNicknameDelegate> delegate;
 

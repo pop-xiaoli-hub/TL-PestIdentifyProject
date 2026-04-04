@@ -8,7 +8,6 @@
 
 @interface TLWChangePhoneView ()
 
-@property (nonatomic, strong, readwrite) UIButton    *backButton;
 @property (nonatomic, strong, readwrite) UILabel     *currentPhoneLabel;
 @property (nonatomic, strong, readwrite) UITextField *phoneField;
 @property (nonatomic, strong, readwrite) UITextField *codeField;
@@ -34,32 +33,8 @@
         make.edges.equalTo(self);
     }];
 
-    [self setupNavBar];
     [self setupPanel];
     [self setupCard];
-}
-
-#pragma mark - Nav Bar
-
-- (void)setupNavBar {
-    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
-    [self addSubview:_backButton];
-    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self).offset(16);
-        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(8);
-        make.width.height.mas_equalTo(44);
-    }];
-
-    UILabel *title = [UILabel new];
-    title.text      = @"换绑手机号";
-    title.textColor = UIColor.whiteColor;
-    title.font      = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
-    [self addSubview:title];
-    [title mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self);
-        make.centerY.equalTo(_backButton);
-    }];
 }
 
 #pragma mark - Panel
@@ -72,7 +47,7 @@
     panelBlur.layer.masksToBounds = YES;
     [self addSubview:panelBlur];
     [panelBlur mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_backButton.mas_bottom).offset(10);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(52);
         make.left.right.bottom.equalTo(self);
     }];
 
@@ -101,7 +76,7 @@
 
     [self addSubview:card];
     [card mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_backButton.mas_bottom).offset(24);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(66);
         make.left.equalTo(self).offset(16);
         make.right.equalTo(self).offset(-16);
     }];

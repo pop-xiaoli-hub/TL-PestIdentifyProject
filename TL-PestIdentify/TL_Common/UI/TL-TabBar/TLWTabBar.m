@@ -2,10 +2,19 @@
 //  TLWTabBar.m
 //  TL-PestIdentify
 //
-//  Created by xiaoli pop on 2026/3/11.
+//  Created by TommyWu on 2026/4/4.
+//  职责：实现组件化底部导航栏视图。
 //
 
 #import "TLWTabBar.h"
+
+static CGFloat const kTabBarTotalHeight = 96.0;
+static CGFloat const kPillHorizontalInset = 28.0;
+static CGFloat const kPillMaxWidth = 520.0;
+static CGFloat const kPillHeight = 76.0;
+static CGFloat const kPillBottomOffset = 10.0;
+static CGFloat const kPillItemTopInset = 6.0;
+static CGFloat const kSymbolPointSize = 22.0;
 
 @implementation TLWTabBar
 
@@ -15,10 +24,11 @@
     self.backgroundImage = [UIImage new];//移除系统默认背景
     self.shadowImage = [UIImage new];
 
+    // 添加渐变层
     self.pillView = [UIView new];
     self.pillView.backgroundColor = UIColor.clearColor;
     self.pillView.userInteractionEnabled = YES;
-    self.pillView.layer.cornerRadius = 34.0;
+	    self.pillView.layer.cornerRadius = kPillHeight / 2.0;
     self.pillView.layer.masksToBounds = NO;
     self.pillView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:1].CGColor;
     self.pillView.layer.shadowOpacity = 0.18;
@@ -34,8 +44,9 @@
       (__bridge id)[UIColor colorWithRed:0.90 green:0.96 blue:0.92 alpha:0.75].CGColor
     ];
     self.pillGradient.locations = @[@0, @1];
-    self.pillGradient.cornerRadius = 34.0;
+	    self.pillGradient.cornerRadius = kPillHeight / 2.0;
     [self.pillView.layer insertSublayer:self.pillGradient atIndex:0];
+      
 
     // 4 个按钮：使用系统 SF Symbols（可根据设计替换）
     UIImage *homeIcon = nil;
@@ -43,7 +54,7 @@
     UIImage *msgIcon = nil;
     UIImage *meIcon = nil;
     if (@available(iOS 13.0, *)) {
-      UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:22.0 weight:UIImageSymbolWeightSemibold];
+	      UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:kSymbolPointSize weight:UIImageSymbolWeightSemibold];
       homeIcon = [[[UIImage systemImageNamed:@"house.fill"] imageWithConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
       communityIcon = [[[UIImage systemImageNamed:@"leaf.fill"] imageWithConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
       msgIcon = [[[UIImage systemImageNamed:@"ellipsis.bubble.fill"] imageWithConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
@@ -55,12 +66,13 @@
     TLWTabBarItemView *v3 = [[TLWTabBarItemView alloc] initWithTitle:@"我的" icon:meIcon ?: [UIImage new]];
     self.itemViews = @[v0, v1, v2, v3];
 
-    for (NSInteger i = 0; i < (NSInteger)self.itemViews.count; i++) {
-      TLWTabBarItemView *item = self.itemViews[i];
-      item.tag = i;
-      item.userInteractionEnabled = YES;
-      [item addTarget:self action:@selector(tl_itemTapped:) forControlEvents:UIControlEventTouchUpInside];
-      [self.pillView addSubview:item];
+	    for (NSInteger i = 0; i < (NSInteger)self.itemViews.count; i++) {
+	      TLWTabBarItemView *item = self.itemViews[i];
+	      item.tag = i;
+	      item.accessibilityIdentifier = [NSString stringWithFormat:@"tl_tab_item_%ld", (long)i];
+	      item.userInteractionEnabled = YES;
+	      [item addTarget:self action:@selector(tl_itemTapped:) forControlEvents:UIControlEventTouchUpInside];
+	      [self.pillView addSubview:item];
     }
     self.currentIndex = 0;
     [self tl_setSelectedIndex:0];
@@ -86,7 +98,6 @@
 
 - (void)tl_itemTapped:(UIControl *)sender {
   NSInteger idx = sender.tag;
-  NSLog(@"当前点击：%ld", idx);
   [self tl_setSelectedIndex:idx];
   if (self.selectionHandler) {
     self.selectionHandler(idx);
@@ -106,17 +117,18 @@
   if (@available(iOS 11.0, *)) {
     safeBottom = self.safeAreaInsets.bottom;
   }
-  s.height = 96.0 + safeBottom; // 胶囊 + 圆按钮更需要高度
+  s.height = kTabBarTotalHeight + safeBottom; // 胶囊 + 圆按钮更需要高度
   return s;
 }
 
 - (void)layoutSubviews {
   [super layoutSubviews];
 
-  // 隐藏系统默认按钮
+  // 隐藏系统注入的交互控件，避免与自定义按钮竞争触摸
   for (UIView *v in self.subviews) {
-    if ([NSStringFromClass(v.class) containsString:@"UITabBarButton"]) {
+    if (v != self.pillView && [v isKindOfClass:UIControl.class]) {
       v.hidden = YES;
+      v.userInteractionEnabled = NO;
     }
   }
   // 确保自定义胶囊在最上层，可接收点击
@@ -127,10 +139,10 @@
     safeBottom = self.safeAreaInsets.bottom;
   }
 
-  CGFloat pillH = 76.0;
-  CGFloat pillW = MIN(self.bounds.size.width - 28.0, 520.0);
+  CGFloat pillH = kPillHeight;
+  CGFloat pillW = MIN(self.bounds.size.width - kPillHorizontalInset, kPillMaxWidth);
   CGFloat pillX = (self.bounds.size.width - pillW) / 2.0;
-  CGFloat pillY = self.bounds.size.height - safeBottom - pillH - 10.0;
+  CGFloat pillY = self.bounds.size.height - safeBottom - pillH - kPillBottomOffset;
   self.pillView.frame = CGRectMake(pillX, pillY, pillW, pillH);
   self.pillView.layer.cornerRadius = pillH / 2.0;
   self.pillGradient.frame = self.pillView.bounds;
@@ -141,7 +153,7 @@
   CGFloat itemW = pillW / self.itemViews.count;
   for (NSInteger i = 0; i < (NSInteger)self.itemViews.count; i++) {
     TLWTabBarItemView *item = self.itemViews[i];
-    item.frame = CGRectMake(i * itemW, 6.0, itemW, pillH - 6.0);
+    item.frame = CGRectMake(i * itemW, kPillItemTopInset, itemW, pillH - kPillItemTopInset);
   }
 }
 

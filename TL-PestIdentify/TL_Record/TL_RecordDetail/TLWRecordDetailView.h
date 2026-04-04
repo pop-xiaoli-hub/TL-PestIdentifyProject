@@ -9,9 +9,6 @@
 
 @interface TLWRecordDetailView : UIView
 
-// 导航
-@property (nonatomic, strong, readonly) UIButton *backButton;
-
 // 照片
 @property (nonatomic, strong, readonly) UIImageView *photoView;
 

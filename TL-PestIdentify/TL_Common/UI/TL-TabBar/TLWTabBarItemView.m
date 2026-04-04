@@ -2,18 +2,26 @@
 //  TLWTabBarItemView.m
 //  TL-PestIdentify
 //
-//  Created by xiaoli pop on 2026/3/11.
+//  Created by TommyWu on 2026/4/4.
+//  职责：实现底部导航栏单项视图。
 //
-
 #import "TLWTabBarItemView.h"
+
+static CGFloat const kCircleSize = 64.0;
+static CGFloat const kIconSize = 20.0;
+static CGFloat const kLabelHeight = 13.0;
+static CGFloat const kIconLabelGap = 2.0;
 
 @implementation TLWTabBarItemView
 
 - (instancetype)initWithTitle:(NSString *)title icon:(UIImage *)icon {
   self = [super initWithFrame:CGRectZero];
   if (self) {
-    self.backgroundColor = UIColor.clearColor;
-    self.userInteractionEnabled = YES;
+	    self.backgroundColor = UIColor.clearColor;
+	    self.userInteractionEnabled = YES;
+      self.isAccessibilityElement = YES;
+      self.accessibilityLabel = title;
+      self.accessibilityTraits = UIAccessibilityTraitButton;
 
     self.circleView = [UIView new];
     self.circleView.backgroundColor = UIColor.whiteColor;
@@ -57,7 +65,7 @@
 - (void)layoutSubviews {
   [super layoutSubviews];
 
-  CGFloat circleSize = 64.0;
+  CGFloat circleSize = kCircleSize;
   CGFloat circleX = (self.bounds.size.width - circleSize) / 2.0;
   self.circleView.frame = CGRectMake(circleX, 0, circleSize, circleSize);
   self.circleView.layer.cornerRadius = circleSize / 2.0;
@@ -66,9 +74,9 @@
   self.selectedGradient.cornerRadius = self.circleView.layer.cornerRadius;
 
   // 图标 + 文字整体在圆圈内垂直居中
-  CGFloat iconSize = 20.0;
-  CGFloat labelHeight = 13.0;
-  CGFloat gap = 2.0;
+  CGFloat iconSize = kIconSize;
+  CGFloat labelHeight = kLabelHeight;
+  CGFloat gap = kIconLabelGap;
   CGFloat totalH = iconSize + gap + labelHeight;
   CGFloat topY = (circleSize - totalH) / 2.0;
 
@@ -104,6 +112,8 @@
     self.iconView.tintColor = green;
     self.titleLabel.textColor = green;
   }
+
+  self.accessibilityTraits = UIAccessibilityTraitButton | (selected ? UIAccessibilityTraitSelected : 0);
 }
 
 

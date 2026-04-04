@@ -36,23 +36,23 @@ static NSInteger  const kPageSize       = 20;
     return self;
 }
 
+- (NSString *)navTitle { return @"我的收藏"; }
+- (NSString *)navTitleIconName { return @"liked"; }
+
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.navigationController.navigationBarHidden = YES;
+    [self.navBar setRightButtonTitle:@"筛选" iconName:@"filter"];
 
     [self.view addSubview:self.favoriteView];
     [self.favoriteView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
+    [self.view bringSubviewToFront:self.navBar];
 
     [self.favoriteView.collectionView registerClass:[TLWFavoriteCell class]
                          forCellWithReuseIdentifier:kFavoriteCellID];
     self.favoriteView.collectionView.dataSource = self;
     self.favoriteView.collectionView.delegate   = self;
-
-    [self.favoriteView.backButton addTarget:self
-                                     action:@selector(onBack)
-                           forControlEvents:UIControlEventTouchUpInside];
 
     // 下拉刷新
     UIRefreshControl *rc = [UIRefreshControl new];
@@ -68,12 +68,6 @@ static NSInteger  const kPageSize       = 20;
         [self onRefresh];
     }
     self.hasAppearedOnce = YES;
-}
-
-- (void)viewDidAppear:(BOOL)animated {
-    [super viewDidAppear:animated];
-    self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
 }
 
 #pragma mark - Lazy
@@ -146,10 +140,6 @@ static NSInteger  const kPageSize       = 20;
 }
 
 #pragma mark - Actions
-
-- (void)onBack {
-    [self.navigationController popViewControllerAnimated:YES];
-}
 
 #pragma mark - UICollectionViewDataSource
 

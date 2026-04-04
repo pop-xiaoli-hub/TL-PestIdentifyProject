@@ -1,18 +1,36 @@
+source 'https://github.com/CocoaPods/Specs.git'
+source 'https://github.com/volcengine/volcengine-specs.git'
+
 platform :ios, '12.0'
 
 target 'TL-PestIdentify' do
   pod 'LookinServer', :configurations => ['Debug']
   pod 'YYModel'
-  pod 'AgriPestClient', :git => 'https://github.com/lukecc00/AgriPest-IOS-SDK.git', :tag => 'v1.0.108'
+  pod 'AgriPestClient', :git => 'https://github.com/Biscoffee/AgriPest-IOS-SDK.git', :tag => 'v1.0.109'
   pod 'WCDB.objc', :git => 'https://github.com/Tencent/wcdb.git', :branch => 'master'
   pod 'Masonry'
   pod 'SDWebImage', '~> 5.0'
+
+  # 火山引擎 Dialog 语音对话 SDK
+  pod 'SocketRocket', '0.6.1'
+  pod 'SpeechEngineToB', '0.0.14.2-bugfix'
 end
 
 # Xcode 26 兼容
 post_install do |installer|
+  # SpeechEngineToB 当前 pod 带的是 device arm64 静态库，Apple Silicon 模拟器构建需要排除 arm64 simulator。
+  installer.aggregate_targets.each do |aggregate_target|
+    aggregate_target.user_project.native_targets.each do |native_target|
+      native_target.build_configurations.each do |config|
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+      end
+    end
+    aggregate_target.user_project.save
+  end
+
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
       # AFNetworking: Xcode 26 netinet6/in6.h private header 问题
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       if target.name == 'AFNetworking'

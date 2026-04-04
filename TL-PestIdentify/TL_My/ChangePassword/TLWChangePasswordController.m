@@ -25,24 +25,19 @@
     return self;
 }
 
+- (NSString *)navTitle { return @"修改密码"; }
+
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.hidesBottomBarWhenPushed = YES;
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
+    [self.view bringSubviewToFront:self.navBar];
     [self setupActions];
     if (_currentPassword.length > 0) {
         _myView.currentPassword = _currentPassword;
     }
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    [self.navigationController setNavigationBarHidden:YES animated:animated];
-    self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
 }
 
 - (TLWChangePasswordView *)myView {
@@ -51,15 +46,10 @@
 }
 
 - (void)setupActions {
-    [_myView.backButton    addTarget:self action:@selector(onBack)    forControlEvents:UIControlEventTouchUpInside];
     [_myView.confirmButton addTarget:self action:@selector(onConfirm) forControlEvents:UIControlEventTouchUpInside];
 }
 
 #pragma mark - Actions
-
-- (void)onBack {
-    [self.navigationController popViewControllerAnimated:YES];
-}
 
 - (void)onConfirm {
     NSString *newPwd     = _myView.passwordField.text ?: @"";
