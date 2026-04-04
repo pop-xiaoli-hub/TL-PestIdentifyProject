@@ -6,6 +6,11 @@
 
 #import "TLWSDKManager.h"
 #import <UIKit/UIKit.h>
+#import <Security/Security.h>
+
+static NSString * const kKeychainService = @"com.tl.pestidentify.auth";
+static NSString * const kKeychainAccessToken  = @"access_token";
+static NSString * const kKeychainRefreshToken = @"refresh_token";
 
 NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotification";
 
@@ -26,6 +31,58 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 @implementation TLWSDKManager
 
+#pragma mark - Keychain Helpers
+
++ (BOOL)_keychainSave:(NSString *)value forAccount:(NSString *)account {
+    if (!value) return NO;
+    NSData *data = [value dataUsingEncoding:NSUTF8StringEncoding];
+    // 先删除旧值
+    NSDictionary *delQuery = @{
+        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
+        (__bridge id)kSecAttrService: kKeychainService,
+        (__bridge id)kSecAttrAccount: account,
+    };
+    SecItemDelete((__bridge CFDictionaryRef)delQuery);
+    // 写入新值
+    NSDictionary *addQuery = @{
+        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
+        (__bridge id)kSecAttrService: kKeychainService,
+        (__bridge id)kSecAttrAccount: account,
+        (__bridge id)kSecValueData:   data,
+        (__bridge id)kSecAttrAccessible: (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+    };
+    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)addQuery, NULL);
+    return status == errSecSuccess;
+}
+
++ (nullable NSString *)_keychainLoadForAccount:(NSString *)account {
+    NSDictionary *query = @{
+        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
+        (__bridge id)kSecAttrService: kKeychainService,
+        (__bridge id)kSecAttrAccount: account,
+        (__bridge id)kSecReturnData:  @YES,
+        (__bridge id)kSecMatchLimit:  (__bridge id)kSecMatchLimitOne,
+    };
+    CFTypeRef result = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
+    if (status == errSecSuccess && result) {
+        NSString *value = [[NSString alloc] initWithData:(__bridge_transfer NSData *)result encoding:NSUTF8StringEncoding];
+        return value;
+    }
+    return nil;
+}
+
++ (void)_keychainDeleteForAccount:(NSString *)account {
+    NSDictionary *query = @{
+        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
+        (__bridge id)kSecAttrService: kKeychainService,
+        (__bridge id)kSecAttrAccount: account,
+    };
+    SecItemDelete((__bridge CFDictionaryRef)query);
+}
+
+#pragma mark - Singleton
+
 + (instancetype)shared {
   static TLWSDKManager *instance;
   static dispatch_once_t onceToken;
@@ -41,9 +98,24 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
         // 配置 SDK
         AGDefaultConfiguration *config = [AGDefaultConfiguration sharedConfig];
         config.host = @"http://115.191.67.35:8080";
-        // 从本地恢复登录态
+        // 从 Keychain 恢复登录态（迁移：若 Keychain 无值但 NSUserDefaults 有，则迁移后删除旧值）
         NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-        NSString *token = [ud stringForKey:kTokenKey];
+        NSString *token = [TLWSDKManager _keychainLoadForAccount:kKeychainAccessToken];
+        if (!token.length) {
+            // 尝试从旧的 NSUserDefaults 迁移
+            NSString *legacyToken = [ud stringForKey:kTokenKey];
+            if (legacyToken.length) {
+                [TLWSDKManager _keychainSave:legacyToken forAccount:kKeychainAccessToken];
+                NSString *legacyRefresh = [ud stringForKey:kRefreshKey];
+                if (legacyRefresh.length) {
+                    [TLWSDKManager _keychainSave:legacyRefresh forAccount:kKeychainRefreshToken];
+                }
+                // 迁移完成后清除 NSUserDefaults 中的敏感信息
+                [ud removeObjectForKey:kTokenKey];
+                [ud removeObjectForKey:kRefreshKey];
+                token = legacyToken;
+            }
+        }
         if (token.length > 0) {
             config.accessToken = token;
         }
@@ -64,15 +136,27 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 }
 
 - (void)saveAuthResponse:(AGAuthResponse *)auth {
-  NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-  // 设置SDK的token
+  // 关键字段 nil 防护：token 必须存在，否则不写入
+  if (!auth.token.length) {
+      NSLog(@"[Token] saveAuthResponse: token 为空，跳过保存");
+      return;
+  }
+
+  // Token 存入 Keychain
   [AGDefaultConfiguration sharedConfig].accessToken = auth.token;
-  [ud setObject:auth.token        forKey:kTokenKey];
-  [ud setObject:auth.refreshToken forKey:kRefreshKey];
+  [TLWSDKManager _keychainSave:auth.token forAccount:kKeychainAccessToken];
+  if (auth.refreshToken.length) {
+      [TLWSDKManager _keychainSave:auth.refreshToken forAccount:kKeychainRefreshToken];
+  }
+
+  // 非敏感信息存 NSUserDefaults
+  NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
   [ud setInteger:auth.userId.integerValue forKey:kUserIdKey];
-  [ud setObject:auth.username     forKey:kUsernameKey];
+  if (auth.username) {
+      [ud setObject:auth.username forKey:kUsernameKey];
+  }
   if (auth.generatedPassword.length > 0) {
-    [ud setObject:auth.generatedPassword forKey:kGenPwdKey];
+      [ud setObject:auth.generatedPassword forKey:kGenPwdKey];
   }
 
   _userId   = auth.userId.integerValue;
@@ -80,7 +164,7 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 }
 
 - (nullable NSString *)refreshToken {
-  return [[NSUserDefaults standardUserDefaults] stringForKey:kRefreshKey];
+  return [TLWSDKManager _keychainLoadForAccount:kKeychainRefreshToken];
 }
 
 - (nullable NSString *)generatedPassword {
@@ -88,12 +172,24 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 }
 
 - (void)fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion {
+    __weak typeof(self) weakSelf = self;
     [_api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
+
             if (!error && output.code.integerValue == 200) {
                 self.cachedProfile = output.data;
                 [[NSNotificationCenter defaultCenter] postNotificationName:TLWProfileDidUpdateNotification object:nil];
                 if (completion) completion(self.cachedProfile);
+                return;
+            }
+
+            // 401 时自动走 refresh 兜底，刷新成功后重试拉取资料
+            if (!error && output.code.integerValue == 401) {
+                [self handleUnauthorizedWithRetry:^{
+                    [self fetchProfileWithCompletion:completion];
+                }];
                 return;
             }
 
@@ -103,11 +199,16 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 }
 
 - (void)logout {
-  NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
   [AGDefaultConfiguration sharedConfig].accessToken = nil;
 
-  [ud removeObjectForKey:kTokenKey];
-  [ud removeObjectForKey:kRefreshKey];
+  // 清除 Keychain 中的敏感凭证
+  [TLWSDKManager _keychainDeleteForAccount:kKeychainAccessToken];
+  [TLWSDKManager _keychainDeleteForAccount:kKeychainRefreshToken];
+
+  // 清除 NSUserDefaults 中的非敏感信息
+  NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+  [ud removeObjectForKey:kTokenKey];     // 兼容清理旧数据
+  [ud removeObjectForKey:kRefreshKey];   // 兼容清理旧数据
   [ud removeObjectForKey:kUserIdKey];
   [ud removeObjectForKey:kUsernameKey];
   [ud removeObjectForKey:kGenPwdKey];
@@ -359,12 +460,34 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 
 - (void)_navigateToLogin {
-    // 动态 import 避免循环依赖，运行时查找登录 VC 类
     Class loginClass = NSClassFromString(@"TLWPasswordLoginController");
     if (!loginClass) return;
     UIViewController *loginVC = [[loginClass alloc] init];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
-    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    nav.navigationBarHidden = YES;
+
+    // 优先从活跃的 UIWindowScene 获取 keyWindow，避免多 Scene 下切错窗口
+    UIWindow *window = nil;
+    if (@available(iOS 13.0, *)) {
+        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundActive &&
+                [scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                for (UIWindow *w in windowScene.windows) {
+                    if (w.isKeyWindow) {
+                        window = w;
+                        break;
+                    }
+                }
+                if (window) break;
+            }
+        }
+    }
+    if (!window) {
+        window = [UIApplication sharedApplication].windows.firstObject;
+    }
+    if (!window) return;
+
     [UIView transitionWithView:window
                       duration:0.35
                        options:UIViewAnimationOptionTransitionCrossDissolve

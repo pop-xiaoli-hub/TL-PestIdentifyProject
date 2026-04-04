@@ -60,6 +60,8 @@ static CGFloat const kMessageVerticalInset = 6.0;
     [self.avatarImageView sd_cancelCurrentImageLoad];
     self.avatarImageView.image = nil;
     self.avatarImageView.backgroundColor = [UIColor clearColor];
+    self.bubbleView.layer.borderWidth = 0;
+    self.bubbleView.layer.borderColor = [UIColor clearColor].CGColor;
     [self.bubbleBottomConstraint deactivate];
     [self.statusBottomConstraint deactivate];
 }
@@ -68,9 +70,17 @@ static CGFloat const kMessageVerticalInset = 6.0;
     BOOL isUser = (message.role == TLWAIAssistantMessageRoleUser);
     [self tl_configureAvatarForUser:isUser];
 
-    self.bubbleView.backgroundColor = isUser
-        ? [UIColor colorWithRed:0.47 green:0.78 blue:0.58 alpha:1.0]
-        : [UIColor colorWithWhite:1.0 alpha:0.82];
+    if (isUser) {
+        // 用户消息：蓝色填充背景
+        self.bubbleView.backgroundColor = [UIColor colorWithRed:0.29 green:0.56 blue:0.85 alpha:1.0]; // #4A90D9
+        self.bubbleView.layer.borderWidth = 0;
+        self.bubbleView.layer.borderColor = [UIColor clearColor].CGColor;
+    } else {
+        // AI 回复：透明背景 + 橙黄色描边
+        self.bubbleView.backgroundColor = [UIColor clearColor];
+        self.bubbleView.layer.borderWidth = 1.5;
+        self.bubbleView.layer.borderColor = [UIColor colorWithRed:0.96 green:0.65 blue:0.14 alpha:1.0].CGColor; // #F5A623
+    }
     self.messageLabel.textColor = isUser
         ? [UIColor whiteColor]
         : [UIColor colorWithRed:0.12 green:0.16 blue:0.18 alpha:1.0];
