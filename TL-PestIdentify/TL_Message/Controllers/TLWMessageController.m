@@ -12,6 +12,8 @@
 #import "TLWNotificationController.h"
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
+#import <AgriPestClient/AGResultPostResponseDto.h>
+#import <AgriPestClient/AGPostResponseDto.h>
 #import "TLWPostDetailController.h"
 #import <Masonry/Masonry.h>
 
@@ -148,6 +150,7 @@ static NSInteger const kMessagePageSize = 20;
             self.currentPage = page;
             self.hasMoreMessages = [self tl_hasMoreFromCommentPage:data.commentMessages fetchedCount:newCommentItems.count];
             [self tl_rebuildItems];
+            [self tl_fillMissingPostImages:newCommentItems];
         });
     }];
 }
@@ -298,6 +301,36 @@ static NSInteger const kMessagePageSize = 20;
     if (!targetIndexPath) return;
     [self.myView.tableView reloadRowsAtIndexPaths:@[targetIndexPath]
                                 withRowAnimation:UITableViewRowAnimationNone];
+}
+
+/// 后端评论消息未返回 postImageUrl，客户端用 postId 补查帖子封面图
+- (void)tl_fillMissingPostImages:(NSArray<TLWMessageItem *> *)items {
+    // 收集需要补图的 postId，去重
+    NSMutableDictionary<NSNumber *, NSMutableArray<TLWMessageItem *> *> *postIdToItems = [NSMutableDictionary dictionary];
+    for (TLWMessageItem *item in items) {
+        if (item.postId && item.postImageUrl.length == 0) {
+            if (!postIdToItems[item.postId]) {
+                postIdToItems[item.postId] = [NSMutableArray array];
+            }
+            [postIdToItems[item.postId] addObject:item];
+        }
+    }
+    if (postIdToItems.count == 0) return;
+
+    for (NSNumber *postId in postIdToItems) {
+        [[TLWSDKManager shared].api getPostDetailWithId:postId completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (error || output.code.integerValue != 200) return;
+                NSString *imageUrl = output.data.images.firstObject;
+                if (imageUrl.length == 0) return;
+
+                for (TLWMessageItem *item in postIdToItems[postId]) {
+                    item.postImageUrl = imageUrl;
+                }
+                [self.myView.tableView reloadData];
+            });
+        }];
+    }
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
