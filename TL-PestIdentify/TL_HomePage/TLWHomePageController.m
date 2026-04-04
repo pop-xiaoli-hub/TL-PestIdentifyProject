@@ -9,6 +9,7 @@
 #import "TLWHomePageView.h"
 #import "TLWHomeCardCell.h"
 #import "TLWHomeCustomCell.h"
+#import "TL_AddPlantPage/TLWAddPlantController.h"
 #import "TLWIdentifyPageController.h"
 #import "TLWRecordController.h"
 #import "TLWAIAssistantController.h"
@@ -98,7 +99,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 #pragma mark - UITableViewDataSource
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-  return 4;
+  return 3;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -150,6 +151,26 @@ extern NSString * const TLWProfileDidUpdateNotification;
     return cell;
   }
   TLWHomeCustomCell *cell = [tableView dequeueReusableCellWithIdentifier:@"kTLWHomeCustomCellIdentifier" forIndexPath:indexPath];
+  __weak typeof(self) weakSelf = self;
+  cell.clickCreateButton = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    TLWAddPlantController *controller = [[TLWAddPlantController alloc] init];
+    controller.hidesBottomBarWhenPushed = YES;
+    [strongSelf.navigationController pushViewController:controller animated:YES];
+  };
+  cell.clickContentCard = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    TLWAddPlantController *controller = [[TLWAddPlantController alloc] init];
+    controller.hidesBottomBarWhenPushed = YES;
+    [strongSelf.navigationController pushViewController:controller animated:YES];
+  };
+  cell.selectionStyle = UITableViewCellSelectionStyleNone;
   return cell;
 }
 
