@@ -14,6 +14,7 @@ NSString * const kTLWPhotoCellID = @"TLWPhotoCell";
 @property (nonatomic, strong) UILabel *selectNumLabel;
 @property (nonatomic, assign) BOOL showsSelectionIndicator;
 @property (nonatomic, assign) NSInteger selectionIndex;
+@property (nonatomic, assign) BOOL useCheckmarkStyle;
 
 @end
 
@@ -73,6 +74,7 @@ NSString * const kTLWPhotoCellID = @"TLWPhotoCell";
     }
     _imageView.image = nil;
     self.selectionIndex = 0;
+    self.useCheckmarkStyle = NO;
     [self setShowsSelectionIndicator:NO];
 }
 
@@ -81,8 +83,9 @@ NSString * const kTLWPhotoCellID = @"TLWPhotoCell";
     [self updateSelectionViews];
 }
 
-- (void)configureWithSelectionIndex:(NSInteger)index {
+- (void)configureWithSelectionIndex:(NSInteger)index useCheckmarkStyle:(BOOL)useCheckmarkStyle {
     self.selectionIndex = index;
+    self.useCheckmarkStyle = useCheckmarkStyle;
     [self updateSelectionViews];
 }
 
@@ -96,7 +99,7 @@ NSString * const kTLWPhotoCellID = @"TLWPhotoCell";
     if (self.selectionIndex > 0) {
         self.selectCircle.hidden = YES;
         self.selectNumLabel.hidden = NO;
-        self.selectNumLabel.text = [NSString stringWithFormat:@"%ld", (long)self.selectionIndex];
+        self.selectNumLabel.text = self.useCheckmarkStyle ? @"✓" : [NSString stringWithFormat:@"%ld", (long)self.selectionIndex];
     } else {
         self.selectCircle.hidden = NO;
         self.selectNumLabel.hidden = YES;

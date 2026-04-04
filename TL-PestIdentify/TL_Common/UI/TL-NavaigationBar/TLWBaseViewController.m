@@ -50,6 +50,7 @@
 
     BOOL canPop = self.navigationController.viewControllers.count > 1;
     self.navigationController.interactivePopGestureRecognizer.enabled = canPop;
+    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
 
     if (self.navBar) {
         self.navBar.backButton.hidden = !canPop;

@@ -46,8 +46,7 @@ static CGFloat const kVoicePanelHeight = 180.0;
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        UIWindow *window = [self tl_activeWindow];
-        _safeBottomInset = window.safeAreaInsets.bottom;
+        _safeBottomInset = [self tl_initialSafeBottomInset];
         _currentTextViewHeight = kTextViewBaseHeight;
         _preferredHeight = kRoundBaseHeight + _safeBottomInset;
         _previewImages = [NSMutableArray array];
@@ -222,6 +221,17 @@ static CGFloat const kVoicePanelHeight = 180.0;
     [super layoutSubviews];
 }
 
+- (void)safeAreaInsetsDidChange {
+    [super safeAreaInsetsDidChange];
+    CGFloat newInset = self.safeAreaInsets.bottom;
+    // 键盘弹起时系统可能把 safeBottom 变为 0，这里忽略，避免输入区高度突然缩小。
+    if (newInset <= 0) return;
+    if (ABS(newInset - self.safeBottomInset) < 0.5) return;
+    self.safeBottomInset = newInset;
+    [self tl_updateInputBarHeight];
+    [self setNeedsLayout];
+}
+
 - (void)setInputText:(NSString *)text {
     self.inputTextField.text = text ?: @"";
     [self tl_refreshInputArea];
@@ -307,6 +317,7 @@ static CGFloat const kVoicePanelHeight = 180.0;
         self.micButton.hidden = YES;
         self.galleryButton.hidden = YES;
         self.sendButtonWrapper.hidden = NO;
+        [self.inputBar bringSubviewToFront:self.sendButtonWrapper];
         self.roundContainerRightConstraint.offset = -(16 + kInputBoxHeight + 8);
         [self.textViewRightConstraint uninstall];
         [self.inputTextField mas_updateConstraints:^(MASConstraintMaker *make) {
@@ -448,6 +459,13 @@ static CGFloat const kVoicePanelHeight = 180.0;
         }
     }
     return [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
+}
+
+- (CGFloat)tl_initialSafeBottomInset {
+    UIWindow *window = [self tl_activeWindow];
+    CGFloat inset = window.safeAreaInsets.bottom;
+    if (inset > 0) return inset;
+    return self.safeAreaInsets.bottom;
 }
 
 @end
