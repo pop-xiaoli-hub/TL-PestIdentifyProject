@@ -211,6 +211,17 @@
 }
 
 - (void)tl_send {
+    UITextRange *markedRange = self.myView.inputTextField.markedTextRange;
+    if (markedRange) {
+        UITextPosition *start = markedRange.start;
+        UITextPosition *end = markedRange.end;
+        if (start && end) {
+            NSString *marked = [self.myView.inputTextField textInRange:markedRange];
+            if (marked.length > 0) {
+                [self.myView.inputTextField replaceRange:markedRange withText:marked];
+            }
+        }
+    }
     NSString *text = [self.myView.inputTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (text.length == 0 && self.pendingImages.count == 0) return;
 

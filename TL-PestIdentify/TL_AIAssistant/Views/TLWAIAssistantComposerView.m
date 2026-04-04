@@ -317,6 +317,7 @@ static CGFloat const kVoicePanelHeight = 180.0;
         self.micButton.hidden = YES;
         self.galleryButton.hidden = YES;
         self.sendButtonWrapper.hidden = NO;
+        [self.inputBar bringSubviewToFront:self.sendButtonWrapper];
         self.roundContainerRightConstraint.offset = -(16 + kInputBoxHeight + 8);
         [self.textViewRightConstraint uninstall];
         [self.inputTextField mas_updateConstraints:^(MASConstraintMaker *make) {
