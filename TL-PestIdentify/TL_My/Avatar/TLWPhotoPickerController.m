@@ -31,6 +31,7 @@ static CGFloat   const kCellGap       = 1.0;
 @property (nonatomic, strong) UILabel                   *bottomCountLabel;
 @property (nonatomic, strong) UIButton                  *bottomDoneBtn;
 @property (nonatomic, strong) UILabel                   *bottomBadge;
+@property (nonatomic, strong) PHAsset                   *singleSelectedAsset;
 
 @end
 
@@ -312,9 +313,12 @@ static CGFloat   const kCellGap       = 1.0;
     if ([self isMultiSelectMode]) {
         NSUInteger idx = [_selectedAssets indexOfObject:asset];
         [cell setShowsSelectionIndicator:YES];
-        [cell configureWithSelectionIndex:(idx != NSNotFound) ? (NSInteger)(idx + 1) : 0];
+        [cell configureWithSelectionIndex:(idx != NSNotFound) ? (NSInteger)(idx + 1) : 0
+                        useCheckmarkStyle:NO];
     } else {
-        [cell setShowsSelectionIndicator:NO];
+        BOOL isSelected = (self.singleSelectedAsset && [self.singleSelectedAsset.localIdentifier isEqualToString:asset.localIdentifier]);
+        [cell setShowsSelectionIndicator:YES];
+        [cell configureWithSelectionIndex:isSelected ? 1 : 0 useCheckmarkStyle:YES];
     }
 
     return cell;
@@ -328,9 +332,12 @@ didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
 
     // 单选模式：点击直接回调
     if (![self isMultiSelectMode]) {
+        self.singleSelectedAsset = asset;
+        [collectionView reloadItemsAtIndexPaths:@[indexPath]];
         [self loadFullImageForAsset:asset completion:^(UIImage *image) {
             if (self.onSelectImage) {
                 self.onSelectImage(image);
+                [self.navigationController popViewControllerAnimated:YES];
             } else {
                 TLWAvatarCropController *cropVC = [[TLWAvatarCropController alloc] initWithImage:image];
                 cropVC.delegate = self.cropDelegate;

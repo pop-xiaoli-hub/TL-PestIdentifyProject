@@ -27,14 +27,9 @@ static CGFloat const kNavHeight = 48.0;
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        UIWindow *window = [self tl_activeWindow];
-        CGFloat safeTop = window.safeAreaInsets.top;
-        CGFloat navTop = safeTop + kNavOffset;
-        CGFloat contentTop = navTop + kNavHeight + 8.0;
-
         [self tl_setupBackground];
-        [self tl_setupCardWithTop:contentTop];
-        [self tl_setupContentWithTop:contentTop];
+        [self tl_setupCard];
+        [self tl_setupContent];
         [self tl_bindComposerHeight];
     }
     return self;
@@ -120,7 +115,7 @@ static CGFloat const kNavHeight = 48.0;
     self.layer.contents = (__bridge id)bg.CGImage;
 }
 
-- (void)tl_setupCardWithTop:(CGFloat)cardTop {
+- (void)tl_setupCard {
     UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight];
     UIVisualEffectView *cardView = [[UIVisualEffectView alloc] initWithEffect:blur];
     cardView.layer.cornerRadius = 20;
@@ -136,11 +131,11 @@ static CGFloat const kNavHeight = 48.0;
     [self addSubview:cardView];
     [cardView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.right.bottom.equalTo(self);
-        make.top.equalTo(self).offset(cardTop);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(kNavOffset + kNavHeight + 8.0);
     }];
 }
 
-- (void)tl_setupContentWithTop:(CGFloat)contentTop {
+- (void)tl_setupContent {
     self.messageListView = [[TLWAIAssistantMessageListView alloc] initWithFrame:CGRectZero];
     [self addSubview:self.messageListView];
 
@@ -156,7 +151,7 @@ static CGFloat const kNavHeight = 48.0;
     }];
 
     [self.messageListView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self).offset(contentTop);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(kNavOffset + kNavHeight + 8.0);
         make.left.right.equalTo(self);
         // 让消息区始终贴着输入区上沿，composer 高度变化时列表可自动重排。
         make.bottom.equalTo(self.composerView.mas_top);
@@ -172,23 +167,6 @@ static CGFloat const kNavHeight = 48.0;
         strongSelf.composerHeightConstraint.offset = height;
         [strongSelf setNeedsLayout];
     };
-}
-
-- (UIWindow *)tl_activeWindow {
-    NSSet<UIScene *> *scenes = UIApplication.sharedApplication.connectedScenes;
-    for (UIScene *scene in scenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
-        UIWindowScene *windowScene = (UIWindowScene *)scene;
-        for (UIWindow *window in windowScene.windows) {
-            if (window.isKeyWindow) {
-                return window;
-            }
-        }
-        if (windowScene.windows.firstObject) {
-            return windowScene.windows.firstObject;
-        }
-    }
-    return [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
 }
 
 @end

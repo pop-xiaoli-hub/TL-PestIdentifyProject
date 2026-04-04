@@ -16,7 +16,7 @@ FOUNDATION_EXPORT NSString * const kTLWPhotoCellID;
 @property (nonatomic, assign)          PHImageRequestID   requestID;
 
 - (void)setShowsSelectionIndicator:(BOOL)showsSelectionIndicator;
-- (void)configureWithSelectionIndex:(NSInteger)index;
+- (void)configureWithSelectionIndex:(NSInteger)index useCheckmarkStyle:(BOOL)useCheckmarkStyle;
 
 @end
 

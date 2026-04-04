@@ -46,8 +46,7 @@ static CGFloat const kVoicePanelHeight = 180.0;
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        UIWindow *window = [self tl_activeWindow];
-        _safeBottomInset = window.safeAreaInsets.bottom;
+        _safeBottomInset = 0;
         _currentTextViewHeight = kTextViewBaseHeight;
         _preferredHeight = kRoundBaseHeight + _safeBottomInset;
         _previewImages = [NSMutableArray array];
@@ -220,6 +219,15 @@ static CGFloat const kVoicePanelHeight = 180.0;
 
 - (void)layoutSubviews {
     [super layoutSubviews];
+}
+
+- (void)safeAreaInsetsDidChange {
+    [super safeAreaInsetsDidChange];
+    CGFloat newInset = self.safeAreaInsets.bottom;
+    if (ABS(newInset - self.safeBottomInset) < 0.5) return;
+    self.safeBottomInset = newInset;
+    [self tl_updateInputBarHeight];
+    [self setNeedsLayout];
 }
 
 - (void)setInputText:(NSString *)text {
