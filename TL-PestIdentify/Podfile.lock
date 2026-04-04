@@ -36,7 +36,7 @@ PODS:
   - YYModel (1.0.4)
 
 DEPENDENCIES:
-  - AgriPestClient (from `https://github.com/lukecc00/AgriPest-IOS-SDK.git`, tag `v1.0.108`)
+  - AgriPestClient (from `https://github.com/Biscoffee/AgriPest-IOS-SDK.git`, tag `v1.0.109`)
   - LookinServer
   - Masonry
   - SDWebImage (~> 5.0)
@@ -47,13 +47,13 @@ DEPENDENCIES:
 
 SPEC REPOS:
   https://github.com/CocoaPods/Specs.git:
+    - AFNetworking
+    - ISO8601
+    - JSONModel
     - SocketRocket
   https://github.com/volcengine/volcengine-specs.git:
     - SpeechEngineToB
   trunk:
-    - AFNetworking
-    - ISO8601
-    - JSONModel
     - LookinServer
     - Masonry
     - SDWebImage
@@ -62,16 +62,16 @@ SPEC REPOS:
 
 EXTERNAL SOURCES:
   AgriPestClient:
-    :git: https://github.com/lukecc00/AgriPest-IOS-SDK.git
-    :tag: v1.0.108
+    :git: https://github.com/Biscoffee/AgriPest-IOS-SDK.git
+    :tag: v1.0.109
   WCDB.objc:
     :branch: master
     :git: https://github.com/Tencent/wcdb.git
 
 CHECKOUT OPTIONS:
   AgriPestClient:
-    :git: https://github.com/lukecc00/AgriPest-IOS-SDK.git
-    :tag: v1.0.108
+    :git: https://github.com/Biscoffee/AgriPest-IOS-SDK.git
+    :tag: v1.0.109
   WCDB.objc:
     :commit: df808591b9f9a9ab42156006819c3550d5af13a3
     :git: https://github.com/Tencent/wcdb.git
@@ -90,6 +90,6 @@ SPEC CHECKSUMS:
   WCDBOptimizedSQLCipher: 871994f7f620302fdf87a2729c099a1efa2223da
   YYModel: 2a7fdd96aaa4b86a824e26d0c517de8928c04b30
 
-PODFILE CHECKSUM: 23d97f3654c2a77e6eec4ae99e44a749e754477d
+PODFILE CHECKSUM: 6435e8b43b9ddb137ce71c138525d26791e16937
 
 COCOAPODS: 1.16.2
