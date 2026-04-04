@@ -47,8 +47,14 @@
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self.navigationController setNavigationBarHidden:YES animated:animated];
-    self.navigationController.interactivePopGestureRecognizer.enabled  = YES;
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+
+    BOOL canPop = self.navigationController.viewControllers.count > 1;
+    self.navigationController.interactivePopGestureRecognizer.enabled = canPop;
+
+    if (self.navBar) {
+        self.navBar.backButton.hidden = !canPop;
+        self.navBar.backButton.userInteractionEnabled = canPop;
+    }
 }
 
 #pragma mark - Override Points
