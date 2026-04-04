@@ -29,8 +29,10 @@
 - 发布帖子：多图选择 + 裁剪
 
 ### AI 助手
-- 多轮对话式 AI 助手
-- 支持图片 + 文字混合输入
+- 多轮对话式 AI 助手（已接入 AgriPestClient chatProfile SDK）
+- 支持图片 + 文字混合输入（图片压缩后 Base64 编码传输）
+- AI 占位消息"正在思考中..."+ 实时回显
+- 401 token 过期自动续期重试
 
 ### 我的
 - 编辑资料页（Figma 1:1 还原，独立毛玻璃卡片设计）
@@ -135,7 +137,7 @@ TL-PestIdentify/
 | WCDB.objc | master (git) | 本地 SQLite 数据库 |
 | Masonry | 1.1.0 | AutoLayout DSL |
 | SDWebImage | ~5.0 | 异步图片加载缓存 |
-| AgriPestClient | v1.0.105 | AI 病虫害识别 SDK |
+| AgriPestClient | v1.0.109 | AI 病虫害识别 SDK |
 | LookinServer | 1.2.8 | UI 层级调试（仅 Debug）|
 
 ---
@@ -178,8 +180,8 @@ gh api 'repos/lukecc00/AgroAiServer/commits?sha=master&per_page=20' \
 
 ### 待接入接口
 - [ ] **拍照识别** — `POST /api/identify`，图片 Base64/multipart 上传，跳转识别结果页
-- [ ] **AI 助手多图上传** — `POST /api/ai/chat`，目前逐张调用，待改为批量
-- [ ] **消息列表** — 替换 mock 数据，接入真实通知接口
+- [x] **AI 助手对话** — 已接入 `chatProfileWithChatRequest:` SDK，支持文字+单图对话
+- [x] **消息列表** — 已接入真实评论/通知接口，评论缩略图通过 postId 补查帖子封面
 - [ ] **识别记录列表** — 替换 mock 数据，接入后端记录接口
 
 ### 待完成功能

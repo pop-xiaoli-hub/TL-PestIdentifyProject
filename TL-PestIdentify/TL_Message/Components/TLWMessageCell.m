@@ -17,6 +17,7 @@
 @property (nonatomic, strong) UIView *redDot;
 // User-type only
 @property (nonatomic, strong) UIView *thumbnailView;
+@property (nonatomic, strong) UIImageView *thumbnailImageView;
 @property (nonatomic, strong) UILabel *timeLabel;
 
 @end
@@ -61,10 +62,9 @@
     _thumbnailView.layer.masksToBounds = YES;
     _thumbnailView.backgroundColor = [UIColor colorWithRed:0.56 green:0.78 blue:0.52 alpha:1];
     _thumbnailView.hidden = YES;
-    UIImageView *thumbImg = [[UIImageView alloc] init];
-    thumbImg.contentMode = UIViewContentModeScaleAspectFill;
-    thumbImg.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    [_thumbnailView addSubview:thumbImg];
+    _thumbnailImageView = [[UIImageView alloc] init];
+    _thumbnailImageView.contentMode = UIViewContentModeScaleAspectFill;
+    [_thumbnailView addSubview:_thumbnailImageView];
     [self.contentView addSubview:_thumbnailView];
 
     _timeLabel = [[UILabel alloc] init];
@@ -93,6 +93,9 @@
         make.right.equalTo(self.contentView).offset(-16);
         make.centerY.equalTo(self.contentView);
         make.width.height.mas_equalTo(44);
+    }];
+    [_thumbnailImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.thumbnailView);
     }];
 
     // Time label: above thumbnail, right aligned
@@ -133,14 +136,11 @@
 
     if (isUser) {
         // Load post cover image
-        UIImageView *thumbImg = _thumbnailView.subviews.firstObject;
-        if ([thumbImg isKindOfClass:[UIImageView class]]) {
-            if (item.postImageUrl.length > 0) {
-                [thumbImg sd_setImageWithURL:[NSURL URLWithString:item.postImageUrl]
-                           placeholderImage:nil];
-            } else {
-                thumbImg.image = nil;
-            }
+        if (item.postImageUrl.length > 0) {
+            [self.thumbnailImageView sd_setImageWithURL:[NSURL URLWithString:item.postImageUrl]
+                                       placeholderImage:nil];
+        } else {
+            self.thumbnailImageView.image = nil;
         }
 
         // Red dot goes on thumbnail corner, must be above thumbnail

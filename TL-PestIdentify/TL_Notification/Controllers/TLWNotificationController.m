@@ -173,10 +173,15 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
     // 展开时标记已读
     if (item.isExpanded && item.hasUnread && item.messageId) {
         item.hasUnread = NO;
-        [[TLWSDKManager shared].api markAsReadWithId:item.messageId
+        NSNumber *msgId = item.messageId;
+        [[TLWSDKManager shared].api markAsReadWithId:msgId
                                    completionHandler:^(AGResultVoid *output, NSError *error) {
             if (!error && output.code.integerValue == 401) {
-                [[TLWSDKManager shared] handleUnauthorizedWithRetry:nil];
+                [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                    // 刷新成功后补发 markAsRead，保持本地与服务端已读状态一致
+                    [[TLWSDKManager shared].api markAsReadWithId:msgId
+                                               completionHandler:^(AGResultVoid *o, NSError *e) {}];
+                }];
             }
         }];
     }
