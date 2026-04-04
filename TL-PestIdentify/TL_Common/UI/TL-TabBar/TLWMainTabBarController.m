@@ -34,6 +34,7 @@ static CGFloat const kDefaultTabBarHeight = 96.0;
 // 胶囊外围的白色半透明背景，用遮罩挖掉胶囊区域
 @property (nonatomic, strong) UIView *whiteBg;
 @property (nonatomic, strong) CAShapeLayer *whiteBgMask;
+@property (nonatomic, assign) BOOL isForwardingInitialAppearance;
 
 @end
 
@@ -145,6 +146,38 @@ static CGFloat const kDefaultTabBarHeight = 96.0;
     _whiteBgMask.frame = _whiteBg.bounds;
 }
 
+#pragma mark - Appearance Forwarding
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    UIViewController *selectedVC = [self tl_selectedChildController];
+    if (!selectedVC) return;
+    self.isForwardingInitialAppearance = YES;
+    [selectedVC beginAppearanceTransition:YES animated:animated];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    UIViewController *selectedVC = [self tl_selectedChildController];
+    if (!selectedVC || !self.isForwardingInitialAppearance) return;
+    [selectedVC endAppearanceTransition];
+    self.isForwardingInitialAppearance = NO;
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    UIViewController *selectedVC = [self tl_selectedChildController];
+    if (!selectedVC) return;
+    [selectedVC beginAppearanceTransition:NO animated:animated];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    UIViewController *selectedVC = [self tl_selectedChildController];
+    if (!selectedVC) return;
+    [selectedVC endAppearanceTransition];
+}
+
 #pragma mark - UINavigationControllerDelegate   模拟系统推栈行为
 
 - (void)navigationController:(UINavigationController *)navigationController
@@ -172,18 +205,30 @@ static CGFloat const kDefaultTabBarHeight = 96.0;
     UIViewController *fromVC = _childVCs[_selectedIndex];
     UIViewController *toVC   = _childVCs[idx];
 
-    // 正确触发 viewWillDisappear / viewWillAppear 等生命周期
-    [fromVC beginAppearanceTransition:NO animated:NO];
-    [toVC   beginAppearanceTransition:YES animated:NO];
+    BOOL parentVisible = self.isViewLoaded && self.view.window != nil;
+    if (parentVisible) {
+        // 正确触发 viewWillDisappear / viewWillAppear 等生命周期
+        [fromVC beginAppearanceTransition:NO animated:NO];
+        [toVC   beginAppearanceTransition:YES animated:NO];
+    }
 
     fromVC.view.hidden = YES;
     toVC.view.hidden   = NO;
 
-    [fromVC endAppearanceTransition];// 触发 viewDidDisappear
-    [toVC   endAppearanceTransition];// 触发 viewDidAppear
+    if (parentVisible) {
+        [fromVC endAppearanceTransition];// 触发 viewDidDisappear
+        [toVC   endAppearanceTransition];// 触发 viewDidAppear
+    }
 
     _selectedIndex = idx;
     [_mainTabBar tl_setSelectedIndex:idx];
+}
+
+- (UIViewController *)tl_selectedChildController {
+    if (self.selectedIndex < 0 || self.selectedIndex >= self.childVCs.count) {
+        return nil;
+    }
+    return self.childVCs[self.selectedIndex];
 }
 
 @end
