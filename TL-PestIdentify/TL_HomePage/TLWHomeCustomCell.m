@@ -2,160 +2,220 @@
 //  TLWHomeCustomCell.m
 //  TL-PestIdentify
 //
-//  Created by xiaoli pop on 2026/3/9.
-//
 
 #import "TLWHomeCustomCell.h"
 #import <Masonry.h>
 
 @interface TLWHomeCustomCell ()
 
-@property (nonatomic, strong) UIView *roundedBackgroundView;
+@property (nonatomic, strong) UIView *cardView;
 @property (nonatomic, strong) UIImageView *avatarImageView;
 @property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UIImageView *locationIconView;
 @property (nonatomic, strong) UILabel *locationLabel;
-@property (nonatomic, strong) UIView *yieldBadgeView;
-@property (nonatomic, strong) UILabel *yieldLabel;
-@property (nonatomic, strong) UIImageView *yieldIconView;
-@property (nonatomic, strong) UIImageView *cropImageView;
+@property (nonatomic, strong) UIButton *createButton;
+@property (nonatomic, strong) UIButton *contentCardButton;
+@property (nonatomic, strong) UIView *plusHorizontalLine;
+@property (nonatomic, strong) UIView *plusVerticalLine;
+@property (nonatomic, strong) CAGradientLayer *createButtonGradientLayer;
 
 @end
 
 @implementation TLWHomeCustomCell
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
-    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
-    if (self) {
-        [self setupSubviews];
-    }
-    return self;
+  self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
+  if (self) {
+    [self tl_setupSubviews];
+  }
+  return self;
 }
 
-- (void)setupSubviews {
-    self.selectionStyle = UITableViewCellSelectionStyleNone;
-    self.backgroundColor = [UIColor clearColor];
-    self.contentView.backgroundColor = [UIColor clearColor];
+- (void)prepareForReuse {
+  [super prepareForReuse];
+  self.clickCreateButton = nil;
+  self.clickContentCard = nil;
+}
 
-    _roundedBackgroundView = [[UIView alloc] init];
-    _roundedBackgroundView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.96];
-    _roundedBackgroundView.layer.cornerRadius = 16.0;
-    _roundedBackgroundView.layer.masksToBounds = YES;
+- (void)layoutSubviews {
+  [super layoutSubviews];
+  self.cardView.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.cardView.bounds cornerRadius:self.cardView.layer.cornerRadius].CGPath;
+  self.createButtonGradientLayer.frame = self.createButton.bounds;
+}
 
-    [self.contentView addSubview:_roundedBackgroundView];
+- (void)tl_setupSubviews {
+  self.selectionStyle = UITableViewCellSelectionStyleNone;
+  self.backgroundColor = [UIColor clearColor];
+  self.contentView.backgroundColor = [UIColor clearColor];
 
-    [_roundedBackgroundView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.contentView).offset(16.0);
-        make.right.equalTo(self.contentView).offset(-16.0);
-        make.top.equalTo(self.contentView).offset(6.0);
-        make.bottom.equalTo(self.contentView).offset(-6.0);
-    }];
+  UIView *cardView = [[UIView alloc] init];
+  cardView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.96];
+  cardView.layer.cornerRadius = 22.0;
+  cardView.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.10].CGColor;
+  cardView.layer.shadowOpacity = 1.0;
+  cardView.layer.shadowOffset = CGSizeMake(0, 8);
+  cardView.layer.shadowRadius = 18.0;
+  [self.contentView addSubview:cardView];
+  self.cardView = cardView;
 
-    // 头像
-    self.avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_avatar.png"]];
-    self.avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
-    self.avatarImageView.clipsToBounds = YES;
-    self.avatarImageView.layer.cornerRadius = 30.0;
-    [self.roundedBackgroundView addSubview:self.avatarImageView];
+  [cardView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.contentView).offset(10.0);
+    make.right.equalTo(self.contentView).offset(-10.0);
+    make.top.equalTo(self.contentView).offset(8.0);
+    make.bottom.equalTo(self.contentView).offset(-8.0);
+  }];
 
-    // 标题和位置
-    self.titleLabel = [[UILabel alloc] init];
-    self.titleLabel.text = @"我的种植物";
-    self.titleLabel.textColor = [UIColor colorWithWhite:0.12 alpha:1.0];
-    self.titleLabel.font = [UIFont systemFontOfSize:20.0 weight:UIFontWeightSemibold];
+  UIImageView *avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_avatar.png"]];
+  avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
+  avatarImageView.clipsToBounds = YES;
+  avatarImageView.layer.cornerRadius = 25.0;
+  [cardView addSubview:avatarImageView];
+  self.avatarImageView = avatarImageView;
 
-    self.locationLabel = [[UILabel alloc] init];
-    self.locationLabel.text = @"杭州";
-    self.locationLabel.textColor = [UIColor colorWithWhite:0.55 alpha:1.0];
-    self.locationLabel.font = [UIFont systemFontOfSize:14.0];
+  UILabel *titleLabel = [[UILabel alloc] init];
+  titleLabel.text = @"种植物管理";
+  titleLabel.textColor = [UIColor colorWithWhite:0.22 alpha:1.0];
+  titleLabel.font = [UIFont systemFontOfSize:18.0 weight:UIFontWeightSemibold];
+  [cardView addSubview:titleLabel];
+  self.titleLabel = titleLabel;
 
-    [self.roundedBackgroundView addSubview:self.titleLabel];
-    [self.roundedBackgroundView addSubview:self.locationLabel];
+  UIImageView *locationIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_location.png"]];
+  locationIconView.contentMode = UIViewContentModeScaleAspectFit;
+  [cardView addSubview:locationIconView];
+  self.locationIconView = locationIconView;
 
-    // 右侧产量 badge
-    self.yieldBadgeView = [[UIView alloc] init];
-    self.yieldBadgeView.backgroundColor = [UIColor clearColor];
-    self.yieldBadgeView.layer.cornerRadius = 20.0;
-    self.yieldBadgeView.layer.masksToBounds = YES;
+  UILabel *locationLabel = [[UILabel alloc] init];
+  locationLabel.text = @"杭州";
+  locationLabel.textColor = [UIColor colorWithWhite:0.60 alpha:1.0];
+  locationLabel.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightMedium];
+  [cardView addSubview:locationLabel];
+  self.locationLabel = locationLabel;
 
-    CAGradientLayer *yieldGradient = [CAGradientLayer layer];
-    yieldGradient.startPoint = CGPointMake(0.0, 0.5);
-    yieldGradient.endPoint = CGPointMake(1.0, 0.5);
-    yieldGradient.colors = @[
-        (__bridge id)[UIColor colorWithRed:0.09 green:0.93 blue:0.70 alpha:1.0].CGColor,
-        (__bridge id)[UIColor colorWithRed:0.14 green:0.83 blue:0.96 alpha:1.0].CGColor
-    ];
-    yieldGradient.locations = @[@0.0, @1.0];
-    yieldGradient.cornerRadius = 16.0;
-    [self.yieldBadgeView.layer insertSublayer:yieldGradient atIndex:0];
+  UIButton *createButton = [UIButton buttonWithType:UIButtonTypeCustom];
+  createButton.backgroundColor = [UIColor colorWithRed:0.30 green:0.92 blue:0.76 alpha:1.0];
+  createButton.layer.cornerRadius = 20.0;
+  createButton.layer.masksToBounds = NO;
+  createButton.layer.shadowColor = [UIColor colorWithRed:0.15 green:0.90 blue:0.78 alpha:0.45].CGColor;
+  createButton.layer.shadowOpacity = 1.0;
+  createButton.layer.shadowOffset = CGSizeMake(0, 6);
+  createButton.layer.shadowRadius = 14.0;
+  [createButton addTarget:self action:@selector(tl_createButtonTapped) forControlEvents:UIControlEventTouchUpInside];
+  [cardView addSubview:createButton];
+  self.createButton = createButton;
 
-    self.yieldLabel = [[UILabel alloc] init];
-    self.yieldLabel.text = @"5200kg/ha";
-    self.yieldLabel.textColor = [UIColor whiteColor];
-    self.yieldLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+  CAGradientLayer *gradientLayer = [CAGradientLayer layer];
+  gradientLayer.colors = @[
+    (__bridge id)[UIColor colorWithRed:0.37 green:0.95 blue:0.91 alpha:1.0].CGColor,
+    (__bridge id)[UIColor colorWithRed:0.23 green:0.89 blue:0.63 alpha:1.0].CGColor
+  ];
+  gradientLayer.startPoint = CGPointMake(0.0, 0.5);
+  gradientLayer.endPoint = CGPointMake(1.0, 0.5);
+  gradientLayer.cornerRadius = 20.0;
+  [createButton.layer insertSublayer:gradientLayer atIndex:0];
+  self.createButtonGradientLayer = gradientLayer;
 
-    self.yieldIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_yield_leaf.png"]];
-    self.yieldIconView.contentMode = UIViewContentModeScaleAspectFit;
-    self.yieldIconView.tintColor = [UIColor whiteColor];
+  UIImageView *createIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_yield_leaf.png"]];
+  createIconView.contentMode = UIViewContentModeScaleAspectFit;
+  [createButton addSubview:createIconView];
 
-    [self.roundedBackgroundView addSubview:self.yieldBadgeView];
-    [self.yieldBadgeView addSubview:self.yieldLabel];
-    [self.yieldBadgeView addSubview:self.yieldIconView];
+  UILabel *createLabel = [[UILabel alloc] init];
+  createLabel.text = @"新建";
+  createLabel.textColor = [UIColor whiteColor];
+  createLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+  [createButton addSubview:createLabel];
 
-    // 底部作物大图
-    self.cropImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_eg1.jpg"]];
-    self.cropImageView.contentMode = UIViewContentModeScaleAspectFill;
-    self.cropImageView.clipsToBounds = YES;
-    self.cropImageView.layer.cornerRadius = 16.0;
-    [self.roundedBackgroundView addSubview:self.cropImageView];
+  UIButton *contentCardButton = [UIButton buttonWithType:UIButtonTypeCustom];
+  contentCardButton.backgroundColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+  contentCardButton.layer.cornerRadius = 16.0;
+  contentCardButton.layer.masksToBounds = YES;
+  [contentCardButton addTarget:self action:@selector(tl_contentCardTapped) forControlEvents:UIControlEventTouchUpInside];
+  [cardView addSubview:contentCardButton];
+  self.contentCardButton = contentCardButton;
 
-    // 约束
-    [self.avatarImageView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.roundedBackgroundView).offset(14.0);
-        make.top.equalTo(self.roundedBackgroundView).offset(10.0);
-        make.width.height.mas_equalTo(60.0);
-    }];
+  UIView *plusHorizontalLine = [[UIView alloc] init];
+  plusHorizontalLine.backgroundColor = [UIColor whiteColor];
+  plusHorizontalLine.layer.cornerRadius = 3.0;
+  [contentCardButton addSubview:plusHorizontalLine];
+  self.plusHorizontalLine = plusHorizontalLine;
 
-    [self.titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.avatarImageView.mas_right).offset(7.0);
-        make.top.equalTo(self.avatarImageView.mas_top).offset(6.0);
-        make.right.lessThanOrEqualTo(self.yieldBadgeView.mas_left).offset(-8.0);
-    }];
+  UIView *plusVerticalLine = [[UIView alloc] init];
+  plusVerticalLine.backgroundColor = [UIColor whiteColor];
+  plusVerticalLine.layer.cornerRadius = 3.0;
+  [contentCardButton addSubview:plusVerticalLine];
+  self.plusVerticalLine = plusVerticalLine;
 
-    [self.locationLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.titleLabel);
-        make.top.equalTo(self.titleLabel.mas_bottom).offset(2.0);
-    }];
+  [avatarImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(cardView).offset(16.0);
+    make.top.equalTo(cardView).offset(16.0);
+    make.width.height.mas_equalTo(50.0);
+  }];
 
-    [self.yieldBadgeView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerY.equalTo(self.avatarImageView);
-        make.right.equalTo(self.roundedBackgroundView).offset(-14.0);
-        make.height.mas_equalTo(40.0);
-        make.width.greaterThanOrEqualTo(@110.0);
-    }];
+  [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(avatarImageView.mas_right).offset(12.0);
+    make.top.equalTo(avatarImageView).offset(2.0);
+    make.right.lessThanOrEqualTo(createButton.mas_left).offset(-12.0);
+  }];
 
-    [self.yieldIconView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.yieldBadgeView).offset(10.0);
-        make.centerY.equalTo(self.yieldBadgeView);
-        make.width.height.mas_equalTo(20.0);
-    }];
+  [locationIconView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(titleLabel);
+    make.top.equalTo(titleLabel.mas_bottom).offset(6.0);
+    make.width.height.mas_equalTo(13.0);
+  }];
 
-    [self.yieldLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.yieldIconView.mas_right).offset(6.0);
-        make.centerY.equalTo(self.yieldBadgeView);
-        make.right.equalTo(self.yieldBadgeView).offset(-12.0);
-    }];
+  [locationLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(locationIconView.mas_right).offset(4.0);
+    make.centerY.equalTo(locationIconView);
+  }];
 
-    [self.cropImageView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.roundedBackgroundView).offset(10);
-        make.right.equalTo(self.roundedBackgroundView).offset(-10);
-        make.top.equalTo(self.avatarImageView.mas_bottom).offset(10.0);
-        make.bottom.equalTo(self.roundedBackgroundView).offset(-10);
-    }];
+  [createButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(cardView).offset(-16.0);
+    make.centerY.equalTo(avatarImageView);
+    make.width.mas_equalTo(108.0);
+    make.height.mas_equalTo(40.0);
+  }];
+  [createButton layoutIfNeeded];
 
-    // 更新渐变层 frame
-    dispatch_async(dispatch_get_main_queue(), ^{
-        yieldGradient.frame = self.yieldBadgeView.bounds;
-    });
+  [createIconView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(createButton).offset(14.0);
+    make.centerY.equalTo(createButton);
+    make.width.height.mas_equalTo(18.0);
+  }];
+
+  [createLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(createIconView.mas_right).offset(10.0);
+    make.centerY.equalTo(createButton);
+  }];
+
+  [contentCardButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(cardView).offset(10.0);
+    make.right.equalTo(cardView).offset(-10.0);
+    make.top.equalTo(avatarImageView.mas_bottom).offset(16.0);
+    make.bottom.equalTo(cardView).offset(-10.0);
+  }];
+
+  [plusHorizontalLine mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.center.equalTo(contentCardButton);
+    make.width.mas_equalTo(72.0);
+    make.height.mas_equalTo(8.0);
+  }];
+
+  [plusVerticalLine mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.center.equalTo(contentCardButton);
+    make.width.mas_equalTo(8.0);
+    make.height.mas_equalTo(72.0);
+  }];
+}
+
+- (void)tl_createButtonTapped {
+  if (self.clickCreateButton) {
+    self.clickCreateButton();
+  }
+}
+
+- (void)tl_contentCardTapped {
+  if (self.clickContentCard) {
+    self.clickContentCard();
+  }
 }
 
 @end

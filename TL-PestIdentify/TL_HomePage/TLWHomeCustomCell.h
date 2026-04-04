@@ -11,7 +11,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWHomeCustomCell : UITableViewCell
 
+@property (nonatomic, copy, nullable) void(^clickCreateButton)(void);
+@property (nonatomic, copy, nullable) void(^clickContentCard)(void);
+
 @end
 
 NS_ASSUME_NONNULL_END
-
