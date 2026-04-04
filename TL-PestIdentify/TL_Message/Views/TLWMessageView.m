@@ -69,7 +69,7 @@
     _tableView.separatorColor = [UIColor colorWithWhite:0.88 alpha:1];
     _tableView.separatorInset = UIEdgeInsetsMake(0, 78, 0, 0);
     _tableView.rowHeight = 72;
-    _tableView.scrollEnabled = NO;
+    _tableView.scrollEnabled = YES;
     _tableView.tableFooterView = [[UIView alloc] init];
     [card addSubview:_tableView];
 

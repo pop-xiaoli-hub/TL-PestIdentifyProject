@@ -24,6 +24,8 @@ static NSString *const kMessageCellID = @"TLWMessageCell";
 
 @property (nonatomic, strong) TLWMessageView           *myView;
 @property (nonatomic, strong) NSMutableArray<TLWMessageItem *> *items;
+@property (nonatomic, strong) NSMutableDictionary<NSNumber *, NSString *> *postImageCache;
+@property (nonatomic, strong) NSMutableSet<NSNumber *> *loadingPostIds;
 
 @end
 
@@ -41,6 +43,8 @@ static NSString *const kMessageCellID = @"TLWMessageCell";
     self.myView.tableView.dataSource = self;
     self.myView.tableView.delegate = self;
     [self.myView.tableView registerClass:[TLWMessageCell class] forCellReuseIdentifier:kMessageCellID];
+    self.postImageCache = [NSMutableDictionary dictionary];
+    self.loadingPostIds = [NSMutableSet set];
 
     [self tl_buildStaticItems];
 }
@@ -111,7 +115,7 @@ static NSString *const kMessageCellID = @"TLWMessageCell";
             sysItem.title           = @"系统消息";
             sysItem.hasUnread       = data.systemUnreadCount.integerValue > 0;
             sysItem.unreadCount     = data.systemUnreadCount;
-            sysItem.subtitle = @"还原使用植小保app";
+            sysItem.subtitle = @"欢迎使用植小保app";
             [newItems addObject:sysItem];
 
             // 评论互动行（直接展开，每条一行）
@@ -126,31 +130,15 @@ static NSString *const kMessageCellID = @"TLWMessageCell";
                 commentItem.timeString      = [self tl_relativeTime:dto.createdAt];
                 commentItem.postId          = dto.postId;
                 commentItem.messageId       = dto._id;
+                if (dto.postId) {
+                    commentItem.postImageUrl = self.postImageCache[dto.postId];
+                }
                 [newItems addObject:commentItem];
             }
 
             self.items = newItems;
+            [self.loadingPostIds removeAllObjects];
             [self.myView.tableView reloadData];
-
-            // 异步补全评论行的帖子首图
-            for (NSInteger i = 0; i < newItems.count; i++) {
-                TLWMessageItem *it = newItems[i];
-                if (it.type != TLWMessageItemTypeUser || !it.postId) continue;
-                NSInteger capturedIndex = i;
-                NSNumber *postId = it.postId;
-                [[TLWSDKManager shared].api getPostDetailWithId:postId
-                                              completionHandler:^(AGResultPostResponseDto *out, NSError *err) {
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        if (err || out.code.integerValue != 200 || !out.data) return;
-                        if (capturedIndex >= (NSInteger)self.items.count) return;
-                        if (![self.items[capturedIndex].postId isEqual:postId]) return;
-                        self.items[capturedIndex].postImageUrl = out.data.images.firstObject;
-                        NSIndexPath *ip = [NSIndexPath indexPathForRow:capturedIndex inSection:0];
-                        [self.myView.tableView reloadRowsAtIndexPaths:@[ip]
-                                                    withRowAnimation:UITableViewRowAnimationNone];
-                    });
-                }];
-            }
         });
     }];
 }
@@ -173,7 +161,11 @@ static NSString *const kMessageCellID = @"TLWMessageCell";
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     TLWMessageCell *cell = [tableView dequeueReusableCellWithIdentifier:kMessageCellID forIndexPath:indexPath];
-    [cell configureWithItem:self.items[indexPath.row]];
+    TLWMessageItem *item = self.items[indexPath.row];
+    [cell configureWithItem:item];
+    if (item.type == TLWMessageItemTypeUser && item.postId && item.postImageUrl.length == 0) {
+        [self tl_loadPostImageForPostId:item.postId];
+    }
     return cell;
 }
 
@@ -201,8 +193,7 @@ static NSString *const kMessageCellID = @"TLWMessageCell";
             item.hasUnread = NO;
             [self.myView.tableView reloadRowsAtIndexPaths:@[indexPath]
                                         withRowAnimation:UITableViewRowAnimationNone];
-            [[TLWSDKManager shared].api markAsReadWithId:item.messageId
-                                      completionHandler:^(AGResultVoid *output, NSError *error) {}];
+            [self tl_markMessageAsReadForItem:item preferredIndexPath:indexPath];
         }
 
         [[TLWSDKManager shared].api getPostDetailWithId:item.postId
@@ -231,6 +222,90 @@ static NSString *const kMessageCellID = @"TLWMessageCell";
             });
         }];
     }
+}
+
+#pragma mark - Private
+
+- (void)tl_loadPostImageForPostId:(NSNumber *)postId {
+    if (!postId) return;
+
+    NSString *cachedUrl = self.postImageCache[postId];
+    if (cachedUrl.length > 0) {
+        [self tl_applyPostImageUrl:cachedUrl forPostId:postId];
+        return;
+    }
+    if ([self.loadingPostIds containsObject:postId]) return;
+
+    [self.loadingPostIds addObject:postId];
+    [[TLWSDKManager shared].api getPostDetailWithId:postId
+                                  completionHandler:^(AGResultPostResponseDto *out, NSError *err) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.loadingPostIds removeObject:postId];
+            if (err || out.code.integerValue != 200 || !out.data) {
+                if (!err && out.code.integerValue == 401) {
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self tl_loadPostImageForPostId:postId]; }];
+                }
+                return;
+            }
+            NSString *imageUrl = out.data.images.firstObject;
+            if (imageUrl.length == 0) return;
+            self.postImageCache[postId] = imageUrl;
+            [self tl_applyPostImageUrl:imageUrl forPostId:postId];
+        });
+    }];
+}
+
+- (void)tl_applyPostImageUrl:(NSString *)imageUrl forPostId:(NSNumber *)postId {
+    if (imageUrl.length == 0 || !postId) return;
+
+    NSMutableArray<NSIndexPath *> *changedIndexPaths = [NSMutableArray array];
+    for (NSInteger i = 0; i < self.items.count; i++) {
+        TLWMessageItem *item = self.items[i];
+        if (item.type != TLWMessageItemTypeUser) continue;
+        if (![item.postId isEqual:postId]) continue;
+        if ([item.postImageUrl isEqualToString:imageUrl]) continue;
+        item.postImageUrl = imageUrl;
+        [changedIndexPaths addObject:[NSIndexPath indexPathForRow:i inSection:0]];
+    }
+    if (changedIndexPaths.count == 0) return;
+    [self.myView.tableView reloadRowsAtIndexPaths:changedIndexPaths
+                                withRowAnimation:UITableViewRowAnimationNone];
+}
+
+- (void)tl_markMessageAsReadForItem:(TLWMessageItem *)item preferredIndexPath:(NSIndexPath *)indexPath {
+    if (!item.messageId) return;
+    NSNumber *messageId = item.messageId;
+    [[TLWSDKManager shared].api markAsReadWithId:messageId
+                              completionHandler:^(AGResultVoid *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!error && output.code.integerValue == 200) return;
+
+            item.hasUnread = YES;
+            [self tl_reloadMessageRowForMessageId:messageId preferredIndexPath:indexPath];
+
+            if (!error && output.code.integerValue == 401) {
+                [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self tl_markMessageAsReadForItem:item preferredIndexPath:indexPath]; }];
+            }
+        });
+    }];
+}
+
+- (void)tl_reloadMessageRowForMessageId:(NSNumber *)messageId preferredIndexPath:(NSIndexPath *)indexPath {
+    NSIndexPath *targetIndexPath = nil;
+    if (indexPath.row < self.items.count &&
+        [self.items[indexPath.row].messageId isEqual:messageId]) {
+        targetIndexPath = indexPath;
+    } else {
+        NSInteger targetIndex = [self.items indexOfObjectPassingTest:^BOOL(TLWMessageItem *obj, NSUInteger idx, BOOL *stop) {
+            return [obj.messageId isEqual:messageId];
+        }];
+        if (targetIndex != NSNotFound) {
+            targetIndexPath = [NSIndexPath indexPathForRow:targetIndex inSection:0];
+        }
+    }
+    if (!targetIndexPath) return;
+    [self.myView.tableView reloadRowsAtIndexPaths:@[targetIndexPath]
+                                withRowAnimation:UITableViewRowAnimationNone];
 }
 
 #pragma mark - Lazy
