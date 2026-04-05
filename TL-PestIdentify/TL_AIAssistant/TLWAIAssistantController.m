@@ -244,6 +244,10 @@
                                                                            text:text
                                                                     localImages:imagesToSend
                                                                 remoteImageURLs:nil];
+    // 记录第一张图片的原始尺寸，供 cell 按比例渲染
+    if (imagesToSend.count > 0) {
+        userMessage.imageDisplaySize = imagesToSend.firstObject.size;
+    }
     [self.session appendMessage:userMessage];
 
     // 发送后立刻把消息里的原图替换为缩略图，释放大图内存

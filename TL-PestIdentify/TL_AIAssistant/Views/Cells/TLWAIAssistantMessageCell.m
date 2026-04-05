@@ -98,10 +98,33 @@ static CGFloat const kMessageVerticalInset = 6.0;
 
     BOOL hasImages = (message.localImages.count + message.remoteImageURLs.count) > 0;
     BOOL hasText = message.text.length > 0;
+    NSInteger imageCount = message.localImages.count + message.remoteImageURLs.count;
+
+    // 动态计算图片区域高度
+    CGFloat imageAreaHeight = 0;
+    if (hasImages) {
+        BOOL isSingleImage = (imageCount == 1);
+        if (isSingleImage) {
+            CGSize originalSize = message.imageDisplaySize;
+            if (originalSize.width > 0 && originalSize.height > 0) {
+                CGFloat maxW = 200.0, maxH = 200.0, minH = 80.0;
+                CGFloat ratio = originalSize.height / originalSize.width;
+                CGFloat w = MIN(originalSize.width, maxW);
+                CGFloat h = w * ratio;
+                if (h > maxH) { h = maxH; }
+                if (h < minH) { h = minH; }
+                imageAreaHeight = h;
+            } else {
+                imageAreaHeight = 120;
+            }
+        } else {
+            imageAreaHeight = 120;
+        }
+    }
 
     // 一条消息可能只有图、只有字、图文并存，所以顶部和底部约束都要动态切换。
     self.imageScrollView.hidden = !hasImages;
-    self.imageHeightConstraint.offset = hasImages ? 72 : 0;
+    self.imageHeightConstraint.offset = imageAreaHeight;
     [self.imageTopConstraint setOffset:hasImages ? 12 : 0];
 
     [self.messageTopConstraint uninstall];
@@ -264,25 +287,60 @@ static CGFloat const kMessageVerticalInset = 6.0;
 - (void)tl_configureImageStripWithMessage:(TLWAIAssistantMessage *)message {
     [self.imageScrollView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
 
-    CGFloat thumbSize = 72;
+    NSInteger imageCount = message.localImages.count + message.remoteImageURLs.count;
+    if (imageCount == 0) return;
+
+    // 单张图片按原始比例显示，多张图片用缩略图横向滚动
+    BOOL isSingleImage = (imageCount == 1);
+    CGFloat maxImageWidth = 200.0;
+    CGFloat maxImageHeight = 200.0;
+    CGFloat minImageHeight = 80.0;
+    CGFloat fallbackSize = 120.0;
+
+    CGFloat displayWidth;
+    CGFloat displayHeight;
+
+    if (isSingleImage) {
+        CGSize originalSize = message.imageDisplaySize;
+        if (originalSize.width > 0 && originalSize.height > 0) {
+            // 按比例缩放：先适配最大宽度，再限制最大高度
+            CGFloat ratio = originalSize.height / originalSize.width;
+            displayWidth = MIN(originalSize.width, maxImageWidth);
+            displayHeight = displayWidth * ratio;
+            if (displayHeight > maxImageHeight) {
+                displayHeight = maxImageHeight;
+                displayWidth = displayHeight / ratio;
+            }
+            if (displayHeight < minImageHeight) {
+                displayHeight = minImageHeight;
+            }
+        } else {
+            displayWidth = fallbackSize;
+            displayHeight = fallbackSize;
+        }
+    } else {
+        displayWidth = fallbackSize;
+        displayHeight = fallbackSize;
+    }
+
+    self.imageScrollView.alwaysBounceHorizontal = (!isSingleImage && imageCount > 2);
     CGFloat gap = 8;
     CGFloat x = 0;
-    NSInteger imageCount = message.localImages.count + message.remoteImageURLs.count;
-    self.imageScrollView.alwaysBounceHorizontal = imageCount > 3;
+    CGFloat thumbW = isSingleImage ? displayWidth : fallbackSize;
+    CGFloat thumbH = isSingleImage ? displayHeight : fallbackSize;
 
-    // 本地图和远程图分开渲染，分别对应草稿态和历史/上传完成态。
     for (UIImage *image in message.localImages) {
-        UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(x, 0, thumbSize, thumbSize)];
+        UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(x, 0, thumbW, thumbH)];
         imageView.image = image;
         imageView.contentMode = UIViewContentModeScaleAspectFill;
         imageView.clipsToBounds = YES;
         imageView.layer.cornerRadius = 10;
         [self.imageScrollView addSubview:imageView];
-        x += thumbSize + gap;
+        x += thumbW + gap;
     }
 
     for (NSString *urlString in message.remoteImageURLs) {
-        UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(x, 0, thumbSize, thumbSize)];
+        UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(x, 0, thumbW, thumbH)];
         imageView.contentMode = UIViewContentModeScaleAspectFill;
         imageView.clipsToBounds = YES;
         imageView.layer.cornerRadius = 10;
@@ -292,10 +350,10 @@ static CGFloat const kMessageVerticalInset = 6.0;
             [imageView sd_setImageWithURL:url];
         }
         [self.imageScrollView addSubview:imageView];
-        x += thumbSize + gap;
+        x += thumbW + gap;
     }
 
-    self.imageScrollView.contentSize = CGSizeMake(MAX(x - gap, thumbSize), thumbSize);
+    self.imageScrollView.contentSize = CGSizeMake(MAX(x - gap, thumbW), thumbH);
 }
 
 - (NSString *)tl_statusTextForMessage:(TLWAIAssistantMessage *)message {
