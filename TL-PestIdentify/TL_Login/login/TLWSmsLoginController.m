@@ -83,17 +83,19 @@
     AGSendSmsRequest *req = [[AGSendSmsRequest alloc] init];
     req.phone = phone;
     [[TLWSDKManager shared].api sendSmsCodeWithSendSmsRequest:req completionHandler:^(AGResultVoid *output, NSError *error) {
-        if (error) {
-            self.loginView.sendCodeButton.enabled = YES;
-            [self showAlertWithMessage:error.localizedDescription];
-            return;
-        }
-        if (output.code.integerValue != 200) {
-            self.loginView.sendCodeButton.enabled = YES;
-            [self showAlertWithMessage:output.message ?: @"发送失败"];
-            return;
-        }
-        [self startCountdown];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error) {
+                self.loginView.sendCodeButton.enabled = YES;
+                [self showAlertWithMessage:error.localizedDescription];
+                return;
+            }
+            if (output.code.integerValue != 200) {
+                self.loginView.sendCodeButton.enabled = YES;
+                [self showAlertWithMessage:output.message ?: @"发送失败"];
+                return;
+            }
+            [self startCountdown];
+        });
     }];
 }
 
@@ -164,7 +166,7 @@
 
 - (void)handleSkip {
     TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
-    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    UIWindow *window = [TLWSDKManager tl_activeWindow];
     window.rootViewController = tabBar;
     [UIView transitionWithView:window
                       duration:0.35
@@ -216,7 +218,7 @@
 
 - (void)goToMain {
     TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
-    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    UIWindow *window = [TLWSDKManager tl_activeWindow];
     window.rootViewController = tabBar;
     [UIView transitionWithView:window
                       duration:0.35

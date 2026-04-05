@@ -4,7 +4,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <UIKit/UIImage.h>
+#import <UIKit/UIKit.h>
 // SDK 头文件统一引入
 #import <AgriPestClient/AGApiService.h>
 #import <AgriPestClient/AGDefaultConfiguration.h>
@@ -39,6 +39,10 @@ NS_ASSUME_NONNULL_BEGIN
 @interface TLWSDKManager : NSObject
 
 + (instancetype)shared;
+
+/// 获取当前活跃窗口（优先从前台 Scene 取 keyWindow，兜底 windows.firstObject）
++ (UIWindow *)tl_activeWindow;
+
 /// SDK API 服务
 @property (nonatomic, strong, readonly) AGApiService *api;
 

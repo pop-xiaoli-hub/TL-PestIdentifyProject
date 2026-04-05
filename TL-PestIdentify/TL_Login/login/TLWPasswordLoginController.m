@@ -117,7 +117,7 @@
 
 - (void)handleSkip {
     TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
-    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    UIWindow *window = [TLWSDKManager tl_activeWindow];
     window.rootViewController = tabBar;
     [UIView transitionWithView:window
                       duration:0.35
@@ -163,7 +163,7 @@
 
 - (void)goToMain {
     TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
-    UIWindow *window = [UIApplication sharedApplication].windows.firstObject;
+    UIWindow *window = [TLWSDKManager tl_activeWindow];
     window.rootViewController = tabBar;
     [UIView transitionWithView:window
                       duration:0.35

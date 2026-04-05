@@ -29,6 +29,8 @@ typedef NS_ENUM(NSInteger, TLWAIAssistantMessageStatus) {
 @property (nonatomic, copy) NSString *text;
 @property (nonatomic, copy) NSArray<UIImage *> *localImages;
 @property (nonatomic, copy) NSArray<NSString *> *remoteImageURLs;
+/// 第一张图片的原始尺寸，用于 cell 按比例显示。CGSizeZero 表示未知，fallback 正方形。
+@property (nonatomic, assign) CGSize imageDisplaySize;
 @property (nonatomic, strong) NSDate *createdAt;
 @property (nonatomic, copy, nullable) NSString *errorMessage;
 

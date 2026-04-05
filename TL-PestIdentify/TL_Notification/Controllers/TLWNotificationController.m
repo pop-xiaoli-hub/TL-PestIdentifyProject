@@ -170,19 +170,44 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
     TLWNotificationItem *item = self.filteredItems[indexPath.row];
     item.isExpanded = !item.isExpanded;
 
-    // 展开时标记已读
+    // 展开时标记已读（乐观更新，失败回滚）
     if (item.isExpanded && item.hasUnread && item.messageId) {
         item.hasUnread = NO;
         NSNumber *msgId = item.messageId;
+        NSIndexPath *currentIndexPath = indexPath;
+        __weak typeof(self) weakSelf = self;
         [[TLWSDKManager shared].api markAsReadWithId:msgId
                                    completionHandler:^(AGResultVoid *output, NSError *error) {
-            if (!error && output.code.integerValue == 401) {
-                [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
-                    // 刷新成功后补发 markAsRead，保持本地与服务端已读状态一致
-                    [[TLWSDKManager shared].api markAsReadWithId:msgId
-                                               completionHandler:^(AGResultVoid *o, NSError *e) {}];
-                }];
-            }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (error) {
+                    // 网络失败，回滚未读状态
+                    item.hasUnread = YES;
+                    [weakSelf.myView.tableView reloadRowsAtIndexPaths:@[currentIndexPath]
+                                                     withRowAnimation:UITableViewRowAnimationNone];
+                    return;
+                }
+                if (output.code.integerValue == 401) {
+                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                        [[TLWSDKManager shared].api markAsReadWithId:msgId
+                                                   completionHandler:^(AGResultVoid *o, NSError *e) {
+                            if (e || o.code.integerValue != 200) {
+                                dispatch_async(dispatch_get_main_queue(), ^{
+                                    item.hasUnread = YES;
+                                    [weakSelf.myView.tableView reloadRowsAtIndexPaths:@[currentIndexPath]
+                                                                     withRowAnimation:UITableViewRowAnimationNone];
+                                });
+                            }
+                        }];
+                    }];
+                    return;
+                }
+                if (output.code.integerValue != 200) {
+                    // 服务端返回非 200，回滚
+                    item.hasUnread = YES;
+                    [weakSelf.myView.tableView reloadRowsAtIndexPaths:@[currentIndexPath]
+                                                     withRowAnimation:UITableViewRowAnimationNone];
+                }
+            });
         }];
     }
 
