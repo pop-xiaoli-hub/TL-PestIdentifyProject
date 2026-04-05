@@ -31,6 +31,31 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 @implementation TLWSDKManager
 
+#pragma mark - Window
+
++ (UIWindow *)tl_activeWindow {
+    UIWindow *window = nil;
+    if (@available(iOS 13.0, *)) {
+        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if (scene.activationState == UISceneActivationStateForegroundActive &&
+                [scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                for (UIWindow *w in windowScene.windows) {
+                    if (w.isKeyWindow) {
+                        window = w;
+                        break;
+                    }
+                }
+                if (window) break;
+            }
+        }
+    }
+    if (!window) {
+        window = [UIApplication sharedApplication].windows.firstObject;
+    }
+    return window;
+}
+
 #pragma mark - Keychain Helpers
 
 + (BOOL)_keychainSave:(NSString *)value forAccount:(NSString *)account {
@@ -466,26 +491,7 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
     nav.navigationBarHidden = YES;
 
-    // 优先从活跃的 UIWindowScene 获取 keyWindow，避免多 Scene 下切错窗口
-    UIWindow *window = nil;
-    if (@available(iOS 13.0, *)) {
-        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-            if (scene.activationState == UISceneActivationStateForegroundActive &&
-                [scene isKindOfClass:[UIWindowScene class]]) {
-                UIWindowScene *windowScene = (UIWindowScene *)scene;
-                for (UIWindow *w in windowScene.windows) {
-                    if (w.isKeyWindow) {
-                        window = w;
-                        break;
-                    }
-                }
-                if (window) break;
-            }
-        }
-    }
-    if (!window) {
-        window = [UIApplication sharedApplication].windows.firstObject;
-    }
+    UIWindow *window = [TLWSDKManager tl_activeWindow];
     if (!window) return;
 
     [UIView transitionWithView:window
