@@ -18,6 +18,19 @@
 
 @implementation SceneDelegate
 
+- (void)tl_switchToLoginRoot {
+    TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
+    nav.navigationBarHidden = YES;
+
+    [UIView transitionWithView:self.window
+                      duration:0.25
+                       options:UIViewAnimationOptionTransitionCrossDissolve
+                    animations:^{
+        self.window.rootViewController = nav;
+    } completion:nil];
+}
+
 
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
   UIWindowScene *windowScene = (UIWindowScene *)scene;
@@ -31,8 +44,14 @@
 
       // 异步拉取资料，检查引导/偏好是否完成
       [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
-          // 拉取失败（网络异常/token过期）时不做引导跳转，留在主页
-          if (!profile) return;
+          // 启动阶段资料校验失败时，认为本地登录态无效，清理并回到登录页
+          if (!profile) {
+              dispatch_async(dispatch_get_main_queue(), ^{
+                  [[TLWSDKManager shared] logout];
+                  [self tl_switchToLoginRoot];
+              });
+              return;
+          }
 
           BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
           BOOL hasCrops = (profile.followedCrops.count > 0);
