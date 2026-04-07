@@ -23,6 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)selectTabAtIndex:(NSInteger)index animated:(BOOL)animated;
 - (void)configureWithImage:(nullable UIImage *)image results:(NSArray<NSDictionary *> *)results;
+- (void)applyRecordStyleLayout;
 
 @end
 
