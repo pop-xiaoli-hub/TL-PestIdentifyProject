@@ -21,9 +21,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIButton *aiButton;
 @property (nonatomic, strong, readonly) UIButton *retakeButton;
 
+- (void)applyLayoutStyleFlag:(NSInteger)styleFlag;
 - (void)selectTabAtIndex:(NSInteger)index animated:(BOOL)animated;
 - (void)configureWithImage:(nullable UIImage *)image results:(NSArray<NSDictionary *> *)results;
-- (void)applyRecordStyleLayout;
 
 @end
 

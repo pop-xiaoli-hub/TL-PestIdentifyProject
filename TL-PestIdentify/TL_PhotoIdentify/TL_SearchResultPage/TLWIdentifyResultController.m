@@ -18,6 +18,14 @@
 
 @implementation TLWIdentifyResultController
 
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _layoutStyleFlag = 0;
+  }
+  return self;
+}
+
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.view.backgroundColor = [UIColor blackColor];
@@ -38,6 +46,7 @@
     [button addTarget:self action:@selector(tl_tabTapped:) forControlEvents:UIControlEventTouchUpInside];
   }];
 
+  [self.myView applyLayoutStyleFlag:self.layoutStyleFlag];
   [self.myView configureWithImage:self.image results:self.identifyResults ?: @[]];
 }
 

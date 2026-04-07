@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface TLWIdentifyResultController : UIViewController
 @property (nonatomic, strong) UIImage *image;
 @property (nonatomic, copy) NSArray<NSDictionary *> *identifyResults;
+@property (nonatomic, assign) NSInteger layoutStyleFlag;
 @end
 
 NS_ASSUME_NONNULL_END

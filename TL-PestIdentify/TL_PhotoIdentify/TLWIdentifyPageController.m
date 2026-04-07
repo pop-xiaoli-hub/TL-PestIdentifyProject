@@ -48,6 +48,7 @@
 
 - (void)viewWillAppear:(BOOL)animated {
   [super viewWillAppear:animated];
+  [self.navigationController setNavigationBarHidden:YES animated:NO];
   [self tl_setupCamera];//页面出现时启动相机
 }
 
