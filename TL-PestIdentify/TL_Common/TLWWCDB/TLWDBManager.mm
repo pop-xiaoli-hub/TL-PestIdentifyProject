@@ -8,15 +8,20 @@
 #import "TLWDBManager.h"
 #import "TLWDBCollectedModel.h"
 #import "TLWDBCollectedModel+WCTTableCoding.h"
+#import "TLWDBIdentificationModel.h"
+#import "TLWDBIdentificationModel+WCTTableCoding.h"
+#import "TLWSDKManager.h"
 #import <WCDB/WCDBObjc.h>
 #import <AgriPestClient/AGPostResponseDto.h>
-
-static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
 
 @interface TLWDBManager ()
 @property (nonatomic, strong) WCTDatabase *database;
 @property (nonatomic, strong) WCTTable<TLWDBCollectedModel *> *collectedTable;
+@property (nonatomic, strong) WCTTable<TLWDBIdentificationModel *> *identificationTable;
 @property (nonatomic, assign) NSInteger nextGeneratedLocalId;
+@property (nonatomic, assign) NSInteger nextGeneratedIdentificationLocalId;
+@property (nonatomic, assign) BOOL didSetupCollectedTable;
+@property (nonatomic, assign) BOOL didSetupIdentificationTable;
 
 @end
 
@@ -27,25 +32,20 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         instance = [[TLWDBManager alloc] init];
+        [instance setupDatabase];
     });
     return instance;
 }
 
 - (instancetype)init {
     self = [super init];
-    if (self) {
-        NSString *dbPath = [self dbPath];
-        _database = [[WCTDatabase alloc] initWithPath:dbPath];
-        [_database createTable:kTLWCollectedTableName withClass:TLWDBCollectedModel.class];
-        _collectedTable = [_database getTable:kTLWCollectedTableName withClass:TLWDBCollectedModel.class];
-        _nextGeneratedLocalId = [self loadNextLocalId];
-    }
     return self;
 }
 
 #pragma mark - Public CRUD
 //插入单条
 - (BOOL)upsertCollectedPostFromDto:(AGPostResponseDto *)postDto {
+    [self setupCollectedTableIfNeeded];
     if (!postDto || !postDto._id) {
         return NO;
     }
@@ -72,6 +72,7 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
 
 //批量插入
 - (BOOL)upsertCollectedPostsFromDtos:(NSArray<AGPostResponseDto *> *)postDtos {
+    [self setupCollectedTableIfNeeded];
     if (postDtos.count == 0) {
         return YES;
     }
@@ -113,11 +114,13 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
 }
 
 - (NSArray<TLWDBCollectedModel *> *)fetchAllCollectedPosts {
+    [self setupCollectedTableIfNeeded];
     NSArray<TLWDBCollectedModel *> *result = [self.collectedTable getObjectsOrders:TLWDBCollectedModel.collectedAt.asOrder(WCTOrderedDescending)];
     return result ?: @[];
 }
 
 - (nullable TLWDBCollectedModel *)fetchCollectedPostByPostId:(NSNumber *)postId {
+    [self setupCollectedTableIfNeeded];
     if (!postId) {
         return nil;
     }
@@ -130,6 +133,7 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
 }
 
 - (BOOL)deleteCollectedPostByPostId:(NSNumber *)postId {
+    [self setupCollectedTableIfNeeded];
     if (!postId) {
         return NO;
     }
@@ -137,14 +141,140 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
 }
 
 - (BOOL)deleteAllCollectedPosts {
+    [self setupCollectedTableIfNeeded];
     return [self.collectedTable deleteObjects];
+}
+
+- (BOOL)insertIdentificationRecord:(TLWDBIdentificationModel *)record {
+    [self setupIdentificationTableIfNeeded];
+    TLWDBIdentificationModel *normalizedRecord = [self normalizedIdentificationRecordFromRecord:record];
+    if (!normalizedRecord) {
+        return NO;
+    }
+    normalizedRecord.localId = [self generateNextIdentificationLocalId];
+    return [self.identificationTable insertObject:normalizedRecord];
+}
+
+- (BOOL)updateIdentificationRecord:(TLWDBIdentificationModel *)record {
+    [self setupIdentificationTableIfNeeded];
+    TLWDBIdentificationModel *normalizedRecord = [self normalizedIdentificationRecordFromRecord:record];
+    if (!normalizedRecord || normalizedRecord.localId <= 0) {
+        return NO;
+    }
+    return [self.identificationTable insertOrReplaceObject:normalizedRecord];
+}
+
+- (BOOL)upsertIdentificationRecord:(TLWDBIdentificationModel *)record {
+    [self setupIdentificationTableIfNeeded];
+    TLWDBIdentificationModel *normalizedRecord = [self normalizedIdentificationRecordFromRecord:record];
+    if (!normalizedRecord) {
+        return NO;
+    }
+
+    TLWDBIdentificationModel *existingRecord = [self fetchIdentificationRecordByImageUrl:normalizedRecord.imageUrl];
+    if (existingRecord) {
+        normalizedRecord.localId = existingRecord.localId;
+        return [self.identificationTable insertOrReplaceObject:normalizedRecord];
+    }
+
+    normalizedRecord.localId = [self generateNextIdentificationLocalId];
+    return [self.identificationTable insertObject:normalizedRecord];
+}
+
+- (NSArray<TLWDBIdentificationModel *> *)fetchAllIdentificationRecords {
+    [self setupIdentificationTableIfNeeded];
+    NSArray<TLWDBIdentificationModel *> *result = [self.identificationTable getObjectsOrders:TLWDBIdentificationModel.identifiedAt.asOrder(WCTOrderedDescending)];
+    return result ?: @[];
+}
+
+- (nullable TLWDBIdentificationModel *)fetchIdentificationRecordByLocalId:(NSInteger)localId {
+    [self setupIdentificationTableIfNeeded];
+    if (localId <= 0) {
+        return nil;
+    }
+    return [self.identificationTable getObjectWhere:TLWDBIdentificationModel.localId == localId];
+}
+
+- (nullable TLWDBIdentificationModel *)fetchIdentificationRecordByImageUrl:(NSString *)imageUrl {
+    [self setupIdentificationTableIfNeeded];
+    if (![imageUrl isKindOfClass:[NSString class]] || imageUrl.length == 0) {
+        return nil;
+    }
+    return [self.identificationTable getObjectWhere:TLWDBIdentificationModel.imageUrl == imageUrl];
+}
+
+- (BOOL)deleteIdentificationRecordByLocalId:(NSInteger)localId {
+    [self setupIdentificationTableIfNeeded];
+    if (localId <= 0) {
+        return NO;
+    }
+    return [self.identificationTable deleteObjectsWhere:TLWDBIdentificationModel.localId == localId];
+}
+
+- (BOOL)deleteIdentificationRecordByImageUrl:(NSString *)imageUrl {
+    [self setupIdentificationTableIfNeeded];
+    if (![imageUrl isKindOfClass:[NSString class]] || imageUrl.length == 0) {
+        return NO;
+    }
+    return [self.identificationTable deleteObjectsWhere:TLWDBIdentificationModel.imageUrl == imageUrl];
+}
+
+- (BOOL)deleteAllIdentificationRecords {
+    [self setupIdentificationTableIfNeeded];
+    return [self.identificationTable deleteObjects];
 }
 
 #pragma mark - Private
 
+- (void)setupDatabase {
+    if (self.database) {//初始化创建数据库
+        return;
+    }
+    NSString *dbPath = [self dbPath];//获取数据库路径
+    self.database = [[WCTDatabase alloc] initWithPath:dbPath];
+}
+
+//创建收藏帖子列表
+- (void)setupCollectedTableIfNeeded {
+    if (self.didSetupCollectedTable) {//如果已经建表返回
+        return;
+    }
+
+    [self setupDatabase];//防御性变成，防止数据库建立失败。
+    TLWDBCollectedModel *tableObject = [[TLWDBCollectedModel alloc] init];
+    NSString *tableName = [self tableNameForObject:tableObject];//获取表名
+    [self.database createTable:tableName withClass:TLWDBCollectedModel.class];//建表
+    self.collectedTable = [self.database getTable:tableName withClass:TLWDBCollectedModel.class];//持有表
+    self.didSetupCollectedTable = YES;//标记
+    self.nextGeneratedLocalId = [self loadNextLocalId];//该方法会将当前表里已有的记录扫一遍，找到最大的localId，然后+1
+}
+
+- (void)setupIdentificationTableIfNeeded {
+    if (self.didSetupIdentificationTable) {
+        return;
+    }
+
+    [self setupDatabase];
+    TLWDBIdentificationModel *tableObject = [[TLWDBIdentificationModel alloc] init];
+    NSString *tableName = [self tableNameForObject:tableObject];
+    [self.database createTable:tableName withClass:TLWDBIdentificationModel.class];
+    self.identificationTable = [self.database getTable:tableName withClass:TLWDBIdentificationModel.class];
+    self.didSetupIdentificationTable = YES;
+    self.nextGeneratedIdentificationLocalId = [self loadNextIdentificationLocalId];
+}
+
+- (NSString *)tableNameForObject:(NSObject *)object {
+    if (!object) {
+        return @"";
+    }
+    return NSStringFromClass(object.class);
+}
+
 - (NSString *)dbPath {
     NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    return [documentsPath stringByAppendingPathComponent:@"tlw_database.db"];
+    NSInteger userId = [TLWSDKManager shared].userId;
+    NSString *databaseName = [NSString stringWithFormat:@"tlw_database_%ld.db", (long)userId];
+    return [documentsPath stringByAppendingPathComponent:databaseName];
 }
 
 - (TLWDBCollectedModel *)buildModelFromDto:(AGPostResponseDto *)postDto {
@@ -185,6 +315,38 @@ static NSString * const kTLWCollectedTableName = @"tl_collected_posts";
 - (NSInteger)generateNextLocalId {
     NSInteger localId = self.nextGeneratedLocalId;
     self.nextGeneratedLocalId += 1;
+    return localId;
+}
+
+- (TLWDBIdentificationModel *)normalizedIdentificationRecordFromRecord:(TLWDBIdentificationModel *)record {
+    if (![record isKindOfClass:[TLWDBIdentificationModel class]] ||
+        ![record.imageUrl isKindOfClass:[NSString class]] ||
+        record.imageUrl.length == 0) {
+        return nil;
+    }
+
+    TLWDBIdentificationModel *normalizedRecord = [[TLWDBIdentificationModel alloc] init];
+    normalizedRecord.localId = record.localId;
+    normalizedRecord.imageUrl = record.imageUrl;
+    normalizedRecord.pestName = ([record.pestName isKindOfClass:[NSString class]] && record.pestName.length > 0) ? record.pestName : @"";
+    normalizedRecord.identifiedAt = record.identifiedAt > 0 ? record.identifiedAt : (long long)([[NSDate date] timeIntervalSince1970] * 1000);
+    return normalizedRecord;
+}
+
+- (NSInteger)loadNextIdentificationLocalId {
+    NSArray<TLWDBIdentificationModel *> *allModels = [self fetchAllIdentificationRecords];
+    NSInteger maxLocalId = 0;
+    for (TLWDBIdentificationModel *model in allModels) {
+        if (model.localId > maxLocalId) {
+            maxLocalId = model.localId;
+        }
+    }
+    return maxLocalId + 1;
+}
+
+- (NSInteger)generateNextIdentificationLocalId {
+    NSInteger localId = self.nextGeneratedIdentificationLocalId;
+    self.nextGeneratedIdentificationLocalId += 1;
     return localId;
 }
 

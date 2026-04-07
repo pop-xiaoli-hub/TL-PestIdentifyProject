@@ -46,8 +46,6 @@ DEPENDENCIES:
   - YYModel
 
 SPEC REPOS:
-  https://github.com/CocoaPods/Specs.git:
-    - SocketRocket
   https://github.com/volcengine/volcengine-specs.git:
     - SpeechEngineToB
   trunk:
@@ -57,6 +55,7 @@ SPEC REPOS:
     - LookinServer
     - Masonry
     - SDWebImage
+    - SocketRocket
     - WCDBOptimizedSQLCipher
     - YYModel
 

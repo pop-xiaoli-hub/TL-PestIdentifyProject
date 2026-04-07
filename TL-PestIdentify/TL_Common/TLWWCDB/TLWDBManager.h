@@ -9,6 +9,7 @@
 
 @class AGPostResponseDto;
 @class TLWDBCollectedModel;
+@class TLWDBIdentificationModel;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -36,6 +37,33 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 清空收藏表
 - (BOOL)deleteAllCollectedPosts;
+
+/// 插入识别记录
+- (BOOL)insertIdentificationRecord:(TLWDBIdentificationModel *)record;
+
+/// 更新识别记录
+- (BOOL)updateIdentificationRecord:(TLWDBIdentificationModel *)record;
+
+/// 插入或更新识别记录
+- (BOOL)upsertIdentificationRecord:(TLWDBIdentificationModel *)record;
+
+/// 查询全部识别记录（按识别时间倒序）
+- (NSArray<TLWDBIdentificationModel *> *)fetchAllIdentificationRecords;
+
+/// 根据本地主键查询识别记录
+- (nullable TLWDBIdentificationModel *)fetchIdentificationRecordByLocalId:(NSInteger)localId;
+
+/// 根据图片 URL 查询识别记录
+- (nullable TLWDBIdentificationModel *)fetchIdentificationRecordByImageUrl:(NSString *)imageUrl;
+
+/// 删除指定本地主键的识别记录
+- (BOOL)deleteIdentificationRecordByLocalId:(NSInteger)localId;
+
+/// 删除指定图片 URL 的识别记录
+- (BOOL)deleteIdentificationRecordByImageUrl:(NSString *)imageUrl;
+
+/// 清空识别记录表
+- (BOOL)deleteAllIdentificationRecords;
 
 @end
 

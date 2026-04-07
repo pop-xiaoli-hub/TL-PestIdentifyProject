@@ -12,6 +12,7 @@
 #import <AgriPestClient/AGCommentResponseDto.h>
 #import <AgriPestClient/AGPostResponseDto.h>
 #import "TLWSDKManager.h"
+#import "TLWDBManager.h"
 #import "TLWToast.h"
 
 static NSString *const kCommentCellID = @"TLWCommentCell";
@@ -52,6 +53,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
                  previousCount:(NSInteger)previousCount
                optimisticCount:(NSInteger)optimisticCount
                         sender:(UIButton *)sender;
+- (nullable AGPostResponseDto *)currentPostDtoForCollectionWithFavoriteCount:(NSInteger)favoriteCount;
 - (void)updateTableHeaderLayoutIfNeeded;
 
 @end
@@ -631,6 +633,17 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       }
       strongSelf.post.favoriteCount = @(optimisticCount);
       strongSelf.post.isCollected = shouldCollect;
+      NSNumber* postId = strongSelf.post._id;
+      if (postId) {
+        if (shouldCollect) {
+          AGPostResponseDto *postDto = [strongSelf currentPostDtoForCollectionWithFavoriteCount:optimisticCount];
+          if (postDto) {
+            [[TLWDBManager shared] upsertCollectedPostFromDto:postDto];
+          }
+        } else {
+          [[TLWDBManager shared] deleteCollectedPostByPostId:postId];
+        }
+      }
     });
   };
 
@@ -694,6 +707,35 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   } else {
     [[TLWSDKManager shared] unlikePostWithId:postId completionHandler:completion];
   }
+}
+
+- (nullable AGPostResponseDto *)currentPostDtoForCollectionWithFavoriteCount:(NSInteger)favoriteCount {
+  NSNumber *postId = self.post._id ?: self._id;
+  if (!postId) {
+    return nil;
+  }
+
+  AGPostResponseDto *dto = [[AGPostResponseDto alloc] init];
+  dto._id = postId;
+  dto.title = self.post.title ?: @"";
+
+  NSArray *images = self.post.images.count > 0 ? self.post.images : self.post.picUrls;
+  if ([images isKindOfClass:[NSArray class]]) {
+    NSMutableArray<NSString *> *normalizedImages = [NSMutableArray array];
+    for (id item in images) {
+      if ([item isKindOfClass:[NSString class]] && [((NSString *)item) length] > 0) {
+        [normalizedImages addObject:item];
+      }
+    }
+    dto.images = [normalizedImages copy];
+  } else {
+    dto.images = @[];
+  }
+
+  dto.authorName = self.post.authorName ?: @"";
+  dto.authorAvatar = self.post.authorAvatar ?: @"";
+  dto.favoriteCount = @(MAX(0, favoriteCount));
+  return dto;
 }
 
 
