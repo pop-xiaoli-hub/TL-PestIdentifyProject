@@ -346,10 +346,9 @@ static CGFloat   const kCellGap       = 1.0;
 didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
     PHAsset *asset = _assets[(NSUInteger)indexPath.item];
 
-    // 单选模式：点击直接回调
+    // 单选模式：点击直接加载原图并回调，不刷新 cell 避免闪烁
     if (![self isMultiSelectMode]) {
         self.singleSelectedAsset = asset;
-        [collectionView reloadItemsAtIndexPaths:@[indexPath]];
         [self loadFullImageForAsset:asset completion:^(UIImage *image) {
             if (self.onSelectImage) {
                 self.onSelectImage(image);

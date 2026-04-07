@@ -61,7 +61,11 @@ static NSInteger const kMessagePageSize = 20;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [self tl_refreshMessages];
+    // TabBar 初始化时会一次性 addSubview 所有子页面，hidden 的页面也会收到 viewWillAppear，
+    // 此时发请求可能因 token 尚未就绪而失败，所以只在真正可见时才刷新。
+    if (!self.view.hidden) {
+        [self tl_refreshMessages];
+    }
 }
 
 #pragma mark - Static structure (骨架行)
@@ -317,20 +321,28 @@ static NSInteger const kMessagePageSize = 20;
     }
     if (postIdToItems.count == 0) return;
 
+    // 等所有请求完成后一次性刷新，避免多次 reloadData 导致闪烁
+    dispatch_group_t group = dispatch_group_create();
     for (NSNumber *postId in postIdToItems) {
+        dispatch_group_enter(group);
         [[TLWSDKManager shared].api getPostDetailWithId:postId completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                if (error || output.code.integerValue != 200) return;
-                NSString *imageUrl = output.data.images.firstObject;
-                if (imageUrl.length == 0) return;
-
-                for (TLWMessageItem *item in postIdToItems[postId]) {
-                    item.postImageUrl = imageUrl;
+                if (!error && output.code.integerValue == 200) {
+                    NSString *imageUrl = output.data.images.firstObject;
+                    if (imageUrl.length > 0) {
+                        for (TLWMessageItem *item in postIdToItems[postId]) {
+                            item.postImageUrl = imageUrl;
+                        }
+                    }
                 }
-                [self.myView.tableView reloadData];
+                dispatch_group_leave(group);
             });
         }];
     }
+
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        [self.myView.tableView reloadData];
+    });
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
