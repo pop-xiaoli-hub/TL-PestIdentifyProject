@@ -6,12 +6,12 @@
 #import "TLWPublishController.h"
 #import "TLWPublishView.h"
 #import "TLWCropPickerController.h"
+#import "TLWPhotoPickerController.h"
 #import <Masonry/Masonry.h>
-#import <PhotosUI/PhotosUI.h>
 #import <AgriPestClient/AgriPestClient.h>
 #import "TLWCommunityPost.h"
 #import "TLWSDKManager.h"
-@interface TLWPublishController ()<UIGestureRecognizerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, PHPickerViewControllerDelegate>
+@interface TLWPublishController ()<UIGestureRecognizerDelegate, UICollectionViewDataSource, UICollectionViewDelegate>
 
 @property (nonatomic, strong) TLWPublishView *myView;
 @property (nonatomic, strong, nullable) id draftObject;
@@ -177,23 +177,6 @@
   [self tl_cropSelectTapped];
 }
 
-#pragma mark - UIImagePickerControllerDelegate
-
-- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
-  UIImage *image = info[UIImagePickerControllerOriginalImage];
-  if (image) {
-    if (self.selectedImages.count < 8) {
-      [self.selectedImages addObject:image];
-      [self.myView.imagesCollectionView reloadData];
-    }
-  }
-  [picker dismissViewControllerAnimated:YES completion:nil];
-}
-
-- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
-  [picker dismissViewControllerAnimated:YES completion:nil];
-}
-
 #pragma mark - Public
 
 - (void)tl_configureWithDraft:(nullable id)draft {
@@ -246,69 +229,20 @@
     return;
   }
 
-  if (@available(iOS 14.0, *)) {
-    PHPickerConfiguration *configuration = [[PHPickerConfiguration alloc] init];
-    configuration.selectionLimit = remainCount;
-    configuration.filter = [PHPickerFilter imagesFilter];
-    PHPickerViewController *picker = [[PHPickerViewController alloc] initWithConfiguration:configuration];
-    picker.delegate = self;
-    picker.modalPresentationStyle = UIModalPresentationFullScreen;
-    [self presentViewController:picker animated:YES completion:nil];
-    return;
-  }
+  TLWPhotoPickerController *pickerVC = [[TLWPhotoPickerController alloc] init];
+  pickerVC.maxCount = remainCount;
+  __weak typeof(self) weakSelf = self;
+  pickerVC.onSelectImages = ^(NSArray<UIImage *> *images) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf || images.count == 0) return;
+    [strongSelf.selectedImages addObjectsFromArray:images];
+    [strongSelf.myView.imagesCollectionView reloadData];
+  };
 
-  if (![UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypePhotoLibrary]) {
-    return;
-  }
-  UIImagePickerController *picker = [[UIImagePickerController alloc] init];
-  picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
-  picker.delegate = self;
-  picker.modalPresentationStyle = UIModalPresentationFullScreen;
-  [self presentViewController:picker animated:YES completion:nil];
-}
-
-- (void)picker:(PHPickerViewController *)picker didFinishPicking:(NSArray<PHPickerResult *> *)results API_AVAILABLE(ios(14.0)) {
-  [picker dismissViewControllerAnimated:YES completion:nil];
-  if (results.count == 0) {
-    return;
-  }
-
-  NSInteger remainCount = MAX(0, 8 - self.selectedImages.count);
-  if (remainCount <= 0) {
-    return;
-  }
-
-  dispatch_group_t group = dispatch_group_create();
-  NSMutableArray<UIImage *> *newImages = [NSMutableArray array];
-
-  for (PHPickerResult *result in results) {
-    if (newImages.count >= remainCount) {
-      break;
-    }
-    NSItemProvider *provider = result.itemProvider;
-    if (![provider canLoadObjectOfClass:[UIImage class]]) {
-      continue;
-    }
-    dispatch_group_enter(group);
-    [provider loadObjectOfClass:[UIImage class] completionHandler:^(id<NSItemProviderReading> _Nullable object, NSError * _Nullable error) {
-      if (!error && [object isKindOfClass:[UIImage class]]) {
-        @synchronized (newImages) {
-          if (newImages.count < remainCount) {
-            [newImages addObject:(UIImage *)object];
-          }
-        }
-      }
-      dispatch_group_leave(group);
-    }];
-  }
-
-  dispatch_group_notify(group, dispatch_get_main_queue(), ^{
-    if (newImages.count == 0) {
-      return;
-    }
-    [self.selectedImages addObjectsFromArray:newImages];
-    [self.myView.imagesCollectionView reloadData];
-  });
+  UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:pickerVC];
+  nav.navigationBarHidden = YES;
+  nav.modalPresentationStyle = UIModalPresentationFullScreen;
+  [self presentViewController:nav animated:YES completion:nil];
 }
 
 #pragma mark-点击发布
