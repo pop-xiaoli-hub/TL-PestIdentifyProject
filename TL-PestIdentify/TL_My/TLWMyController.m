@@ -8,6 +8,7 @@
 #import "TLWEditProfileController.h"
 #import "TLWSettingViewController.h"
 #import "TLWMyFavoriteController.h"
+#import "TLWRecordController.h"
 #import "TLWPostDetailController.h"
 #import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
@@ -91,6 +92,9 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
     UITapGestureRecognizer *favTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onFavorite)];
     [_myView.favStatView addGestureRecognizer:favTap];
+
+    UITapGestureRecognizer *recordTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onRecord)];
+    [_myView.recordStatView addGestureRecognizer:recordTap];
 }
 
 - (TLWMyView *)myView {
@@ -111,6 +115,11 @@ extern NSString * const TLWProfileDidUpdateNotification;
     [self.navigationController pushViewController:vc animated:YES];
 }
 - (void)onShare { /* TODO: 分享 */ }
+- (void)onRecord {
+    TLWRecordController *vc = [[TLWRecordController alloc] init];
+    vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
+}
 
 - (void)fetchMyPosts {
     __weak typeof(self) weakSelf = self;

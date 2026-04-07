@@ -14,6 +14,7 @@
 @property (nonatomic, strong, readwrite) UILabel     *favCountLabel;
 @property (nonatomic, strong, readwrite) UIView      *favStatView;
 @property (nonatomic, strong, readwrite) UILabel     *recordCountLabel;
+@property (nonatomic, strong, readwrite) UIView      *recordStatView;
 @property (nonatomic, strong, readwrite) UIButton    *editProfileButton;
 @property (nonatomic, strong, readwrite) UIButton    *settingButton;
 @property (nonatomic, strong, readwrite) UIButton    *shareButton;
@@ -105,8 +106,10 @@
     _favCountLabel    = l1;
     _favStatView      = stat1;
     _recordCountLabel = l2;
+    _recordStatView   = stat2;
 
     stat1.userInteractionEnabled = YES;
+    stat2.userInteractionEnabled = YES;
     [statsRow addSubview:stat1];
     [statsRow addSubview:stat2];
     [stat1 mas_makeConstraints:^(MASConstraintMaker *make) {

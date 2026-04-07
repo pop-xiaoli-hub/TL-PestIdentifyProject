@@ -11,6 +11,10 @@
 #import "TLWRecordHeaderView.h"
 #import "TLWRecordModel.h"
 #import "TLWRecordDetailController.h"
+#import "TLWSDKManager.h"
+#import "TLWToast.h"
+#import <AgriPestClient/AGAgentChatHistory.h>
+#import <AgriPestClient/AGResultListAgentChatHistory.h>
 #import <Masonry/Masonry.h>
 
 static NSString *const kCellID   = @"TLWRecordCell";
@@ -60,72 +64,99 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 
 #pragma mark - Data
 
-// TODO: 接口来了替换此方法内部实现，外部调用方式不变
-// 预期接口格式：
-// [{ "date": "2025-11-28", "items": [{
-//   "recordId": "1", "imageURL": "https://...", "recordTime": "2025-11-28 14:32",
-//   "results": [{ "pestName": "蚜虫", "confidence": 0.92, "solution": "..." }]
-// }] }]
 - (void)tl_fetchRecords {
-    // Mock 数据
-    TLWRecordResult *r_aphid = [TLWRecordResult new];
-    r_aphid.pestName  = @"蚜虫";
-    r_aphid.confidence = 0.92f;
-    r_aphid.solution  = @"使用吡虫啉或噻虫嗪类杀虫剂进行喷雾处理，注意轮换用药以防产生抗药性。同时清除田间杂草，减少蚜虫越冬寄主。";
+    __weak typeof(self) weakSelf = self;
+    [[TLWSDKManager shared].api getHistoryWithCompletionHandler:^(AGResultListAgentChatHistory *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!self) return;
 
-    TLWRecordResult *r_powdery = [TLWRecordResult new];
-    r_powdery.pestName  = @"白粉病";
-    r_powdery.confidence = 0.95f;
-    r_powdery.solution  = @"喷施三唑酮（粉锈宁）或戊唑醇，重点喷施叶片正反两面。加强田间通风透光，降低株间湿度。";
+            if (error) {
+                [TLWToast show:@"加载识别记录失败"];
+                self.sections = @[];
+                [self tl_reloadData];
+                return;
+            }
+            if (output.code.integerValue == 401) {
+                [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                    [self tl_fetchRecords];
+                }];
+                return;
+            }
+            if (output.code.integerValue != 200) {
+                [TLWToast show:output.message ?: @"加载识别记录失败"];
+                self.sections = @[];
+                [self tl_reloadData];
+                return;
+            }
 
-    TLWRecordResult *r_rust = [TLWRecordResult new];
-    r_rust.pestName  = @"锈病";
-    r_rust.confidence = 0.89f;
-    r_rust.solution  = @"喷施代森锰锌或三唑类杀菌剂，发病严重时可连续用药2~3次。合理密植，增强通风透光。";
+            NSArray<AGAgentChatHistory> *historyList = output.data ?: @[];
+            self.sections = [self tl_buildSectionsFromHistory:historyList];
+            [self tl_reloadData];
+        });
+    }];
+}
 
-    TLWRecordResult *r_anthr = [TLWRecordResult new];
-    r_anthr.pestName  = @"炭疽病";
-    r_anthr.confidence = 0.87f;
-    r_anthr.solution  = @"发病初期喷施苯醚甲环唑或咪鲜胺，每隔7天喷1次，连续2~3次。注意雨后及时排水，避免湿度过高。";
+/// 将 AGAgentChatHistory 数组转换为按日期分组的 TLWRecordSection 数组
+- (NSArray<TLWRecordSection *> *)tl_buildSectionsFromHistory:(NSArray<AGAgentChatHistory> *)historyList {
+    NSDateFormatter *dateFmt = [[NSDateFormatter alloc] init];
+    dateFmt.dateFormat = @"yyyy-MM-dd";
+    NSDateFormatter *timeFmt = [[NSDateFormatter alloc] init];
+    timeFmt.dateFormat = @"yyyy-MM-dd HH:mm";
 
-    TLWRecordItem *item1 = [TLWRecordItem new];
-    item1.recordId = @"1"; item1.imageURL = @""; item1.recordTime = @"2025-11-28 14:32";
-    item1.results = @[r_aphid];
+    // 按日期分组
+    NSMutableDictionary<NSString *, NSMutableArray<TLWRecordItem *> *> *grouped = [NSMutableDictionary dictionary];
+    NSMutableArray<NSString *> *dateOrder = [NSMutableArray array];
 
-    TLWRecordItem *item2 = [TLWRecordItem new];
-    item2.recordId = @"2"; item2.imageURL = @""; item2.recordTime = @"2025-11-28 12:10";
-    item2.results = @[r_anthr, r_aphid];
+    for (AGAgentChatHistory *history in historyList) {
+        TLWRecordItem *item = [TLWRecordItem new];
+        item.recordId = [NSString stringWithFormat:@"%@", history._id ?: @(0)];
+        item.imageURL = history.imageUrl ?: @"";
 
-    TLWRecordItem *item3 = [TLWRecordItem new];
-    item3.recordId = @"3"; item3.imageURL = @""; item3.recordTime = @"2025-11-28 09:00";
-    item3.results = @[r_powdery];
+        if (history.createTime) {
+            item.recordTime = [timeFmt stringFromDate:history.createTime];
+        } else {
+            item.recordTime = @"";
+        }
 
-    TLWRecordItem *item4 = [TLWRecordItem new];
-    item4.recordId = @"4"; item4.imageURL = @""; item4.recordTime = @"2025-11-28 08:45";
-    item4.results = @[r_aphid];
+        // 从 agentResponse 中提取病害名和解决方案
+        TLWRecordResult *result = [TLWRecordResult new];
+        result.pestName = [self tl_extractPestNameFromResponse:history.agentResponse
+                                                    userQuery:history.userQuery];
+        result.confidence = 0;
+        result.solution = history.agentResponse ?: @"";
+        item.results = @[result];
 
-    TLWRecordSection *sec1 = [TLWRecordSection new];
-    sec1.dateString = @"2025-11-28";
-    sec1.items = @[item1, item2, item3, item4];
+        NSString *dateKey = history.createTime ? [dateFmt stringFromDate:history.createTime] : @"未知日期";
+        if (!grouped[dateKey]) {
+            grouped[dateKey] = [NSMutableArray array];
+            [dateOrder addObject:dateKey];
+        }
+        [grouped[dateKey] addObject:item];
+    }
 
-    TLWRecordItem *item5 = [TLWRecordItem new];
-    item5.recordId = @"5"; item5.imageURL = @""; item5.recordTime = @"2025-11-27 15:20";
-    item5.results = @[r_powdery, r_rust];
+    NSMutableArray<TLWRecordSection *> *sections = [NSMutableArray array];
+    for (NSString *date in dateOrder) {
+        TLWRecordSection *sec = [TLWRecordSection new];
+        sec.dateString = date;
+        sec.items = [grouped[date] copy];
+        [sections addObject:sec];
+    }
+    return [sections copy];
+}
 
-    TLWRecordItem *item6 = [TLWRecordItem new];
-    item6.recordId = @"6"; item6.imageURL = @""; item6.recordTime = @"2025-11-27 11:05";
-    item6.results = @[r_rust];
-
-    TLWRecordItem *item7 = [TLWRecordItem new];
-    item7.recordId = @"7"; item7.imageURL = @""; item7.recordTime = @"2025-11-27 08:30";
-    item7.results = @[r_aphid];
-
-    TLWRecordSection *sec2 = [TLWRecordSection new];
-    sec2.dateString = @"2025-11-27";
-    sec2.items = @[item5, item6, item7];
-
-    self.sections = @[sec1, sec2];
-    [self tl_reloadData];
+/// 从 agentResponse 中提取病害名称，优先取第一行或冒号前的关键词
+- (NSString *)tl_extractPestNameFromResponse:(NSString *)response userQuery:(NSString *)userQuery {
+    if (!response.length) {
+        return userQuery.length ? userQuery : @"未知病害";
+    }
+    // 尝试从第一行提取（通常 Agent 回复开头会包含病害名）
+    NSString *firstLine = [[response componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]] firstObject];
+    // 如果第一行太长（超过20字），可能不是病害名，截取前20字
+    if (firstLine.length > 20) {
+        firstLine = [firstLine substringToIndex:20];
+    }
+    return firstLine.length ? firstLine : @"识别结果";
 }
 
 /// 统一刷新入口，同时控制空态 UI 的显隐
