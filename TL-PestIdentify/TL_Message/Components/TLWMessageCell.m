@@ -138,7 +138,21 @@
         // Load post cover image
         if (item.postImageUrl.length > 0) {
             [self.thumbnailImageView sd_setImageWithURL:[NSURL URLWithString:item.postImageUrl]
-                                       placeholderImage:nil];
+                                      placeholderImage:nil
+                                               options:SDWebImageAvoidAutoSetImage
+                                             completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, NSURL *imageURL) {
+                if (!image) return;
+                if (cacheType == SDImageCacheTypeNone || cacheType == SDImageCacheTypeMemory) {
+                    // 非内存缓存命中时淡入，避免突变闪烁
+                    self.thumbnailImageView.alpha = 0;
+                    self.thumbnailImageView.image = image;
+                    [UIView animateWithDuration:0.2 animations:^{
+                        self.thumbnailImageView.alpha = 1;
+                    }];
+                } else {
+                    self.thumbnailImageView.image = image;
+                }
+            }];
         } else {
             self.thumbnailImageView.image = nil;
         }

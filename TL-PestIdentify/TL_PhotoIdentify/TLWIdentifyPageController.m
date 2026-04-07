@@ -12,8 +12,9 @@
 #import "TLWIdentifyResultController.h"
 #import "TLWSDKManager.h"
 #import <AgriPestClient/AGChatRequest.h>
+#import "TLWPhotoPickerController.h"
 
-@interface TLWIdentifyPageController ()<UIImagePickerControllerDelegate, UINavigationControllerDelegate, AVCapturePhotoCaptureDelegate>
+@interface TLWIdentifyPageController ()<AVCapturePhotoCaptureDelegate>
 @property (nonatomic, strong) TLWIdentifyPageView *myView;
 @property (nonatomic, strong) AVCaptureSession *session;
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
@@ -57,35 +58,21 @@
   }
 }
 
-- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
-  UIImage* image = info[UIImagePickerControllerEditedImage];
-  if (!image) {
-    image = info[UIImagePickerControllerOriginalImage];
-  }
-  __weak typeof(self) weakSelf = self;
-  [picker dismissViewControllerAnimated:YES completion:^{
-    if (!image) {
-      return;
-    }
-    weakSelf.capturedImage = image;
-    weakSelf.capturedImageView.image = image;
-    weakSelf.capturedImageView.hidden = NO;
-    weakSelf.previewLayer.hidden = YES;
-    [weakSelf tl_identifyFromAI];
-  }];
-}
-
-- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
-  [picker dismissViewControllerAnimated:YES completion:nil];
-}
-
 - (void)tl_openPhotoAlbum {
-  UIImagePickerController* picker = [[UIImagePickerController alloc] init];
-  picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
-  picker.allowsEditing = YES;
-  picker.delegate = self;
-  picker.modalPresentationStyle = UIModalPresentationFullScreen;
-  [self presentViewController:picker animated:YES completion:nil];
+  TLWPhotoPickerController *pickerVC = [[TLWPhotoPickerController alloc] init];
+  pickerVC.maxCount = 1;
+  __weak typeof(self) weakSelf = self;
+  pickerVC.onSelectImage = ^(UIImage *image) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf || !image) return;
+    strongSelf.capturedImage = image;
+    strongSelf.capturedImageView.image = image;
+    strongSelf.capturedImageView.hidden = NO;
+    strongSelf.previewLayer.hidden = YES;
+    [strongSelf tl_identifyFromAI];
+  };
+  pickerVC.hidesBottomBarWhenPushed = YES;
+  [self.navigationController pushViewController:pickerVC animated:YES];
 } 
 
 - (void)tl_openFlash: (UIButton* )button {

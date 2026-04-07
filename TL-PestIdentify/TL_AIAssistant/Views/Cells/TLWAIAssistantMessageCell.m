@@ -100,8 +100,9 @@ static CGFloat const kMessageVerticalInset = 6.0;
     BOOL hasText = message.text.length > 0;
     NSInteger imageCount = message.localImages.count + message.remoteImageURLs.count;
 
-    // 动态计算图片区域高度
+    // 动态计算图片区域的显示宽高
     CGFloat imageAreaHeight = 0;
+    CGFloat imageAreaWidth = 0;
     if (hasImages) {
         BOOL isSingleImage = (imageCount == 1);
         if (isSingleImage) {
@@ -111,14 +112,20 @@ static CGFloat const kMessageVerticalInset = 6.0;
                 CGFloat ratio = originalSize.height / originalSize.width;
                 CGFloat w = MIN(originalSize.width, maxW);
                 CGFloat h = w * ratio;
-                if (h > maxH) { h = maxH; }
+                if (h > maxH) {
+                    h = maxH;
+                    w = h / ratio;
+                }
                 if (h < minH) { h = minH; }
                 imageAreaHeight = h;
+                imageAreaWidth = w;
             } else {
                 imageAreaHeight = 120;
+                imageAreaWidth = 120;
             }
         } else {
             imageAreaHeight = 120;
+            imageAreaWidth = imageCount * 120.0 + (imageCount - 1) * 8.0;
         }
     }
 
@@ -151,6 +158,12 @@ static CGFloat const kMessageVerticalInset = 6.0;
             make.right.equalTo(self.avatarImageView.mas_left).offset(-kAvatarGap);
         } else {
             make.left.equalTo(self.avatarImageView.mas_right).offset(kAvatarGap);
+        }
+        // 有图片时给气泡设最小宽度，防止 UIScrollView 无 intrinsicContentSize 导致气泡塌缩
+        if (hasImages) {
+            CGFloat maxBubbleWidth = [UIScreen mainScreen].bounds.size.width - (kAvatarSize + kAvatarGap + 16.0);
+            CGFloat minW = MIN(imageAreaWidth + 24, maxBubbleWidth);
+            make.width.mas_greaterThanOrEqualTo(minW);
         }
         if (!hasImages && !hasText) {
             make.height.mas_equalTo(44);
