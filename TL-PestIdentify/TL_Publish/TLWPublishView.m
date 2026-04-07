@@ -18,11 +18,14 @@ static CGFloat const kCardCornerRadius = 14.0;
 @property (nonatomic, strong, readwrite) UIButton *addImageButton;
 @property (nonatomic, strong, readwrite) UIButton *confirmPublishButton;
 @property (nonatomic, strong, readwrite) UICollectionView *imagesCollectionView;
+@property (nonatomic, strong, readwrite) UIScrollView *scrollView;
 
+@property (nonatomic, strong) UIView *scrollContentView;
 @property (nonatomic, strong) UIView *topCardView;
 @property (nonatomic, strong) UIView *titleCardView;
 @property (nonatomic, strong) UILabel *cropPlaceholderLabel;
 @property (nonatomic, strong) UIButton *cropArrowButton;
+@property (nonatomic, strong) CAGradientLayer *confirmButtonGradient;
 
 @end
 
@@ -33,15 +36,15 @@ static CGFloat const kCardCornerRadius = 14.0;
   if (self) {
     [self tl_setupBackground];
     [self tl_setupHeader];
-    [self tl_setupCards];
     [self tl_setupConfirmButton];
+    [self tl_setupCards];
   }
   return self;
 }
 
 - (void)layoutSubviews {
   [super layoutSubviews];
-  // 在这里可根据需要更新渐变等
+  self.confirmButtonGradient.frame = self.confirmPublishButton.bounds;
 }
 
 #pragma mark - Setup
@@ -100,20 +103,43 @@ static CGFloat const kCardCornerRadius = 14.0;
 }
 
 - (void)tl_setupCards {
+  // ScrollView 包裹所有卡片
+  UIScrollView *scrollView = [[UIScrollView alloc] init];
+  scrollView.showsVerticalScrollIndicator = NO;
+  scrollView.alwaysBounceVertical = YES;
+  scrollView.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
+  [self addSubview:scrollView];
+  self.scrollView = scrollView;
+
+  UIView *scrollContentView = [[UIView alloc] init];
+  [scrollView addSubview:scrollContentView];
+  self.scrollContentView = scrollContentView;
+
+  [scrollView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(60);
+    make.left.right.equalTo(self);
+    make.bottom.equalTo(self.confirmPublishButton.mas_top).offset(-16);
+  }];
+
+  [scrollContentView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(scrollView);
+    make.width.equalTo(scrollView);
+  }];
+
   UIView *topCard = [self tl_cardContainer];
   UIView *titleCard = [self tl_cardContainer];
   UIView *middleCard = [self tl_cardContainer];
-  [self addSubview:topCard];
-  [self addSubview:titleCard];
-  [self addSubview:middleCard];
+  [scrollContentView addSubview:topCard];
+  [scrollContentView addSubview:titleCard];
+  [scrollContentView addSubview:middleCard];
   self.topCardView = topCard;
   self.titleCardView = titleCard;
   self.middleCardView = middleCard;
 
   [topCard mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(80);
-    make.left.equalTo(self).offset(16);
-    make.right.equalTo(self).offset(-16);
+    make.top.equalTo(scrollContentView).offset(20);
+    make.left.equalTo(scrollContentView).offset(16);
+    make.right.equalTo(scrollContentView).offset(-16);
     make.height.mas_equalTo(72);
   }];
 
@@ -126,7 +152,7 @@ static CGFloat const kCardCornerRadius = 14.0;
   [middleCard mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(titleCard.mas_bottom).offset(16);
     make.left.right.equalTo(topCard);
-    make.height.mas_equalTo(500);
+    make.bottom.equalTo(scrollContentView).offset(-20);
   }];
 
   // 顶部卡片：选择农作物
@@ -306,8 +332,9 @@ static CGFloat const kCardCornerRadius = 14.0;
   ];
   gradient.startPoint = CGPointMake(0, 0.5);
   gradient.endPoint = CGPointMake(1, 0.5);
-  gradient.frame = CGRectMake(0, 0, 340, 50);
+  gradient.frame = CGRectZero;
   [confirmButton.layer insertSublayer:gradient atIndex:0];
+  self.confirmButtonGradient = gradient;
 
   [self addSubview:confirmButton];
   self.confirmPublishButton = confirmButton;
@@ -319,10 +346,6 @@ static CGFloat const kCardCornerRadius = 14.0;
     make.height.mas_equalTo(50);
   }];
 
-  // 让渐变在 AutoLayout 后尺寸正确
-  dispatch_async(dispatch_get_main_queue(), ^{
-    gradient.frame = confirmButton.bounds;
-  });
 }
 
 - (void)tl_createBlurLoadingView {

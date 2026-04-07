@@ -129,6 +129,22 @@ static CGFloat   const kCellGap       = 1.0;
 }
 
 - (void)setupCollectionView {
+    // 毛玻璃遮罩：仅覆盖图片区域（navBar 下方）
+    UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight];
+    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
+    [self.view addSubview:blurView];
+    [blurView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_navBar.mas_bottom);
+        make.left.right.bottom.equalTo(self.view);
+    }];
+
+    UIView *overlay = [UIView new];
+    overlay.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.65];
+    [blurView.contentView addSubview:overlay];
+    [overlay mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(blurView.contentView);
+    }];
+
     _layout = [[UICollectionViewFlowLayout alloc] init];
     _layout.minimumInteritemSpacing = kCellGap;
     _layout.minimumLineSpacing      = kCellGap;
@@ -385,7 +401,12 @@ didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
 #pragma mark - Actions
 
 - (void)onBack {
-    [self.navigationController popViewControllerAnimated:YES];
+    if (self.navigationController.viewControllers.firstObject == self &&
+        self.navigationController.presentingViewController) {
+        [self.navigationController dismissViewControllerAnimated:YES completion:nil];
+    } else {
+        [self.navigationController popViewControllerAnimated:YES];
+    }
 }
 
 - (void)onDone {
@@ -419,7 +440,12 @@ didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
         if (self.onSelectImages) {
             self.onSelectImages([images copy]);
         }
-        [self.navigationController popViewControllerAnimated:YES];
+        if (self.navigationController.viewControllers.firstObject == self &&
+            self.navigationController.presentingViewController) {
+            [self.navigationController dismissViewControllerAnimated:YES completion:nil];
+        } else {
+            [self.navigationController popViewControllerAnimated:YES];
+        }
     });
 }
 

@@ -86,7 +86,7 @@
   picker.delegate = self;
   picker.modalPresentationStyle = UIModalPresentationFullScreen;
   [self presentViewController:picker animated:YES completion:nil];
-}
+} 
 
 - (void)tl_openFlash: (UIButton* )button {
   button.selected = !button.selected;
