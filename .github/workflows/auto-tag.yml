@@ -1,0 +1,75 @@
+name: Auto Tag on Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  auto-tag:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: latest_tag
+        run: |
+          # 获取最新的语义化版本 tag（忽略后缀如 -bugfix）
+          LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [ -z "$LATEST" ]; then
+            LATEST="v0.0.0"
+          fi
+          echo "tag=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "Latest tag: $LATEST"
+
+      - name: Determine version bump
+        id: bump
+        run: |
+          LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
+          if echo "$LABELS" | grep -q '"major"'; then
+            echo "part=major" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q '"minor"'; then
+            echo "part=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "part=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Calculate new tag
+        id: new_tag
+        run: |
+          TAG="${{ steps.latest_tag.outputs.tag }}"
+          # 去掉 v 前缀和可能的后缀（如 -bugfix）
+          VERSION=$(echo "$TAG" | sed 's/^v//' | sed 's/-.*//')
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+          PART="${{ steps.bump.outputs.part }}"
+          if [ "$PART" = "major" ]; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif [ "$PART" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "New tag: $NEW_TAG (bump: $PART)"
+
+      - name: Create and push tag
+        run: |
+          NEW_TAG="${{ steps.new_tag.outputs.tag }}"
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
+          echo "✅ Tagged $NEW_TAG"
