@@ -64,6 +64,10 @@
                                   action:@selector(handleSkip)
                         forControlEvents:UIControlEventTouchUpInside];
 
+    [self.loginView.termsCheckButton addTarget:self
+                                        action:@selector(handleToggleTerms)
+                              forControlEvents:UIControlEventTouchUpInside];
+
     // 点击空白处收起键盘
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
                                    initWithTarget:self action:@selector(dismissKeyboard)];
@@ -72,6 +76,11 @@
 }
 
 #pragma mark - Actions
+
+- (void)handleToggleTerms {
+    self.agreedToTerms = !self.agreedToTerms;
+    self.loginView.termsCheckButton.selected = self.agreedToTerms;
+}
 
 - (void)handleSendCode {
     NSString *phone = self.loginView.phoneField.text;
@@ -133,6 +142,10 @@
 }
 
 - (void)handleLogin {
+    if (!self.agreedToTerms) {
+        [TLWToast show:@"请先阅读并同意用户协议和隐私政策"];
+        return;
+    }
     NSString *phone = self.loginView.phoneField.text;
     NSString *code  = self.loginView.codeField.text;
     if (phone.length == 0 || code.length == 0) {
@@ -197,9 +210,20 @@
 #pragma mark - 登录后导航
 
 - (void)navigateAfterLogin {
-    BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
+    NSInteger currentUserId = [TLWSDKManager shared].userId;
+    NSString *elderKey = [NSString stringWithFormat:@"TLW_elder_mode_set_%ld", (long)currentUserId];
+    BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:elderKey];
+    // 兼容读取旧版全局 key（首次迁移）
+    if (!hasElderSetting) {
+        hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
+    }
 
     [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+        if (!profile) {
+            [TLWToast show:@"资料加载失败，已进入主页"];
+            [self goToMain];
+            return;
+        }
         BOOL hasCrops = (profile.followedCrops.count > 0);
 
         if (hasElderSetting && hasCrops) {

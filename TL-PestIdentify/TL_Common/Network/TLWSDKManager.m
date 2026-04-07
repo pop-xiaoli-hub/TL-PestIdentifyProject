@@ -27,6 +27,8 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 @property (nonatomic, assign) BOOL isRefreshing;
 /// 等待 token 刷新完成后重试的 block 队列
 @property (nonatomic, strong) NSMutableArray<dispatch_block_t> *pendingRetryBlocks;
+/// 认证会话版本号。登出时递增，用于丢弃过期 refresh 回调。
+@property (nonatomic, assign) NSUInteger authStateVersion;
 @end
 
 @implementation TLWSDKManager
@@ -150,6 +152,7 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
         //  api服务入口，所有接口都从这里走
         _api = [[AGApiService alloc] init];
         _pendingRetryBlocks = [NSMutableArray array];
+        _authStateVersion = 0;
     }
     return self;
 }
@@ -169,9 +172,18 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
   // Token 存入 Keychain
   [AGDefaultConfiguration sharedConfig].accessToken = auth.token;
-  [TLWSDKManager _keychainSave:auth.token forAccount:kKeychainAccessToken];
+  BOOL tokenSaved = [TLWSDKManager _keychainSave:auth.token forAccount:kKeychainAccessToken];
+  if (!tokenSaved) {
+      NSLog(@"[Token] ⚠️ accessToken 写入 Keychain 失败，重启后可能丢失登录态");
+  }
   if (auth.refreshToken.length) {
-      [TLWSDKManager _keychainSave:auth.refreshToken forAccount:kKeychainRefreshToken];
+      BOOL rtSaved = [TLWSDKManager _keychainSave:auth.refreshToken forAccount:kKeychainRefreshToken];
+      if (!rtSaved) {
+          NSLog(@"[Token] ⚠️ refreshToken 写入 Keychain 失败");
+      }
+  } else {
+      // 服务端未返回 refreshToken 时，删除旧值防止残留历史账号 token
+      [TLWSDKManager _keychainDeleteForAccount:kKeychainRefreshToken];
   }
 
   // 非敏感信息存 NSUserDefaults
@@ -224,6 +236,12 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 }
 
 - (void)logout {
+  @synchronized (self) {
+      self.authStateVersion += 1;
+      self.isRefreshing = NO;
+      [self.pendingRetryBlocks removeAllObjects];
+  }
+
   [AGDefaultConfiguration sharedConfig].accessToken = nil;
 
   // 清除 Keychain 中的敏感凭证
@@ -441,21 +459,40 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 }
 
 - (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock {
-    // 把重试 block 入队（nil 也可以，只需要触发刷新）
-    if (retryBlock) {
-        [self.pendingRetryBlocks addObject:[retryBlock copy]];
+    NSString *rt = nil;
+    NSUInteger requestVersion = 0;
+    BOOL shouldStartRefresh = NO;
+    BOOL shouldForceLogout = NO;
+
+    @synchronized (self) {
+        // 把重试 block 入队（nil 也可以，只需要触发刷新）
+        if (retryBlock) {
+            [self.pendingRetryBlocks addObject:[retryBlock copy]];
+        }
+        // 已在刷新中，等结果就行，不重复发请求
+        if (self.isRefreshing) {
+            return;
+        }
+
+        rt = [self refreshToken];
+        if (!rt.length) {
+            shouldForceLogout = YES;
+            [self.pendingRetryBlocks removeAllObjects];
+        } else {
+            self.isRefreshing = YES;
+            requestVersion = self.authStateVersion;
+            shouldStartRefresh = YES;
+        }
     }
-    // 已在刷新中，等结果就行，不重复发请求
-    if (self.isRefreshing) return;
-    NSString *rt = [self refreshToken];
-    if (!rt.length) {
+
+    if (shouldForceLogout) {
         // 没有 refresh token，直接跳登录
         [self logout];
         [self _navigateToLogin];
         return;
     }
+    if (!shouldStartRefresh) return;
 
-    self.isRefreshing = YES;
     AGRefreshTokenRequest *req = [[AGRefreshTokenRequest alloc] init];
     req.refreshToken = rt;
 
@@ -464,18 +501,33 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
-            self.isRefreshing = NO;
+
+            BOOL shouldIgnore = NO;
+            @synchronized (self) {
+                self.isRefreshing = NO;
+                if (requestVersion != self.authStateVersion) {
+                    // 用户已登出/切换会话，丢弃过期 refresh 回调
+                    [self.pendingRetryBlocks removeAllObjects];
+                    shouldIgnore = YES;
+                }
+            }
+            if (shouldIgnore) return;
 
             if (!error && output.code.integerValue == 200) {
                 // 刷新成功：更新双 token，执行所有排队重试
                 [self saveAuthResponse:output.data];
-                NSArray<dispatch_block_t> *blocks = [self.pendingRetryBlocks copy];
-                [self.pendingRetryBlocks removeAllObjects];
+                NSArray<dispatch_block_t> *blocks = nil;
+                @synchronized (self) {
+                    blocks = [self.pendingRetryBlocks copy];
+                    [self.pendingRetryBlocks removeAllObjects];
+                }
                 for (dispatch_block_t block in blocks) { block(); }
             } else {
                 // 刷新失败：清除凭证，跳回登录页
                 NSLog(@"[Token] refresh 失败，强制登出: %@", error ?: output.message);
-                [self.pendingRetryBlocks removeAllObjects];
+                @synchronized (self) {
+                    [self.pendingRetryBlocks removeAllObjects];
+                }
                 [self logout];
                 [self _navigateToLogin];
             }

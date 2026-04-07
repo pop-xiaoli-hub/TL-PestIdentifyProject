@@ -19,6 +19,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIButton *qqLoginButton;
 @property (nonatomic, strong, readonly) UIButton *localPhoneLoginButton;
 @property (nonatomic, strong, readonly) UIButton *skipButton;
+/// 协议勾选按钮（切换选中/未选中状态）
+@property (nonatomic, strong, readonly) UIButton *termsCheckButton;
 
 @end
 

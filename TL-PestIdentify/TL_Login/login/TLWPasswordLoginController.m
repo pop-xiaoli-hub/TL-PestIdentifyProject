@@ -11,6 +11,7 @@
 #import "TLWSmsLoginController.h"
 #import "TLWGuideController.h"
 #import "TLWPreferenceController.h"
+#import "TLWToast.h"
 
 @interface TLWPasswordLoginController ()
 
@@ -143,9 +144,22 @@
 #pragma mark - 登录后导航
 
 - (void)navigateAfterLogin {
-    BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
+    NSInteger currentUserId = [TLWSDKManager shared].userId;
+    NSString *elderKey = [NSString stringWithFormat:@"TLW_elder_mode_set_%ld", (long)currentUserId];
+    BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:elderKey];
+    // 兼容读取旧版全局 key（首次迁移）
+    if (!hasElderSetting) {
+        hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
+    }
+
     // 请求用户资料并缓存，检查是否已设置偏好
     [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+        if (!profile) {
+            // 网络失败拉不到资料，兜底直接进主页
+            [TLWToast show:@"资料加载失败，已进入主页"];
+            [self goToMain];
+            return;
+        }
         BOOL hasCrops = (profile.followedCrops.count > 0);
         if (hasElderSetting && hasCrops) {
             [self goToMain];
