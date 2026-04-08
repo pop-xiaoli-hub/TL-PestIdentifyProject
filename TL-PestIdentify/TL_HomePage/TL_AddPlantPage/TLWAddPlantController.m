@@ -37,7 +37,6 @@
 
 - (void)viewWillDisappear:(BOOL)animated {
   [super viewWillDisappear:animated];
-  self.navigationController.navigationBarHidden = NO;
 }
 
 - (void)tl_backTapped {
