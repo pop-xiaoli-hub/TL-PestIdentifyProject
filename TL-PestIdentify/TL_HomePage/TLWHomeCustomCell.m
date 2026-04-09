@@ -4,7 +4,10 @@
 //
 
 #import "TLWHomeCustomCell.h"
+#import "Models/TLWPlantModel.h"
+#import "TLWSDKManager.h"
 #import <Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 
 @interface TLWHomeCustomCell ()
 
@@ -45,6 +48,23 @@
   [super layoutSubviews];
   self.cardView.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.cardView.bounds cornerRadius:self.cardView.layer.cornerRadius].CGPath;
   self.createButtonGradientLayer.frame = self.createButton.bounds;
+}
+
+- (void)tl_applyCurrentUserInfo {
+  AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
+  NSString *displayName = profile.fullName ?: profile.username ?: [TLWSDKManager shared].username;
+  self.titleLabel.text = displayName.length > 0 ? displayName : @"用户";
+
+  UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar.png"];
+  if (profile.avatarUrl.length > 0) {
+    [self.avatarImageView sd_setImageWithURL:[NSURL URLWithString:profile.avatarUrl] placeholderImage:placeholderImage];
+  } else {
+    self.avatarImageView.image = placeholderImage;
+  }
+}
+
+- (void)tl_applyLocationName:(nullable NSString *)locationName {
+  self.locationLabel.text = locationName.length > 0 ? locationName : @"杭州";
 }
 
 - (void)tl_setupSubviews {
@@ -238,9 +258,12 @@
 }
 
 - (void)configureAsCreateCell {
-  self.avatarImageView.image = [UIImage imageNamed:@"hp_avatar.png"];
-  self.titleLabel.text = @"种植物管理";
-  self.locationLabel.text = @"杭州";
+  [self configureAsCreateCellWithLocationName:nil];
+}
+
+- (void)configureAsCreateCellWithLocationName:(nullable NSString *)locationName {
+  [self tl_applyCurrentUserInfo];
+  [self tl_applyLocationName:locationName];
   self.createButton.hidden = NO;
   self.plantTagLabel.hidden = YES;
   self.contentImageView.hidden = YES;
@@ -251,19 +274,26 @@
   self.contentCardButton.userInteractionEnabled = YES;
 }
 
-- (void)configureWithPlantInfo:(NSDictionary *)plantInfo {
-  self.avatarImageView.image = [UIImage imageNamed:@"hp_avatar.png"];
-  self.titleLabel.text = @"种植物管理";
-  self.locationLabel.text = @"杭州";
+- (void)configureWithPlantModel:(TLWPlantModel *)plantModel locationName:(nullable NSString *)locationName {
+  [self tl_applyCurrentUserInfo];
+  [self tl_applyLocationName:locationName];
   self.createButton.hidden = YES;
   self.plantTagLabel.hidden = NO;
-  self.plantTagLabel.text = [NSString stringWithFormat:@"  %@  ", [plantInfo[@"name"] isKindOfClass:[NSString class]] ? plantInfo[@"name"] : @"未命名植物"];
-  self.contentImageView.image = [plantInfo[@"image"] isKindOfClass:[UIImage class]] ? plantInfo[@"image"] : [UIImage imageNamed:@"hp_avatar.png"];
+  self.plantTagLabel.text = [NSString stringWithFormat:@"  %@  ", plantModel.plantName.length > 0 ? plantModel.plantName : @"未命名植物"];
+  NSString *imageURLString = plantModel.imageUrl;
+  UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar.png"];
+  if (plantModel.localImage) {
+    self.contentImageView.image = plantModel.localImage;
+  } else if (imageURLString.length > 0) {
+    [self.contentImageView sd_setImageWithURL:[NSURL URLWithString:imageURLString] placeholderImage:placeholderImage];
+  } else {
+    self.contentImageView.image = placeholderImage;
+  }
   self.contentImageView.hidden = NO;
   self.contentCardButton.backgroundColor = [UIColor clearColor];
   self.plusHorizontalLine.hidden = YES;
   self.plusVerticalLine.hidden = YES;
-  self.contentCardButton.userInteractionEnabled = NO;
+  self.contentCardButton.userInteractionEnabled = YES;
 }
 
 - (void)tl_createButtonTapped {

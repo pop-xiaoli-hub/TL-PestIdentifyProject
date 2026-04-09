@@ -560,4 +560,13 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
   return [self.api uploadFileWithFile:file prefix:uploadPrefix completionHandler:handler];
 }
 
+- (NSURLSessionTask *)createCropWithRequest:(AGMyCropCreateRequest *)request
+                          completionHandler:(void (^)(AGResultMyCropResponseDto * output, NSError * error))handler {
+  return [self.api createCropWithMyCropCreateRequest:request completionHandler:handler];
+}
+
+- (NSURLSessionTask *)getMyCropsWithCompletionHandler:(void (^)(AGResultListMyCropResponseDto * output, NSError * error))handler {
+  return [self.api getMyCropsWithCompletionHandler:handler];
+}
+
 @end

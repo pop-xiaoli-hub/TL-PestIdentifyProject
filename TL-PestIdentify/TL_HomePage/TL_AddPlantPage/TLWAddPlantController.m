@@ -72,7 +72,6 @@
     [self tl_showAlertWithMessage:@"请选择种植物图片"];
     return;
   }
-
   if (self.onConfirmAddPlant) {
     self.onConfirmAddPlant(plantName, self.selectedPlantImage);
   }

@@ -7,6 +7,8 @@
 
 #import <UIKit/UIKit.h>
 
+@class TLWPlantModel;
+
 NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWHomeCustomCell : UITableViewCell
@@ -15,7 +17,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) void(^clickContentCard)(void);
 
 - (void)configureAsCreateCell;
-- (void)configureWithPlantInfo:(NSDictionary *)plantInfo;
+- (void)configureAsCreateCellWithLocationName:(nullable NSString *)locationName;
+- (void)configureWithPlantModel:(TLWPlantModel *)plantModel locationName:(nullable NSString *)locationName;
 
 @end
 
