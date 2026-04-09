@@ -14,9 +14,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UITextView *inputTextField;
 @property (nonatomic, strong, readonly) UIButton *cameraButton;
 @property (nonatomic, strong, readonly) UIButton *micButton;
-@property (nonatomic, strong, readonly) UIButton *galleryButton;
+@property (nonatomic, strong, readonly) UIButton *plusButton;
 @property (nonatomic, strong, readonly) UIButton *sendButton;
 @property (nonatomic, strong, readonly) UIImageView *voiceSpeechImageView;
+@property (nonatomic, strong, readonly) UIButton *plusCameraButton;
+@property (nonatomic, strong, readonly) UIButton *plusAlbumButton;
+@property (nonatomic, strong, readonly) UIButton *plusAICallButton;
+@property (nonatomic, assign, readonly) BOOL isPlusPanelVisible;
+@property (nonatomic, strong, readonly) UIButton *stopButton;
 @property (nonatomic, copy, nullable) void (^onRemoveImageAtIndex)(NSUInteger index);
 @property (nonatomic, copy, nullable) void (^onHeightDidChange)(CGFloat height);
 @property (nonatomic, assign, readonly) CGFloat preferredHeight;
@@ -27,6 +32,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)hideSelectedImage;
 - (void)showVoicePanel;
 - (void)hideVoicePanel;
+- (void)showPlusPanel;
+- (void)hidePlusPanel;
+- (void)enterAILoadingMode;
+- (void)exitAILoadingMode;
 
 @end
 

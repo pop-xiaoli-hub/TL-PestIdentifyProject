@@ -6,6 +6,7 @@
 //  职责：编排AI助手页面交互与业务流程。
 //
 #import "TLWAIAssistantController.h"
+#import "TLWAICallController.h"
 #import "TLWAIAssistantMessage.h"
 #import "TLWAIAssistantSession.h"
 #import "TLWAIAssistantView.h"
@@ -22,9 +23,11 @@
 @property (nonatomic, strong) TLWAIAssistantView *myView;
 @property (nonatomic, copy)   NSString           *initialQuestion;
 @property (nonatomic, assign) BOOL                showVoicePanelAfterKeyboardHide;
+@property (nonatomic, assign) BOOL                showPlusPanelAfterKeyboardHide;
 // 草稿态图片先留在 controller，真正发送后再固化成 message 进入 session。
 @property (nonatomic, strong) NSMutableArray<UIImage *> *pendingImages;
 @property (nonatomic, strong) TLWAIAssistantSession *session;
+@property (nonatomic, weak)   TLWAIAssistantMessage *currentAIMessage;
 @end
 
 @implementation TLWAIAssistantController
@@ -38,7 +41,8 @@
     return self;
 }
 
-- (NSString *)navTitle { return @"AI助手"; }
+- (NSString *)navTitle         { return @"AI助手"; }
+- (NSString *)navTitleIconName { return @"aiAssisstantIcon"; }
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -63,11 +67,23 @@
     longPress.minimumPressDuration = 0.3;
     [self.myView.voiceSpeechImageView addGestureRecognizer:longPress];
 
-    [self.myView.galleryButton addTarget:self
-                                  action:@selector(tl_gallery)
-                        forControlEvents:UIControlEventTouchUpInside];
+    [self.myView.plusButton addTarget:self
+                                action:@selector(tl_togglePlusPanel)
+                      forControlEvents:UIControlEventTouchUpInside];
+    [self.myView.plusCameraButton addTarget:self
+                                     action:@selector(tl_camera)
+                           forControlEvents:UIControlEventTouchUpInside];
+    [self.myView.plusAlbumButton addTarget:self
+                                    action:@selector(tl_gallery)
+                          forControlEvents:UIControlEventTouchUpInside];
+    [self.myView.plusAICallButton addTarget:self
+                                     action:@selector(tl_aiCall)
+                           forControlEvents:UIControlEventTouchUpInside];
     [self.myView.sendButton addTarget:self
                                action:@selector(tl_send)
+                     forControlEvents:UIControlEventTouchUpInside];
+    [self.myView.stopButton addTarget:self
+                               action:@selector(tl_stopAI)
                      forControlEvents:UIControlEventTouchUpInside];
 
     // 键盘通知
@@ -151,8 +167,27 @@
     }
 }
 
+- (void)tl_togglePlusPanel {
+    // 收起语音面板
+    [self.myView hideVoicePanel];
+
+    if (self.myView.isPlusPanelVisible) {
+        [self.myView hidePlusPanel];
+    } else {
+        // 键盘和 plus 面板互斥：先收键盘，等键盘动画结束再展开
+        if (self.myView.inputTextField.isFirstResponder) {
+            self.showPlusPanelAfterKeyboardHide = YES;
+            [self.myView endEditing:YES];
+        } else {
+            [self.myView showPlusPanel];
+        }
+    }
+}
+
 - (void)tl_dismissKeyboard {
     [self.myView endEditing:YES];
+    [self.myView hideVoicePanel];
+    [self.myView hidePlusPanel];
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
@@ -161,7 +196,11 @@
     if ([view isDescendantOfView:self.myView.sendButton]) return NO;
     if ([view isDescendantOfView:self.myView.cameraButton]) return NO;
     if ([view isDescendantOfView:self.myView.micButton]) return NO;
-    if ([view isDescendantOfView:self.myView.galleryButton]) return NO;
+    if ([view isDescendantOfView:self.myView.plusButton]) return NO;
+    if ([view isDescendantOfView:self.myView.plusCameraButton]) return NO;
+    if ([view isDescendantOfView:self.myView.plusAlbumButton]) return NO;
+    if ([view isDescendantOfView:self.myView.plusAICallButton]) return NO;
+    if ([view isDescendantOfView:self.myView.stopButton]) return NO;
     if ([view isDescendantOfView:self.myView.inputTextField]) return NO;
     return YES;
 }
@@ -170,10 +209,12 @@
 
 - (void)tl_keyboardWillShow:(NSNotification *)notification {
     NSDictionary *info = notification.userInfo;
-    //  分别拿出键盘大小和动画时间
     CGRect keyboardFrame = [info[UIKeyboardFrameEndUserInfoKey] CGRectValue];
     CGFloat keyboardHeight = CGRectGetHeight(keyboardFrame);
     NSTimeInterval duration = [info[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+    // 键盘弹出时收起语音面板和 plus 面板（三者互斥）
+    [self.myView hideVoicePanel];
+    [self.myView hidePlusPanel];
     [self.myView adjustForKeyboardHeight:keyboardHeight duration:duration];
 }
 
@@ -187,6 +228,13 @@
             [self.myView showVoicePanel];
         });
     }
+    if (self.showPlusPanelAfterKeyboardHide) {
+        self.showPlusPanelAfterKeyboardHide = NO;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(duration * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            [self.myView showPlusPanel];
+        });
+    }
 }
 
 - (void)dealloc {
@@ -194,6 +242,27 @@
     [TWLSpeechManager sharedManager].resultHandler = nil;
     [TWLSpeechManager sharedManager].errorHandler = nil;
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)tl_stopAI {
+    TLWAIAssistantMessage *aiMessage = self.currentAIMessage;
+    if (!aiMessage) return;
+
+    // 标记已停止
+    aiMessage.status = TLWAIAssistantMessageStatusIdle;
+    if ([aiMessage.text isEqualToString:@"正在思考中..."]) {
+        aiMessage.text = @"已停止回复";
+    }
+    self.currentAIMessage = nil;
+
+    [self.myView exitAILoadingMode];
+    [self.myView displayMessages:self.session.messages];
+}
+
+- (void)tl_aiCall {
+    [self.myView hidePlusPanel];
+    TLWAICallController *vc = [[TLWAICallController alloc] init];
+    [self.navigationController pushViewController:vc animated:YES];
 }
 
 - (void)tl_gallery {
@@ -264,6 +333,10 @@
                                                                          text:@"正在思考中..."];
     aiMessage.status = TLWAIAssistantMessageStatusSending;
     [self.session appendMessage:aiMessage];
+    self.currentAIMessage = aiMessage;
+
+    // 进入 AI 加载态：隐藏 mic，plus 左移，显示 stop
+    [self.myView enterAILoadingMode];
 
     // 会话过长时裁剪早期消息的图片
     [self.session trimImageMemoryIfNeeded];
@@ -295,7 +368,12 @@
             __strong typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
 
+            // 用户已手动停止，忽略回调
+            if (strongSelf.currentAIMessage != aiMessage) return;
+
             if (error) {
+                strongSelf.currentAIMessage = nil;
+                [strongSelf.myView exitAILoadingMode];
                 aiMessage.status = TLWAIAssistantMessageStatusFailed;
                 aiMessage.text = @"网络请求失败，请稍后重试";
                 aiMessage.errorMessage = error.localizedDescription;
@@ -327,6 +405,10 @@
 - (void)tl_handleChatResponse:(AGResultChatProfileResponse *)output
                          error:(NSError *)error
                     forMessage:(TLWAIAssistantMessage *)aiMessage {
+    // 退出 AI 加载态
+    self.currentAIMessage = nil;
+    [self.myView exitAILoadingMode];
+
     if (error || !output || !output.code || output.code.integerValue != 200) {
         aiMessage.status = TLWAIAssistantMessageStatusFailed;
         NSString *serverMsg = output.message ?: @"服务异常";

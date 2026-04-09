@@ -13,16 +13,24 @@ static CGFloat const kInputBoxHeight = 54.0;
 static CGFloat const kTextViewBaseHeight = 34.0;
 static CGFloat const kPreviewAreaHeight = 96.0;
 static CGFloat const kVoicePanelHeight = 180.0;
+static CGFloat const kPlusPanelHeight = 120.0;
 
 @interface TLWAIAssistantComposerView () <UITextViewDelegate>
 @property (nonatomic, strong, readwrite) UITextView *inputTextField;
 @property (nonatomic, strong, readwrite) UIButton *cameraButton;
 @property (nonatomic, strong, readwrite) UIButton *micButton;
-@property (nonatomic, strong, readwrite) UIButton *galleryButton;
+@property (nonatomic, strong, readwrite) UIButton *plusButton;
 @property (nonatomic, strong, readwrite) UIButton *sendButton;
 @property (nonatomic, strong, readwrite) UIImageView *voiceSpeechImageView;
+@property (nonatomic, strong, readwrite) UIButton *plusCameraButton;
+@property (nonatomic, strong, readwrite) UIButton *plusAlbumButton;
+@property (nonatomic, strong, readwrite) UIButton *plusAICallButton;
+@property (nonatomic, strong, readwrite) UIButton *stopButton;
+@property (nonatomic, assign) BOOL isAILoading;
+@property (nonatomic, strong) MASConstraint *plusButtonRightConstraint;
 @property (nonatomic, strong) UIView *inputBar;
 @property (nonatomic, strong) UIView *voicePanel;
+@property (nonatomic, strong) UIView *plusPanel;
 @property (nonatomic, strong) UIView *roundContainer;
 @property (nonatomic, strong) UIView *sendButtonWrapper;
 @property (nonatomic, strong) UIView *previewRow;
@@ -158,14 +166,27 @@ static CGFloat const kVoicePanelHeight = 180.0;
         make.width.height.mas_equalTo(24);
     }];
 
-    _galleryButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_galleryButton setImage:[UIImage imageNamed:@"iconAlbum"] forState:UIControlStateNormal];
-    _galleryButton.contentMode = UIViewContentModeScaleAspectFit;
-    [inputRow addSubview:_galleryButton];
-    [_galleryButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.mas_equalTo(-14);
+    _plusButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_plusButton setImage:[UIImage imageNamed:@"plus"] forState:UIControlStateNormal];
+    _plusButton.contentMode = UIViewContentModeScaleAspectFit;
+    [inputRow addSubview:_plusButton];
+    __block MASConstraint *plusButtonRightConstraint;
+    [_plusButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        plusButtonRightConstraint = make.right.mas_equalTo(-10);
         make.centerY.equalTo(inputRow);
-        make.width.height.mas_equalTo(24);
+        make.width.height.mas_equalTo(30);
+    }];
+    _plusButtonRightConstraint = plusButtonRightConstraint;
+
+    _stopButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_stopButton setImage:[UIImage imageNamed:@"iconStop"] forState:UIControlStateNormal];
+    _stopButton.contentMode = UIViewContentModeScaleAspectFit;
+    _stopButton.hidden = YES;
+    [inputRow addSubview:_stopButton];
+    [_stopButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.right.mas_equalTo(-10);
+        make.centerY.equalTo(inputRow);
+        make.width.height.mas_equalTo(30);
     }];
 
     _micButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -173,7 +194,7 @@ static CGFloat const kVoicePanelHeight = 180.0;
     _micButton.contentMode = UIViewContentModeScaleAspectFit;
     [inputRow addSubview:_micButton];
     [_micButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.equalTo(self->_galleryButton.mas_left).offset(-8);
+        make.right.equalTo(self->_plusButton.mas_left).offset(-8);
         make.centerY.equalTo(inputRow);
         make.width.height.mas_equalTo(24);
     }];
@@ -215,6 +236,71 @@ static CGFloat const kVoicePanelHeight = 180.0;
         make.top.mas_equalTo(20);
         make.width.height.mas_equalTo(110);
     }];
+
+    // Plus 面板
+    _plusPanel = [[UIView alloc] init];
+    _plusPanel.hidden = YES;
+    [_inputBar addSubview:_plusPanel];
+    [_plusPanel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self->_roundContainer.mas_bottom).offset(8);
+        make.left.right.equalTo(self->_inputBar);
+        make.height.mas_equalTo(kPlusPanelHeight);
+    }];
+
+    _plusCameraButton = [self tl_createPlusPanelButtonWithImage:@"plusCamera" title:@"相机"];
+    _plusAlbumButton = [self tl_createPlusPanelButtonWithImage:@"plusAlbum" title:@"相册"];
+    _plusAICallButton = [self tl_createPlusPanelButtonWithImage:@"plusAICall" title:@"AI通话"];
+
+    [_plusPanel addSubview:_plusCameraButton];
+    [_plusPanel addSubview:_plusAlbumButton];
+    [_plusPanel addSubview:_plusAICallButton];
+
+    CGFloat btnSize = 70;
+    CGFloat btnGap = 26;
+    [_plusCameraButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.mas_equalTo(24);
+        make.top.mas_equalTo(4);
+        make.width.mas_equalTo(btnSize);
+    }];
+    [_plusAlbumButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(self->_plusCameraButton.mas_right).offset(btnGap);
+        make.top.equalTo(self->_plusCameraButton);
+        make.width.mas_equalTo(btnSize);
+    }];
+    [_plusAICallButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(self->_plusAlbumButton.mas_right).offset(btnGap);
+        make.top.equalTo(self->_plusCameraButton);
+        make.width.mas_equalTo(btnSize);
+    }];
+}
+
+- (UIButton *)tl_createPlusPanelButtonWithImage:(NSString *)imageName title:(NSString *)title {
+    UIButton *btn = [UIButton buttonWithType:UIButtonTypeCustom];
+
+    UIImageView *iconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:imageName]];
+    iconView.contentMode = UIViewContentModeScaleAspectFit;
+    iconView.tag = 100;
+    [btn addSubview:iconView];
+    [iconView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(btn);
+        make.centerX.equalTo(btn);
+        make.width.height.mas_equalTo(70);
+    }];
+
+    UILabel *label = [[UILabel alloc] init];
+    label.text = title;
+    label.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    label.textColor = [UIColor whiteColor];
+    label.textAlignment = NSTextAlignmentCenter;
+    label.tag = 101;
+    [btn addSubview:label];
+    [label mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(iconView.mas_bottom).offset(4);
+        make.centerX.equalTo(btn);
+        make.bottom.equalTo(btn);
+    }];
+
+    return btn;
 }
 
 - (void)layoutSubviews {
@@ -266,6 +352,8 @@ static CGFloat const kVoicePanelHeight = 180.0;
 
 - (void)showVoicePanel {
     self.voicePanel.hidden = NO;
+    // 互斥：收起 plus 面板
+    self.plusPanel.hidden = YES;
     [self.roundContainerCenterYConstraint deactivate];
     [self.roundContainerTopConstraint activate];
     [self tl_updateInputBarHeight];
@@ -280,6 +368,56 @@ static CGFloat const kVoicePanelHeight = 180.0;
     [self.roundContainerCenterYConstraint activate];
     [self tl_updateInputBarHeight];
     [UIView animateWithDuration:0.25 animations:^{
+        [self layoutIfNeeded];
+    }];
+}
+
+- (void)showPlusPanel {
+    self.plusPanel.hidden = NO;
+    // 互斥：收起语音面板
+    if (!self.voicePanel.hidden) {
+        self.voicePanel.hidden = YES;
+    }
+    [self.roundContainerCenterYConstraint deactivate];
+    [self.roundContainerTopConstraint activate];
+    [self tl_updateInputBarHeight];
+    [UIView animateWithDuration:0.25 animations:^{
+        [self layoutIfNeeded];
+    }];
+}
+
+- (void)hidePlusPanel {
+    self.plusPanel.hidden = YES;
+    [self.roundContainerTopConstraint deactivate];
+    [self.roundContainerCenterYConstraint activate];
+    [self tl_updateInputBarHeight];
+    [UIView animateWithDuration:0.25 animations:^{
+        [self layoutIfNeeded];
+    }];
+}
+
+- (BOOL)isPlusPanelVisible {
+    return !self.plusPanel.hidden;
+}
+
+- (void)enterAILoadingMode {
+    self.isAILoading = YES;
+    self.micButton.hidden = YES;
+    self.stopButton.hidden = NO;
+    // plus 移到 mic 的位置（stop 右侧偏左）
+    self.plusButtonRightConstraint.offset = -(10 + 30 + 8);
+    [UIView animateWithDuration:0.2 animations:^{
+        [self layoutIfNeeded];
+    }];
+}
+
+- (void)exitAILoadingMode {
+    self.isAILoading = NO;
+    self.micButton.hidden = NO;
+    self.stopButton.hidden = YES;
+    // plus 恢复原位
+    self.plusButtonRightConstraint.offset = -10;
+    [UIView animateWithDuration:0.2 animations:^{
         [self layoutIfNeeded];
     }];
 }
@@ -315,7 +453,7 @@ static CGFloat const kVoicePanelHeight = 180.0;
     BOOL hasContent = (self.inputTextField.text.length > 0) || (self.previewImages.count > 0);
     if (hasContent) {
         self.micButton.hidden = YES;
-        self.galleryButton.hidden = YES;
+        self.plusButton.hidden = YES;
         self.sendButtonWrapper.hidden = NO;
         [self.inputBar bringSubviewToFront:self.sendButtonWrapper];
         self.roundContainerRightConstraint.offset = -(16 + kInputBoxHeight + 8);
@@ -324,13 +462,15 @@ static CGFloat const kVoicePanelHeight = 180.0;
             self.textViewRightConstraint = make.right.equalTo(self.roundContainer).offset(-14);
         }];
     } else {
-        self.micButton.hidden = NO;
-        self.galleryButton.hidden = NO;
+        self.micButton.hidden = self.isAILoading;
+        self.stopButton.hidden = !self.isAILoading;
+        self.plusButton.hidden = NO;
         self.sendButtonWrapper.hidden = YES;
         self.roundContainerRightConstraint.offset = -16;
         [self.textViewRightConstraint uninstall];
+        UIView *rightAnchor = self.isAILoading ? self.plusButton : self.micButton;
         [self.inputTextField mas_updateConstraints:^(MASConstraintMaker *make) {
-            self.textViewRightConstraint = make.right.equalTo(self.micButton.mas_left).offset(-6);
+            self.textViewRightConstraint = make.right.equalTo(rightAnchor.mas_left).offset(-6);
         }];
     }
     [self setNeedsLayout];
@@ -341,9 +481,10 @@ static CGFloat const kVoicePanelHeight = 180.0;
     CGFloat textViewExtra = self.currentTextViewHeight - kTextViewBaseHeight;
     CGFloat previewExtra = self.previewRow.hidden ? 0 : kPreviewAreaHeight;
     CGFloat voiceExtra = self.voicePanel.hidden ? 0 : kVoicePanelHeight;
+    CGFloat plusExtra = self.plusPanel.hidden ? 0 : (kPlusPanelHeight + 8);
     CGFloat inputRowHeight = kInputBoxHeight + textViewExtra;
     CGFloat roundContainerHeight = inputRowHeight + previewExtra;
-    CGFloat inputBarHeight = roundContainerHeight + self.safeBottomInset + inputBoxVerticalPadding * 2 + voiceExtra;
+    CGFloat inputBarHeight = roundContainerHeight + self.safeBottomInset + inputBoxVerticalPadding * 2 + voiceExtra + plusExtra;
 
     self.inputRowHeightConstraint.offset = inputRowHeight;
     self.roundContainerHeightConstraint.offset = roundContainerHeight;

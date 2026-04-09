@@ -7,6 +7,7 @@
 
 #import "AppDelegate.h"
 #import <SpeechEngineToB/SpeechEngine.h>
+#import <TargetConditionals.h>
 
 @interface AppDelegate ()
 
@@ -16,8 +17,13 @@
 
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-  // 初始化火山引擎 Dialog 语音 SDK 环境
-  [SpeechEngine prepareEnvironment];
+  NSDictionary *env = [NSProcessInfo processInfo].environment;
+  BOOL isRunningTests = (env[@"XCTestConfigurationFilePath"] != nil);
+  // 单元测试宿主启动时跳过语音 SDK 初始化，避免影响测试进程拉起。
+  if (!isRunningTests) {
+    // 初始化火山引擎 Dialog 语音 SDK 环境
+    [SpeechEngine prepareEnvironment];
+  }
   return YES;
 }
 

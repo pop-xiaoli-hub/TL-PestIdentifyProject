@@ -47,7 +47,7 @@
     panelBlur.layer.masksToBounds = YES;
     [self addSubview:panelBlur];
     [panelBlur mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(52);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(62);
         make.left.right.bottom.equalTo(self);
     }];
 
@@ -76,7 +76,7 @@
 
     [self addSubview:card];
     [card mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(66);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(76);
         make.left.equalTo(self).offset(16);
         make.right.equalTo(self).offset(-16);
     }];

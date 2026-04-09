@@ -47,7 +47,7 @@
     panelBlur.layer.masksToBounds = YES;
     [self addSubview:panelBlur];
     [panelBlur mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(52);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(62);
         make.left.right.bottom.equalTo(self);
     }];
 
@@ -68,7 +68,7 @@
     sectionTitle.textColor = [UIColor colorWithRed:0.15 green:0.15 blue:0.15 alpha:1];
     [self addSubview:sectionTitle];
     [sectionTitle mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(70);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(80);
         make.left.equalTo(self).offset(20);
     }];
 

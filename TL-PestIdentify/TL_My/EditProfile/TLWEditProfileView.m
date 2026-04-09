@@ -55,7 +55,7 @@ static CGFloat const kSidePad    = 23.0;
     panelBlur.layer.masksToBounds = YES;
     [self addSubview:panelBlur];
     [panelBlur mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(52);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(62);
         make.left.right.bottom.equalTo(self);
     }];
 
@@ -87,7 +87,7 @@ static CGFloat const kSidePad    = 23.0;
             if (prev) {
                 make.top.equalTo(prev.mas_bottom).offset(kCardGap);
             } else {
-                make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(58);
+                make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(68);
             }
         }];
         prev = card;
