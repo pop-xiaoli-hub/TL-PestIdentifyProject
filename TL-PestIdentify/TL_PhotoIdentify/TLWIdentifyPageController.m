@@ -20,14 +20,14 @@
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
 @property (nonatomic, strong) AVCapturePhotoOutput *photoOutput;
 @property (nonatomic, strong) UIImageView *capturedImageView;
-@property (nonatomic, strong) UIActivityIndicatorView* indicator;
+@property (nonatomic, strong) UIImageView *loadingImageView;
 @property (nonatomic, strong) UIImage *capturedImage; // 待识别的图片，接口调用时从此属性读取
 @end
 
 @implementation TLWIdentifyPageController
 
 - (void)viewDidLoad {
-    [super viewDidLoad];
+  [super viewDidLoad];
   [self.view addSubview:self.myView];
   [self tl_setupCamera];
 
@@ -38,7 +38,7 @@
   self.capturedImageView.hidden = YES;
   [self.myView addSubview:self.capturedImageView];
   [self.myView sendSubviewToBack:self.capturedImageView];
-  
+
   [self.myView.backButton addTarget:self action:@selector(tl_dismissCurrentView:) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.flashButton addTarget:self action:@selector(tl_openFlash:) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.photosButton addTarget:self action:@selector(tl_openPhotoAlbum) forControlEvents:UIControlEventTouchUpInside];
@@ -74,7 +74,7 @@
   };
   pickerVC.hidesBottomBarWhenPushed = YES;
   [self.navigationController pushViewController:pickerVC animated:YES];
-} 
+}
 
 - (void)tl_openFlash: (UIButton* )button {
   button.selected = !button.selected;
@@ -125,11 +125,11 @@
 - (void)tl_setupCamera {
   AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeVideo];//进入相机权限检查
   if (status == AVAuthorizationStatusDenied || status == AVAuthorizationStatusRestricted) {//拒绝使用相机
-      NSLog(@"相机权限被拒绝");
+    NSLog(@"相机权限被拒绝");
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:@"相机权限被拒绝" preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
-      return;
+    return;
   } else if (status == AVAuthorizationStatusNotDetermined) {//用户未授权
     __weak typeof(self) weakSelf = self;
     [AVCaptureDevice requestAccessForMediaType:AVMediaTypeVideo completionHandler:^(BOOL granted) {//iOS请求相机的核心API，系统支持的设备，回调参数表示用户是否同意权限
@@ -173,7 +173,7 @@
   if ([self.session canAddInput:input]) {//加入会话
     [self.session addInput:input];
   }
-//流程：摄像头 -> AVCaptureDevice -> AVCaptureDeviceInput -> AVCaptureSession
+  //流程：摄像头 -> AVCaptureDevice -> AVCaptureDeviceInput -> AVCaptureSession
   self.photoOutput = [[AVCapturePhotoOutput alloc] init];//创建照片输出
   if ([self.session canAddOutput:self.photoOutput]) {
     [self.session addOutput:self.photoOutput];
@@ -382,20 +382,34 @@
 
 - (void)tl_showLoadingIndicator {
   dispatch_async(dispatch_get_main_queue(), ^{
-    if (!self.indicator) {
-      self.indicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
-      self.indicator.hidesWhenStopped = YES;
-      self.indicator.center = self.myView.center;
-      [self.myView addSubview:self.indicator];
+    if (!self.loadingImageView) {
+      UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+      self.loadingImageView = [[UIImageView alloc] initWithImage:loadingImage];
+      self.loadingImageView.bounds = CGRectMake(0, 0, 130, 130);
+      self.loadingImageView.center = self.myView.center;
+      self.loadingImageView.contentMode = UIViewContentModeScaleAspectFit;
+      self.loadingImageView.hidden = YES;
+      self.loadingImageView.userInteractionEnabled = NO;
+      [self.myView addSubview:self.loadingImageView];
     }
-    [self.myView bringSubviewToFront:self.indicator];
-    [self.indicator startAnimating];
+    self.loadingImageView.center = self.myView.center;
+    self.loadingImageView.hidden = NO;
+    [self.loadingImageView.layer removeAnimationForKey:@"tl_identify_rotate"];
+
+    CABasicAnimation *rotation = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+    rotation.fromValue = @(0);
+    rotation.toValue = @(M_PI * 2);
+    rotation.duration = 1.0;
+    rotation.repeatCount = HUGE_VALF;
+    rotation.removedOnCompletion = NO;
+    [self.loadingImageView.layer addAnimation:rotation forKey:@"tl_identify_rotate"];
+    [self.myView bringSubviewToFront:self.loadingImageView];
   });
 }
 
 - (void)tl_stopLoadingIndicator {
   dispatch_async(dispatch_get_main_queue(), ^{
-    [self.indicator stopAnimating];
+    [self.loadingImageView.layer removeAnimationForKey:@"tl_identify_rotate"]; self.loadingImageView.hidden = YES;
   });
 }
 
@@ -408,13 +422,13 @@
 
 
 /*
-#pragma mark - Navigation
+ #pragma mark - Navigation
 
-// In a storyboard-based application, you will often want to do a little preparation before navigation
-- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
-    // Get the new view controller using [segue destinationViewController].
-    // Pass the selected object to the new view controller.
-}
-*/
+ // In a storyboard-based application, you will often want to do a little preparation before navigation
+ - (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+ // Get the new view controller using [segue destinationViewController].
+ // Pass the selected object to the new view controller.
+ }
+ */
 
 @end
