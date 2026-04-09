@@ -22,6 +22,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)tl_showSearchOverlay;
 - (void)tl_hideSearchOverlay;
 
+/// 根据是否开启适老化调整社区页外观
+- (void)applyElderModeEnabled:(BOOL)enabled;
+
 /// 设置搜索历史标签（先横向填满再换行）；传 nil 或空数组即清空
 - (void)tl_setSearchHistoryItems:(nullable NSArray<NSString *> *)items;
 

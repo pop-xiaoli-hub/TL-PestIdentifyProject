@@ -12,6 +12,7 @@
 @interface TLWAddPlantController ()
 
 @property (nonatomic, strong) TLWAddPlantView *myView;
+@property (nonatomic, strong) UITapGestureRecognizer *dismissKeyboardTapGesture;
 
 @end
 
@@ -33,7 +34,10 @@
   [self.myView.createButton addTarget:self action:@selector(tl_createTapped) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.contentCardButton addTarget:self action:@selector(tl_addImageTapped) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.confirmButton addTarget:self action:@selector(tl_confirmTapped) forControlEvents:UIControlEventTouchUpInside];
+  [self tl_setupDismissKeyboardGesture];
 }
+
+
 
 - (void)viewWillDisappear:(BOOL)animated {
   [super viewWillDisappear:animated];
@@ -57,6 +61,17 @@
 
 - (void)tl_confirmTapped {
   NSLog(@"[AddPlant] 确认按钮点击，当前植物名：%@", self.myView.plantNameTextField.text ?: @"");
+}
+
+- (void)tl_setupDismissKeyboardGesture {
+  UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_dismissKeyboard)];
+  tapGesture.cancelsTouchesInView = NO;
+  [self.view addGestureRecognizer:tapGesture];
+  self.dismissKeyboardTapGesture = tapGesture;
+}
+
+- (void)tl_dismissKeyboard {
+  [self.view endEditing:YES];
 }
 
 @end

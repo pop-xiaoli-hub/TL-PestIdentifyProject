@@ -7,6 +7,7 @@
 
 #import "TLWIdentifyResultController.h"
 #import "TLWIdentifyResultView.h"
+#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 
 @interface TLWIdentifyResultController ()
@@ -20,8 +21,18 @@
 
 - (instancetype)init {
   self = [super init];
+  
   if (self) {
-    _layoutStyleFlag = 0;
+    _layoutStyleFlag = 1;//默认没有开启适老化
+    NSInteger currentUserId = [TLWSDKManager shared].userId;
+    NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+    BOOL elderModeEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:elderModeKey];
+    if (!elderModeEnabled) {
+      elderModeEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode"];
+    }
+    if (elderModeEnabled) {//如果开启了适老化，则传0
+      _layoutStyleFlag = 0;
+    }
   }
   return self;
 }
