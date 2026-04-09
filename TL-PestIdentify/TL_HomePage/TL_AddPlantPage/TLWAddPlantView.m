@@ -22,6 +22,9 @@
 @property (nonatomic, strong) UIView *plantCardView;
 @property (nonatomic, strong) CAGradientLayer *createGradientLayer;
 @property (nonatomic, strong) CAGradientLayer *confirmGradientLayer;
+@property (nonatomic, strong) UIImageView *selectedPlantImageView;
+@property (nonatomic, strong) UIView *plusHorizontalLine;
+@property (nonatomic, strong) UIView *plusVerticalLine;
 
 @end
 
@@ -258,11 +261,20 @@
   plusHorizontalLine.backgroundColor = [UIColor whiteColor];
   plusHorizontalLine.layer.cornerRadius = 3.0;
   [contentCardButton addSubview:plusHorizontalLine];
+  self.plusHorizontalLine = plusHorizontalLine;
 
   UIView *plusVerticalLine = [[UIView alloc] init];
   plusVerticalLine.backgroundColor = [UIColor whiteColor];
   plusVerticalLine.layer.cornerRadius = 3.0;
   [contentCardButton addSubview:plusVerticalLine];
+  self.plusVerticalLine = plusVerticalLine;
+
+  UIImageView *selectedPlantImageView = [[UIImageView alloc] init];
+  selectedPlantImageView.contentMode = UIViewContentModeScaleAspectFill;
+  selectedPlantImageView.clipsToBounds = YES;
+  selectedPlantImageView.hidden = YES;
+  [contentCardButton addSubview:selectedPlantImageView];
+  self.selectedPlantImageView = selectedPlantImageView;
 
   [sectionTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(self.nameCardView.mas_bottom).offset(28.0);
@@ -335,6 +347,10 @@
     make.width.mas_equalTo(8.0);
     make.height.mas_equalTo(90.0);
   }];
+
+  [selectedPlantImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(contentCardButton);
+  }];
 }
 
 - (void)tl_setupConfirmButton {
@@ -368,6 +384,15 @@
     make.height.mas_equalTo(46.0);
     make.bottom.equalTo(self.contentView).offset(-36.0);
   }];
+}
+
+- (void)updateSelectedPlantImage:(nullable UIImage *)image {
+  BOOL hasImage = (image != nil);
+  self.selectedPlantImageView.image = image;
+  self.selectedPlantImageView.hidden = !hasImage;
+  self.plusHorizontalLine.hidden = hasImage;
+  self.plusVerticalLine.hidden = hasImage;
+  self.contentCardButton.backgroundColor = hasImage ? [UIColor clearColor] : [UIColor colorWithWhite:0.88 alpha:1.0];
 }
 
 @end

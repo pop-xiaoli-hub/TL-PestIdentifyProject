@@ -15,9 +15,11 @@
 @property (nonatomic, strong) UILabel *locationLabel;
 @property (nonatomic, strong) UIButton *createButton;
 @property (nonatomic, strong) UIButton *contentCardButton;
+@property (nonatomic, strong) UIImageView *contentImageView;
 @property (nonatomic, strong) UIView *plusHorizontalLine;
 @property (nonatomic, strong) UIView *plusVerticalLine;
 @property (nonatomic, strong) CAGradientLayer *createButtonGradientLayer;
+@property (nonatomic, strong) UILabel *plantTagLabel;
 
 @end
 
@@ -35,6 +37,8 @@
   [super prepareForReuse];
   self.clickCreateButton = nil;
   self.clickContentCard = nil;
+  self.contentImageView.image = nil;
+  self.plantTagLabel.text = nil;
 }
 
 - (void)layoutSubviews {
@@ -124,6 +128,17 @@
   createLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
   [createButton addSubview:createLabel];
 
+  UILabel *plantTagLabel = [[UILabel alloc] init];
+  plantTagLabel.textColor = [UIColor whiteColor];
+  plantTagLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+  plantTagLabel.backgroundColor = [UIColor colorWithRed:0.30 green:0.92 blue:0.76 alpha:1.0];
+  plantTagLabel.textAlignment = NSTextAlignmentCenter;
+  plantTagLabel.layer.cornerRadius = 20.0;
+  plantTagLabel.layer.masksToBounds = YES;
+  plantTagLabel.hidden = YES;
+  [cardView addSubview:plantTagLabel];
+  self.plantTagLabel = plantTagLabel;
+
   UIButton *contentCardButton = [UIButton buttonWithType:UIButtonTypeCustom];
   contentCardButton.backgroundColor = [UIColor colorWithWhite:0.90 alpha:1.0];
   contentCardButton.layer.cornerRadius = 16.0;
@@ -131,6 +146,13 @@
   [contentCardButton addTarget:self action:@selector(tl_contentCardTapped) forControlEvents:UIControlEventTouchUpInside];
   [cardView addSubview:contentCardButton];
   self.contentCardButton = contentCardButton;
+
+  UIImageView *contentImageView = [[UIImageView alloc] init];
+  contentImageView.contentMode = UIViewContentModeScaleAspectFill;
+  contentImageView.clipsToBounds = YES;
+  contentImageView.hidden = YES;
+  [contentCardButton addSubview:contentImageView];
+  self.contentImageView = contentImageView;
 
   UIView *plusHorizontalLine = [[UIView alloc] init];
   plusHorizontalLine.backgroundColor = [UIColor whiteColor];
@@ -153,7 +175,6 @@
   [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(avatarImageView.mas_right).offset(12.0);
     make.top.equalTo(avatarImageView).offset(2.0);
-    make.right.lessThanOrEqualTo(createButton.mas_left).offset(-12.0);
   }];
 
   [locationIconView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -173,7 +194,6 @@
     make.width.mas_equalTo(108.0);
     make.height.mas_equalTo(40.0);
   }];
-  [createButton layoutIfNeeded];
 
   [createIconView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(createButton).offset(14.0);
@@ -186,11 +206,22 @@
     make.centerY.equalTo(createButton);
   }];
 
+  [plantTagLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(cardView).offset(-16.0);
+    make.centerY.equalTo(avatarImageView);
+    make.width.mas_greaterThanOrEqualTo(86.0);
+    make.height.mas_equalTo(40.0);
+  }];
+
   [contentCardButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(cardView).offset(10.0);
     make.right.equalTo(cardView).offset(-10.0);
     make.top.equalTo(avatarImageView.mas_bottom).offset(16.0);
     make.bottom.equalTo(cardView).offset(-10.0);
+  }];
+
+  [contentImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(contentCardButton);
   }];
 
   [plusHorizontalLine mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -204,6 +235,35 @@
     make.width.mas_equalTo(8.0);
     make.height.mas_equalTo(72.0);
   }];
+}
+
+- (void)configureAsCreateCell {
+  self.avatarImageView.image = [UIImage imageNamed:@"hp_avatar.png"];
+  self.titleLabel.text = @"种植物管理";
+  self.locationLabel.text = @"杭州";
+  self.createButton.hidden = NO;
+  self.plantTagLabel.hidden = YES;
+  self.contentImageView.hidden = YES;
+  self.contentImageView.image = nil;
+  self.contentCardButton.backgroundColor = [UIColor colorWithWhite:0.90 alpha:1.0];
+  self.plusHorizontalLine.hidden = NO;
+  self.plusVerticalLine.hidden = NO;
+  self.contentCardButton.userInteractionEnabled = YES;
+}
+
+- (void)configureWithPlantInfo:(NSDictionary *)plantInfo {
+  self.avatarImageView.image = [UIImage imageNamed:@"hp_avatar.png"];
+  self.titleLabel.text = @"种植物管理";
+  self.locationLabel.text = @"杭州";
+  self.createButton.hidden = YES;
+  self.plantTagLabel.hidden = NO;
+  self.plantTagLabel.text = [NSString stringWithFormat:@"  %@  ", [plantInfo[@"name"] isKindOfClass:[NSString class]] ? plantInfo[@"name"] : @"未命名植物"];
+  self.contentImageView.image = [plantInfo[@"image"] isKindOfClass:[UIImage class]] ? plantInfo[@"image"] : [UIImage imageNamed:@"hp_avatar.png"];
+  self.contentImageView.hidden = NO;
+  self.contentCardButton.backgroundColor = [UIColor clearColor];
+  self.plusHorizontalLine.hidden = YES;
+  self.plusVerticalLine.hidden = YES;
+  self.contentCardButton.userInteractionEnabled = NO;
 }
 
 - (void)tl_createButtonTapped {

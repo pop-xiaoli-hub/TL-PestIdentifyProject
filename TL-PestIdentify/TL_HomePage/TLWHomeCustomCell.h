@@ -14,6 +14,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) void(^clickCreateButton)(void);
 @property (nonatomic, copy, nullable) void(^clickContentCard)(void);
 
+- (void)configureAsCreateCell;
+- (void)configureWithPlantInfo:(NSDictionary *)plantInfo;
+
 @end
 
 NS_ASSUME_NONNULL_END

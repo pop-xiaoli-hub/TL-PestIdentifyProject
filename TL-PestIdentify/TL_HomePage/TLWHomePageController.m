@@ -25,6 +25,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 @property (nonatomic, strong) TLWHomePageView *homePageView;
 @property (nonatomic, assign) BOOL warningExpanded;
+@property (nonatomic, strong) NSMutableArray<NSDictionary *> *managedPlants;
 
 @end
 
@@ -35,6 +36,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
   [super viewDidLoad];
   [self tl_setHomePageBackView];
   [self tl_setupHomePageView];
+  self.managedPlants = [NSMutableArray array];
   [self applyProfile];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(onProfileUpdated)
@@ -99,7 +101,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 #pragma mark - UITableViewDataSource
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-  return 3;
+  return 3 + self.managedPlants.count;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -152,24 +154,30 @@ extern NSString * const TLWProfileDidUpdateNotification;
   }
   TLWHomeCustomCell *cell = [tableView dequeueReusableCellWithIdentifier:@"kTLWHomeCustomCellIdentifier" forIndexPath:indexPath];
   __weak typeof(self) weakSelf = self;
-  cell.clickCreateButton = ^{
-    __strong typeof(weakSelf) strongSelf = weakSelf;
-    if (!strongSelf) {
-      return;
+  if (indexPath.row == 2) {
+    [cell configureAsCreateCell];
+    cell.clickCreateButton = ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+      [strongSelf tl_openAddPlantController];
+    };
+    cell.clickContentCard = ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+      [strongSelf tl_openAddPlantController];
+    };
+  } else {
+    NSInteger plantIndex = indexPath.row - 3;
+    if (plantIndex >= 0 && plantIndex < self.managedPlants.count) {
+      [cell configureWithPlantInfo:self.managedPlants[plantIndex]];
     }
-    TLWAddPlantController *controller = [[TLWAddPlantController alloc] init];
-    controller.hidesBottomBarWhenPushed = YES;
-    [strongSelf.navigationController pushViewController:controller animated:YES];
-  };
-  cell.clickContentCard = ^{
-    __strong typeof(weakSelf) strongSelf = weakSelf;
-    if (!strongSelf) {
-      return;
-    }
-    TLWAddPlantController *controller = [[TLWAddPlantController alloc] init];
-    controller.hidesBottomBarWhenPushed = YES;
-    [strongSelf.navigationController pushViewController:controller animated:YES];
-  };
+    cell.clickCreateButton = nil;
+    cell.clickContentCard = nil;
+  }
   cell.selectionStyle = UITableViewCellSelectionStyleNone;
   return cell;
 }
@@ -183,9 +191,27 @@ extern NSString * const TLWProfileDidUpdateNotification;
     // 功能入口卡片（拍照识别区域需要更高，保证正方形比例和留白）
     return 210.0;
   } else {
-    // 其他自定义 cell
+    // 新建植物卡和已添加植物卡
     return 300.0;
   }
+}
+
+- (void)tl_openAddPlantController {
+  __weak typeof(self) weakSelf = self;
+  TLWAddPlantController *controller = [[TLWAddPlantController alloc] init];
+  controller.onConfirmAddPlant = ^(NSString *plantName, UIImage *plantImage) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf.managedPlants addObject:@{
+      @"name": plantName ?: @"",
+      @"image": plantImage ?: [UIImage new]
+    }];
+    [strongSelf.homePageView.tableView reloadData];
+  };
+  controller.hidesBottomBarWhenPushed = YES;
+  [self.navigationController pushViewController:controller animated:YES];
 }
 
 

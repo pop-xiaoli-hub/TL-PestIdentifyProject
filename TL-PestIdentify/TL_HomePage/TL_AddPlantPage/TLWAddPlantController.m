@@ -7,12 +7,15 @@
 
 #import "TLWAddPlantController.h"
 #import "TLWAddPlantView.h"
+#import "TLWImagePickerManager.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWAddPlantController ()
+@interface TLWAddPlantController () <TLWImagePickerDelegate>
 
 @property (nonatomic, strong) TLWAddPlantView *myView;
 @property (nonatomic, strong) UITapGestureRecognizer *dismissKeyboardTapGesture;
+@property (nonatomic, strong) TLWImagePickerManager *imagePickerManager;
+@property (nonatomic, strong, nullable) UIImage *selectedPlantImage;
 
 @end
 
@@ -52,15 +55,28 @@
 }
 
 - (void)tl_createTapped {
-  NSLog(@"[AddPlant] 新建按钮点击");
+  [self tl_openAlbum];
 }
 
 - (void)tl_addImageTapped {
-  NSLog(@"[AddPlant] 添加图片卡片点击");
+  [self tl_openAlbum];
 }
 
 - (void)tl_confirmTapped {
-  NSLog(@"[AddPlant] 确认按钮点击，当前植物名：%@", self.myView.plantNameTextField.text ?: @"");
+  NSString *plantName = [self.myView.plantNameTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  if (plantName.length == 0) {
+    [self tl_showAlertWithMessage:@"请输入种植物名称"];
+    return;
+  }
+  if (!self.selectedPlantImage) {
+    [self tl_showAlertWithMessage:@"请选择种植物图片"];
+    return;
+  }
+
+  if (self.onConfirmAddPlant) {
+    self.onConfirmAddPlant(plantName, self.selectedPlantImage);
+  }
+  [self tl_backTapped];
 }
 
 - (void)tl_setupDismissKeyboardGesture {
@@ -72,6 +88,30 @@
 
 - (void)tl_dismissKeyboard {
   [self.view endEditing:YES];
+}
+
+- (void)tl_openAlbum {
+  self.imagePickerManager.maxCount = 1;
+  self.imagePickerManager.delegate = self;
+  [self.imagePickerManager openAlbumFrom:self];
+}
+
+- (TLWImagePickerManager *)imagePickerManager {
+  if (!_imagePickerManager) {
+    _imagePickerManager = [[TLWImagePickerManager alloc] init];
+  }
+  return _imagePickerManager;
+}
+
+- (void)imagePicker:(TLWImagePickerManager *)picker didSelectImage:(UIImage *)image {
+  self.selectedPlantImage = image;
+  [self.myView updateSelectedPlantImage:image];
+}
+
+- (void)tl_showAlertWithMessage:(NSString *)message {
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:message preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+  [self presentViewController:alert animated:YES completion:nil];
 }
 
 @end
