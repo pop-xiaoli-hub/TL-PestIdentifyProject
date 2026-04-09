@@ -9,7 +9,11 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef void(^TLWAddPlantConfirmBlock)(NSString *plantName, UIImage *plantImage);
+
 @interface TLWAddPlantController : UIViewController
+
+@property (nonatomic, copy, nullable) TLWAddPlantConfirmBlock onConfirmAddPlant;
 
 @end
 

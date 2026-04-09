@@ -30,6 +30,9 @@
 #import <AgriPestClient/AGResultPageResultCommentResponseDto.h>
 #import <AgriPestClient/AGCommentRequest.h>
 #import <AgriPestClient/AGResultCommentResponseDto.h>
+#import <AgriPestClient/AGMyCropCreateRequest.h>
+#import <AgriPestClient/AGResultMyCropResponseDto.h>
+#import <AgriPestClient/AGResultListMyCropResponseDto.h>
 
 /// 用户资料变更通知（改昵称、改头像、改偏好等更新缓存后发出）
 extern NSString * const TLWProfileDidUpdateNotification;
@@ -143,6 +146,13 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSURLSessionTask *)uploadFileWithFile:(NSURL *)file
                                   prefix:(NSString *)prefix
                        completionHandler:(void (^)(AGResultString * output, NSError * error))handler;
+
+/// 新建我的作物
+- (NSURLSessionTask *)createCropWithRequest:(AGMyCropCreateRequest *)request
+                          completionHandler:(void (^)(AGResultMyCropResponseDto * output, NSError * error))handler;
+
+/// 获取我的作物列表
+- (NSURLSessionTask *)getMyCropsWithCompletionHandler:(void (^)(AGResultListMyCropResponseDto * output, NSError * error))handler;
 @end
 
 NS_ASSUME_NONNULL_END

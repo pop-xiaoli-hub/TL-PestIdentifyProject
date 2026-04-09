@@ -9,7 +9,9 @@
 #import "TLWHomePageView.h"
 #import "TLWHomeCardCell.h"
 #import "TLWHomeCustomCell.h"
+#import "Models/TLWPlantModel.h"
 #import "TL_AddPlantPage/TLWAddPlantController.h"
+#import "TL_PlantDetailPage/TLWPlantDetailController.h"
 #import "TLWIdentifyPageController.h"
 #import "TLWRecordController.h"
 #import "TLWAIAssistantController.h"
@@ -25,6 +27,8 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 @property (nonatomic, strong) TLWHomePageView *homePageView;
 @property (nonatomic, assign) BOOL warningExpanded;
+@property (nonatomic, strong) NSMutableArray<TLWPlantModel *> *managedPlants;
+@property (nonatomic, assign) BOOL isLoadingCrops;
 
 @end
 
@@ -35,7 +39,9 @@ extern NSString * const TLWProfileDidUpdateNotification;
   [super viewDidLoad];
   [self tl_setHomePageBackView];
   [self tl_setupHomePageView];
+  self.managedPlants = [NSMutableArray array];
   [self applyProfile];
+  [self tl_fetchMyCrops];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(onProfileUpdated)
                                                name:TLWProfileDidUpdateNotification
@@ -99,7 +105,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 #pragma mark - UITableViewDataSource
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-  return 3;
+  return 3 + self.managedPlants.count;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -152,24 +158,43 @@ extern NSString * const TLWProfileDidUpdateNotification;
   }
   TLWHomeCustomCell *cell = [tableView dequeueReusableCellWithIdentifier:@"kTLWHomeCustomCellIdentifier" forIndexPath:indexPath];
   __weak typeof(self) weakSelf = self;
-  cell.clickCreateButton = ^{
-    __strong typeof(weakSelf) strongSelf = weakSelf;
-    if (!strongSelf) {
-      return;
+  if (indexPath.row == 2) {
+    [cell configureAsCreateCellWithLocationName:nil];
+    cell.clickCreateButton = ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+      [strongSelf tl_openAddPlantController];
+    };
+    cell.clickContentCard = ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+      [strongSelf tl_openAddPlantController];
+    };
+  } else {
+    NSInteger plantIndex = indexPath.row - 3;
+    if (plantIndex >= 0 && plantIndex < self.managedPlants.count) {
+      TLWPlantModel *plantModel = self.managedPlants[plantIndex];
+      [cell configureWithPlantModel:plantModel locationName:nil];
+      cell.clickContentCard = ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) {
+          return;
+        }
+        if (plantModel.isUploading) {
+          [strongSelf tl_showMessageAlert:@"正在上传"];
+        } else {
+          TLWPlantDetailController *detailController = [[TLWPlantDetailController alloc] initWithPlantModel:plantModel];
+          detailController.hidesBottomBarWhenPushed = YES;
+          [strongSelf.navigationController pushViewController:detailController animated:YES];
+        }
+      };
     }
-    TLWAddPlantController *controller = [[TLWAddPlantController alloc] init];
-    controller.hidesBottomBarWhenPushed = YES;
-    [strongSelf.navigationController pushViewController:controller animated:YES];
-  };
-  cell.clickContentCard = ^{
-    __strong typeof(weakSelf) strongSelf = weakSelf;
-    if (!strongSelf) {
-      return;
-    }
-    TLWAddPlantController *controller = [[TLWAddPlantController alloc] init];
-    controller.hidesBottomBarWhenPushed = YES;
-    [strongSelf.navigationController pushViewController:controller animated:YES];
-  };
+    cell.clickCreateButton = nil;
+  }
   cell.selectionStyle = UITableViewCellSelectionStyleNone;
   return cell;
 }
@@ -183,9 +208,146 @@ extern NSString * const TLWProfileDidUpdateNotification;
     // 功能入口卡片（拍照识别区域需要更高，保证正方形比例和留白）
     return 210.0;
   } else {
-    // 其他自定义 cell
+    // 新建植物卡和已添加植物卡
     return 300.0;
   }
+}
+
+- (void)tl_openAddPlantController {
+  __weak typeof(self) weakSelf = self;
+  TLWAddPlantController *controller = [[TLWAddPlantController alloc] init];
+  controller.onConfirmAddPlant = ^(NSString *plantName, UIImage *plantImage) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    TLWPlantModel *plantModel = [[TLWPlantModel alloc] initWithPlantName:plantName image:plantImage];
+    [strongSelf.managedPlants insertObject:plantModel atIndex:0];
+    [strongSelf.homePageView.tableView reloadData];
+    [strongSelf tl_uploadPlantModel:plantModel];
+  };
+  controller.hidesBottomBarWhenPushed = YES;
+  [self.navigationController pushViewController:controller animated:YES];
+}
+
+- (void)tl_fetchMyCrops {
+  if (self.isLoadingCrops) {
+    return;
+  }
+  self.isLoadingCrops = YES;
+
+  __weak typeof(self) weakSelf = self;
+  [[TLWSDKManager shared] getMyCropsWithCompletionHandler:^(AGResultListMyCropResponseDto * output, NSError * error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+
+      strongSelf.isLoadingCrops = NO;
+      if (error || output.code.integerValue != 200) {
+        return;
+      }
+
+      NSMutableArray<TLWPlantModel *> *plants = [NSMutableArray array];
+      for (AGMyCropResponseDto *crop in output.data) {
+        if (![crop isKindOfClass:[AGMyCropResponseDto class]]) {
+          continue;
+        }
+
+        TLWPlantModel *plantModel = [[TLWPlantModel alloc] initWithCropResponse:crop];
+        [plants addObject:plantModel];
+      }
+
+      NSMutableArray<TLWPlantModel *> *pendingPlants = [NSMutableArray array];
+      for (TLWPlantModel *localPlant in strongSelf.managedPlants) {
+        if (localPlant.isUploading) {
+          [pendingPlants addObject:localPlant];
+        }
+      }
+
+      NSMutableArray<TLWPlantModel *> *mergedPlants = [NSMutableArray arrayWithArray:pendingPlants];
+      [mergedPlants addObjectsFromArray:plants];
+      strongSelf.managedPlants = mergedPlants;
+      [strongSelf.homePageView.tableView reloadData];
+    });
+  }];
+}
+
+- (void)tl_uploadPlantModel:(TLWPlantModel *)plantModel {
+  NSData *imageData = UIImageJPEGRepresentation(plantModel.localImage, 0.9);
+  if (imageData.length == 0) {
+    plantModel.isUploading = NO;
+    [self.homePageView.tableView reloadData];
+    [self tl_showMessageAlert:@"图片处理失败，请重新选择"];
+    return;
+  }
+
+  NSString *fileName = [NSString stringWithFormat:@"plant_%@.jpg", [[NSUUID UUID] UUIDString]];
+  NSString *tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
+  BOOL writeSuccess = [imageData writeToFile:tempPath atomically:YES];
+  if (!writeSuccess) {
+    plantModel.isUploading = NO;
+    [self.homePageView.tableView reloadData];
+    [self tl_showMessageAlert:@"图片处理失败，请稍后重试"];
+    return;
+  }
+
+  NSURL *fileURL = [NSURL fileURLWithPath:tempPath];
+  __weak typeof(self) weakSelf = self;
+  [[TLWSDKManager shared] uploadFileWithFile:fileURL prefix:@"crop/" completionHandler:^(AGResultString * output, NSError * error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      [[NSFileManager defaultManager] removeItemAtPath:tempPath error:nil];
+      if (!strongSelf) {
+        return;
+      }
+
+      NSString *imageURL = output.data;
+      if (error || output.code.integerValue != 200 || imageURL.length == 0) {
+        plantModel.isUploading = NO;
+        [strongSelf.homePageView.tableView reloadData];
+        NSString *message = error.localizedDescription ?: output.message;
+        [strongSelf tl_showMessageAlert:message.length > 0 ? message : @"图片上传失败，请稍后重试"];
+        return;
+      }
+
+      AGMyCropCreateRequest *request = [[AGMyCropCreateRequest alloc] init];
+      request.plantName = plantModel.plantName;
+      request.imageUrl = imageURL;
+      request.status = @"正常";
+      request.pestCount = @0;
+
+      [[TLWSDKManager shared] createCropWithRequest:request completionHandler:^(AGResultMyCropResponseDto * output, NSError * error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          __strong typeof(weakSelf) innerSelf = weakSelf;
+          if (!innerSelf) {
+            return;
+          }
+
+          plantModel.isUploading = NO;
+          if (error || output.code.integerValue != 200) {
+            NSString *message = error.localizedDescription ?: output.message;
+            [innerSelf tl_showMessageAlert:message.length > 0 ? message : @"新作物创建失败，请稍后重试"];
+            [innerSelf.homePageView.tableView reloadData];
+            return;
+          }
+
+          plantModel.plantId = output.data._id ?: plantModel.plantId;
+          plantModel.plantName = output.data.plantName.length > 0 ? output.data.plantName : plantModel.plantName;
+          plantModel.imageUrl = output.data.imageUrl.length > 0 ? output.data.imageUrl : imageURL;
+          plantModel.localImage = nil;
+          [innerSelf.homePageView.tableView reloadData];
+        });
+      }];
+    });
+  }];
+}
+
+- (void)tl_showMessageAlert:(NSString *)message {
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:message preferredStyle:UIAlertControllerStyleAlert];
+  [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
+  [self presentViewController:alert animated:YES completion:nil];
 }
 
 
