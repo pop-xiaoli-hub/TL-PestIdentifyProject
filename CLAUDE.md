@@ -97,7 +97,7 @@ xcodebuild -workspace TL-PestIdentify/TL-PestIdentify.xcworkspace \
 登录成功后流程：
 
 - 先通过 `TLWSDKManager` 保存登录态
-- 再拉取用户资料
+- 再拉取用户资料（失败时自动重试 3 次，每次间隔 3 秒，不再直接登出）
 - 如果用户已经做过适老化选择，并且已经设置关注作物，则直接进入主 Tab
 - 如果已做适老化选择，但还没选关注作物，则进入 `TLWPreferenceController`
 - 如果连适老化选择都还没做，则进入 `TLWGuideController`
@@ -328,23 +328,32 @@ xcodebuild -workspace TL-PestIdentify/TL-PestIdentify.xcworkspace \
 
 目录：
 
-- `TL-PestIdentify/TL_Common/TL_AiAssisstant`
+- `TL-PestIdentify/TL_AIAssistant`
 
 关键文件：
 
 - `TLWAIAssistantController.m`
+- `TLWAICallController.h` / `TLWAICallController.m`
+- `Views/TLWAIAssistantView.h` / `.m`
+- `Views/TLWAIAssistantComposerView.h` / `.m`
+- `Views/Cells/TLWAIAssistantMessageCell.m`
 
 已经完成的部分：
 
-- 输入框与页面壳子
-- 相机 / 相册入口
-- 多图预览
+- 多轮对话（已接入 AgriPestClient chatProfile SDK）
+- 文字 + 单图混合输入（图片压缩后 Base64 编码）
+- AI 占位消息"正在思考中..."+ 实时回显
+- Plus 面板（相机 / 相册 / AI 通话三入口，与键盘和语音面板互斥）
+- 停止按钮：AI 回复过程中可手动中断
+- AI 加载态交互（隐藏 mic，plus 左移，显示 stop）
 - 语音面板与长按语音输入交互
+- 多图预览
+- 401 token 过期自动续期重试
+- AI 通话页面（TLWAICallController，壳子）
 
 还没完成的部分：
 
-- 真正的 AI 对话上传接口
-- 服务端响应后的消息追加与渲染
+- AI 通话页面的真实语音通话功能接入
 
 ### 8. 我的 / 个人中心
 
@@ -397,8 +406,7 @@ xcodebuild -workspace TL-PestIdentify/TL-PestIdentify.xcworkspace \
 当前代码里最值得优先推进的空缺点：
 
 - `TLWIdentifyPageController.m`：接通真实识别接口
-- `TLWAIAssistantController.m`：接通真实 AI 聊天与多图上传
-- `TLWRecordController.m`：用真实接口替换 mock 记录数据
+- `TLWAICallController.m`：AI 通话页面接入真实语音通话功能
 - `TLWRecordDetailController.m`：支持跳 AI 助手并预填当前病害名
 - `TLWPublishController.m`：发布草稿回显
 - `TLWSettingViewController.m`：设置页二级页面

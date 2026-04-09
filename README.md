@@ -32,6 +32,9 @@
 - 多轮对话式 AI 助手（已接入 AgriPestClient chatProfile SDK）
 - 支持图片 + 文字混合输入（图片压缩后 Base64 编码传输）
 - AI 占位消息"正在思考中..."+ 实时回显
+- Plus 面板（相机 / 相册 / AI 通话三入口，与键盘和语音面板互斥）
+- 停止按钮：AI 回复过程中可手动中断
+- AI 通话页面入口（TLWAICallController）
 - 401 token 过期自动续期重试
 
 ### 我的
@@ -43,11 +46,13 @@
 - 我的收藏列表（分页加载 + 下拉刷新）
 - 设置页
 
-### 登录安全
+### 启动与登录安全
+- 启动时拉取用户资料失败自动重试（3 次），不再直接登出
 - 双 Token 机制（accessToken + refreshToken）
 - accessToken 过期自动续期，续期失败强制跳回登录页
 - 全部 API 接口接入 401 自动重试
 - SMS 验证码登录自动注册提示
+- 测试环境自动跳过语音 SDK 初始化
 
 ### 通用组件
 - 统一 Toast 组件（TLWToast，白色居中 + 半透明遮罩）
@@ -100,7 +105,7 @@ TL-PestIdentify/
 │   └── Setting/                  # 设置
 ├── TL_Record/                    # 识别记录列表
 │   └── TL_RecordDetail/          # 识别记录详情
-├── TL_AIAssistant/               # AI 助手
+├── TL_AIAssistant/               # AI 助手（含 AI 通话入口）
 ├── TL_Message/                   # 消息
 │   ├── Controllers/
 │   ├── Views/
@@ -182,11 +187,12 @@ gh api 'repos/lukecc00/AgroAiServer/commits?sha=master&per_page=20' \
 - [ ] **拍照识别** — `POST /api/identify`，图片 Base64/multipart 上传，跳转识别结果页
 - [x] **AI 助手对话** — 已接入 `chatProfileWithChatRequest:` SDK，支持文字+单图对话
 - [x] **消息列表** — 已接入真实评论/通知接口，评论缩略图通过 postId 补查帖子封面
-- [ ] **识别记录列表** — 替换 mock 数据，接入后端记录接口
+- [x] **识别记录列表** — 已接入 SDK 接口，"我的"页面可跳转识别记录
 
 ### 待完成功能
 - [ ] **发布草稿回显** — 将 draftObject 内容回显到发布页（作物名称、文本、图片）
 - [ ] **记录详情 → AI 助手** — 跳转 AI 助手并预填当前病害名称作为问题
+- [ ] **AI 通话** — TLWAICallController 接入真实语音通话功能
 - [x] **换绑手机号** — 短信验证码 + `changePhone` 接口
 - [x] **修改密码** — `updatePassword` 接口，6-20 位校验，支持显示原密码
 - [x] **双 Token 续期** — 401 自动 refresh，全接口覆盖
