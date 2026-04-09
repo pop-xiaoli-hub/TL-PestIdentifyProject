@@ -26,6 +26,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
 @property (nonatomic, strong) TLWCommunityView *myView;
 @property (nonatomic, strong) NSMutableArray *posts;
+@property (nonatomic, assign) BOOL elderModeEnabled;
 @property (nonatomic, assign) BOOL tl_isFetchingFeed;
 @property (nonatomic, assign) NSInteger currentFeedPage;
 @property (nonatomic, assign) BOOL hasMoreFeed;
@@ -44,7 +45,11 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
 @implementation TLWCommunityController
 
-
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self tl_applyCommunityLayoutStyle];//进行适老化设置判断
+  [self tl_resetSearchStateIfNeeded];
+}
 
 - (void)viewDidLoad {
   [super viewDidLoad];
@@ -85,6 +90,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   self.currentFeedPage = -1;
   self.hasMoreFeed = YES;
   self.feedRequestToken = 0;
+  [self tl_applyCommunityLayoutStyle];
   [self tl_fetchCommunityFeed];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
 }
@@ -254,6 +260,53 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   return [posts copy];
 }
 
+- (void)tl_resetSearchStateIfNeeded {
+  if (self.myView.searchTextField.text.length == 0 &&
+      self.activeSearchQuery.length == 0 &&
+      self.pendingSuggestionQuery.length == 0 &&
+      self.searchSuggestions.count == 0) {
+    return;
+  }
+
+  self.myView.searchTextField.text = @"";
+  self.activeSearchQuery = @"";
+  self.pendingSuggestionQuery = @"";
+  [self.suggestionTask cancel];
+  self.suggestionTask = nil;
+  [self.myView.searchTextField resignFirstResponder];
+  [self.myView tl_hideSearchOverlay];
+  [self tl_clearSuggestionList];
+}
+
+- (BOOL)tl_isElderModeEnabled {
+  NSInteger currentUserId = [TLWSDKManager shared].userId;
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+  if ([defaults objectForKey:elderModeKey] != nil) {//优先读取用户的专属key
+    return [defaults boolForKey:elderModeKey];
+  }
+  if ([defaults objectForKey:@"TLW_elder_mode"] != nil) {//如果客户级没有再兼容全局key
+    return [defaults boolForKey:@"TLW_elder_mode"];
+  }
+  return NO;//默认不开启
+}
+
+- (void)tl_applyCommunityLayoutStyle {
+  self.elderModeEnabled = [self tl_isElderModeEnabled];//获取当前适老化数据      
+  [self.myView applyElderModeEnabled:self.elderModeEnabled];
+
+  TLWCommunityWaterfallLayout *layout = (TLWCommunityWaterfallLayout *)self.myView.collectionView.collectionViewLayout;
+  layout.numberOfColumns = self.elderModeEnabled ? 1 : 2;
+  layout.columnSpacing = self.elderModeEnabled ? 0.0 : 10.0;
+  layout.rowSpacing = self.elderModeEnabled ? 14.0 : 10.0;
+  layout.sectionInset = self.elderModeEnabled ? UIEdgeInsetsMake(14, 12, 20, 12) : UIEdgeInsetsMake(12, 12, 20, 12);
+  [layout invalidateLayout];
+
+  if (self.isViewLoaded) {
+    [self.myView.collectionView reloadData];
+  }
+}
+
 - (void)tl_reloadPostWithId:(NSNumber *)postId {
   if (postId == nil) {
     return;
@@ -390,12 +443,15 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   TLWCommunityCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:kCommunityCellID forIndexPath:indexPath];
   TLWCommunityPost *post = self.posts[indexPath.item];
 
-  if (indexPath.row == 0) {
+  if (self.elderModeEnabled) {
+    post.imageAspectRatio = 0.62;
+  } else if (indexPath.row == 0) {
     post.imageAspectRatio = 0.60;
   } else {
     post.imageAspectRatio = 0.75;
   }
   NSLog(@"点赞数-1 : %@", post.likeCount);
+  cell.elderModeEnabled = self.elderModeEnabled;
   [cell configureWithPost:post];
   return cell;
 }
@@ -429,12 +485,15 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 - (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout heightForItemAtIndexPath:(NSIndexPath *)indexPath itemWidth:(CGFloat)width {
   TLWCommunityPost *post = self.posts[indexPath.item];
   // 瀑布流高度计算使用的纵横比规则应与 cell 展示保持一致
-  if (indexPath.row == 0) {
+  if (self.elderModeEnabled) {
+    post.imageAspectRatio = 0.62;
+  } else if (indexPath.row == 0) {
     post.imageAspectRatio = 0.60;
   } else {
     post.imageAspectRatio = 0.75;
   }
-  return [post cellHeightForWidth:width];
+  CGFloat cellHeight = [post cellHeightForWidth:width];
+  return self.elderModeEnabled ? (cellHeight + 28.0) : cellHeight;
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {

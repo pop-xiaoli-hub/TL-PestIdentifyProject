@@ -27,7 +27,9 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
 @property (nonatomic, strong, readwrite) UITextField *searchTextField;
 @property (nonatomic, strong, readwrite) UITableView *suggestionTableView;
 @property (nonatomic, strong, readwrite) UIButton *voiceButton;
+@property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UIView *searchContainer;
+@property (nonatomic, strong) UIView *searchFieldBackground;
 /// 搜索时的毛玻璃覆盖层（含历史记录、猜你想搜）
 @property (nonatomic, strong) UIVisualEffectView *searchBlurPanel;
 @property (nonatomic, strong) UIView *defaultSearchContentView;
@@ -74,12 +76,14 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
   titleLabel.textColor = [UIColor whiteColor];
   titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
   [self addSubview:titleLabel];
+  self.titleLabel = titleLabel;
 
   UIView *searchFieldBackground = [[UIView alloc] init];
   searchFieldBackground.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.95];
   searchFieldBackground.layer.cornerRadius = 22.0;
   searchFieldBackground.layer.masksToBounds = YES;
   [container addSubview:searchFieldBackground];
+  self.searchFieldBackground = searchFieldBackground;
 
   UIImageView *searchIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_search.png"]];
   searchIcon.contentMode = UIViewContentModeScaleAspectFit;
@@ -148,6 +152,24 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
     make.centerY.equalTo(searchFieldBackground);
     make.height.mas_equalTo(32);
   }];
+}
+
+- (void)applyElderModeEnabled:(BOOL)enabled {
+  self.collectionView.backgroundColor = [UIColor whiteColor];
+  self.titleLabel.font = [UIFont systemFontOfSize:(enabled ? 22.0 : 20.0) weight:UIFontWeightSemibold];
+  self.searchTextField.font = [UIFont systemFontOfSize:(enabled ? 17.0 : 14.0) weight:UIFontWeightMedium];
+  self.searchTextField.textColor = enabled ? [UIColor colorWithWhite:0.30 alpha:1.0] : [UIColor darkTextColor];
+  self.searchTextField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入关键词" attributes:@{
+    NSForegroundColorAttributeName: enabled ? [UIColor colorWithWhite:0.70 alpha:1.0] : [UIColor colorWithWhite:0.72 alpha:1.0],
+    NSFontAttributeName: self.searchTextField.font ?: [UIFont systemFontOfSize:14.0]
+  }];
+
+  self.searchFieldBackground.backgroundColor = enabled
+    ? [[UIColor whiteColor] colorWithAlphaComponent:0.82]
+    : [[UIColor whiteColor] colorWithAlphaComponent:0.95];
+  self.searchFieldBackground.layer.cornerRadius = enabled ? 24.0 : 22.0;
+
+  self.publishButton.transform = enabled ? CGAffineTransformMakeScale(1.06, 1.06) : CGAffineTransformIdentity;
 }
 
 

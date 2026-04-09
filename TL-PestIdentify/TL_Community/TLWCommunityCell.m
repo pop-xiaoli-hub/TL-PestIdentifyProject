@@ -10,6 +10,8 @@
 
 @interface TLWCommunityCell ()
 
+@property (nonatomic, strong) UIVisualEffectView *backgroundBlurView;
+@property (nonatomic, strong) UIView *backgroundGlassLayer;
 @property (nonatomic, strong) UIImageView *photoView;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UIImageView *avatarView;
@@ -23,6 +25,19 @@
 @end
 
 @implementation TLWCommunityCell
+
+- (NSString *)tl_displayTitleTextForPost:(TLWCommunityPost *)post {
+  NSString *rawTitle = post.title.length > 0 ? post.title : post.content;
+  if (![rawTitle isKindOfClass:[NSString class]]) {
+    return @"";
+  }
+
+  NSString *trimmedTitle = [rawTitle stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  if (trimmedTitle.length <= 20) {//小于直接返回
+    return trimmedTitle;
+  }
+  return [[trimmedTitle substringToIndex:20] stringByAppendingString:@"..."];//过长截取
+}
 
 - (instancetype)initWithFrame:(CGRect)frame {
   self = [super initWithFrame:frame];
@@ -40,11 +55,13 @@
   blurView.layer.masksToBounds = YES;
   blurView.layer.cornerRadius = 14.0;
   [self.contentView addSubview:blurView];
+  self.backgroundBlurView = blurView;
   UIView *contentView = blurView.contentView;
   UIView *glassLayer = [[UIView alloc] init];
   glassLayer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.32];
   glassLayer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
   [contentView addSubview:glassLayer];
+  self.backgroundGlassLayer = glassLayer;
   // 边框
   blurView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.55].CGColor;
   blurView.layer.borderWidth = 1.0;
@@ -62,6 +79,7 @@
   self.titleLabel.text = nil;
   self.userLabel.text = nil;
   self.likeLabel.text = nil;
+  self.pendingBlurView.hidden = YES;
 }
 
 - (void)setupSubviews {
@@ -178,6 +196,56 @@
   }];
 }
 
+- (void)setElderModeEnabled:(BOOL)elderModeEnabled {
+  _elderModeEnabled = elderModeEnabled;
+
+  self.contentView.layer.cornerRadius = elderModeEnabled ? 22.0 : 14.0;
+  self.backgroundBlurView.layer.cornerRadius = elderModeEnabled ? 22.0 : 14.0;
+  self.pendingBlurView.layer.cornerRadius = elderModeEnabled ? 22.0 : 14.0;
+
+  self.backgroundBlurView.effect = elderModeEnabled ? nil : [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialLight];
+  self.backgroundBlurView.backgroundColor = elderModeEnabled
+    ? [[UIColor whiteColor] colorWithAlphaComponent:0.98]
+    : [UIColor clearColor];
+  self.backgroundGlassLayer.backgroundColor = elderModeEnabled
+    ? [UIColor clearColor]
+    : [[UIColor whiteColor] colorWithAlphaComponent:0.32];
+  self.backgroundBlurView.layer.borderWidth = elderModeEnabled ? 0.0 : 1.0;
+
+  self.layer.shadowColor = elderModeEnabled
+    ? [UIColor colorWithRed:0.56 green:0.62 blue:0.62 alpha:0.24].CGColor
+    : [UIColor colorWithWhite:0 alpha:0.35].CGColor;
+  self.layer.shadowOffset = elderModeEnabled ? CGSizeMake(0, 6) : CGSizeMake(0, 8);
+  self.layer.shadowRadius = elderModeEnabled ? 16.0 : 12.0;
+
+  self.titleLabel.font = [UIFont systemFontOfSize:(elderModeEnabled ? 18.0 : 13.0)
+                                           weight:UIFontWeightSemibold];
+  self.titleLabel.numberOfLines = elderModeEnabled ? 3 : 2;
+  self.userLabel.font = [UIFont systemFontOfSize:(elderModeEnabled ? 16.0 : 11.0)
+                                          weight:(elderModeEnabled ? UIFontWeightMedium : UIFontWeightRegular)];
+  self.avatarView.layer.cornerRadius = elderModeEnabled ? 18.0 : 10.0;
+  self.likeIconView.hidden = elderModeEnabled;
+  self.likeLabel.hidden = elderModeEnabled;
+  self.pendingLabel.font = [UIFont systemFontOfSize:(elderModeEnabled ? 14.0 : 12.0)
+                                             weight:UIFontWeightMedium];
+
+  [self.avatarView mas_updateConstraints:^(MASConstraintMaker *make) {
+    make.width.height.mas_equalTo(elderModeEnabled ? 36.0 : 20.0);
+  }];
+  [self.titleLabel mas_updateConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.photoView.mas_bottom).offset(elderModeEnabled ? 10.0 : 6.0);
+    make.left.equalTo(self.contentView).offset(elderModeEnabled ? 14.0 : 8.0);
+    make.right.equalTo(self.contentView).offset(elderModeEnabled ? -14.0 : -8.0);
+  }];
+  [self.avatarView mas_updateConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.contentView).offset(elderModeEnabled ? 14.0 : 8.0);
+    make.bottom.equalTo(self.contentView).offset(elderModeEnabled ? -12.0 : -6.0);
+  }];
+  [self.userLabel mas_updateConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.avatarView.mas_right).offset(elderModeEnabled ? 10.0 : 6.0);
+  }];
+}
+
 //- (void)configureWithPost:(TLWCommunityPost *)post {
 //  id first = (post.images.count > 0) ? post.images.firstObject : nil;
 //  if (!first || first == [NSNull null]) {
@@ -206,27 +274,27 @@
 - (void)configureWithPost:(TLWCommunityPost *)post {
   id first = (post.images.count > 0) ? post.images.firstObject : nil;
   if (!first || first == [NSNull null]) {
-    self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
+    self.photoView.image = [UIImage imageNamed:@"cp_placeholder.jpg"];
   } else if ([first isKindOfClass:[UIImage class]]) {
     UIImage *img = (UIImage *)first;
-    self.photoView.image = img ?: [UIImage imageNamed:@"cm_placeholder"];
+    self.photoView.image = img ?: [UIImage imageNamed:@"cp_placeholder.jpg"];
   } else if ([first isKindOfClass:[NSString class]]) {
     NSString *urlStr = (NSString *)first;
     if (urlStr.length == 0) {
-      self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
+      self.photoView.image = [UIImage imageNamed:@"cp_placeholder.jpg"];
     } else {
       NSURL *url = [NSURL URLWithString:urlStr];
       // 仅加载展示，不参与瀑布流高度计算
-      [self.photoView sd_setImageWithURL:url placeholderImage:[UIImage imageNamed:@"cm_placeholder"]];
+      [self.photoView sd_setImageWithURL:url placeholderImage:[UIImage imageNamed:@"cp_placeholder.jpg"]];
     }
   } else {
-    self.photoView.image = [UIImage imageNamed:@"cm_placeholder"];
+    self.photoView.image = [UIImage imageNamed:@"cp_placeholder.jpg"];
   }
   [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar] placeholderImage:[UIImage imageNamed:@"hp_avatar.png"]];
-  self.titleLabel.text = post.title.length > 0 ? post.title : post.content;
+  self.titleLabel.text = [self tl_displayTitleTextForPost:post];
   self.userLabel.text = post.authorName;
   self.likeLabel.text = [NSString stringWithFormat:@"%@", post.likeCount];
-  
+  [self setElderModeEnabled:self.elderModeEnabled];
 
   // 本地发布中：显示毛玻璃遮罩；上传完成后隐藏
   self.pendingBlurView.hidden = !post.isLocalPending;
