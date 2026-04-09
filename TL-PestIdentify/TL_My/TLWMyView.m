@@ -14,6 +14,7 @@
 @property (nonatomic, strong, readwrite) UILabel     *favCountLabel;
 @property (nonatomic, strong, readwrite) UIView      *favStatView;
 @property (nonatomic, strong, readwrite) UILabel     *recordCountLabel;
+@property (nonatomic, strong, readwrite) UIView      *recordStatView;
 @property (nonatomic, strong, readwrite) UIButton    *editProfileButton;
 @property (nonatomic, strong, readwrite) UIButton    *settingButton;
 @property (nonatomic, strong, readwrite) UIButton    *shareButton;
@@ -105,8 +106,10 @@
     _favCountLabel    = l1;
     _favStatView      = stat1;
     _recordCountLabel = l2;
+    _recordStatView   = stat2;
 
     stat1.userInteractionEnabled = YES;
+    stat2.userInteractionEnabled = YES;
     [statsRow addSubview:stat1];
     [statsRow addSubview:stat2];
     [stat1 mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -248,12 +251,26 @@
         item.userInteractionEnabled = YES;
         UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_postItemTapped:)];
         [item addGestureRecognizer:tap];
+        // 非首个帖子前插入浅灰分割线
+        if (prev) {
+            UIView *sep = [UIView new];
+            sep.backgroundColor = [UIColor colorWithWhite:0.88 alpha:1.0];
+            [_postListContent addSubview:sep];
+            [sep mas_makeConstraints:^(MASConstraintMaker *make) {
+                make.top.equalTo(prev.mas_bottom).offset(10);
+                make.left.equalTo(_postListContent).offset(16);
+                make.right.equalTo(_postListContent).offset(-16);
+                make.height.mas_equalTo(0.5);
+            }];
+            prev = sep;
+        }
+
         [_postListContent addSubview:item];
         [item mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(_postListContent).offset(16);
             make.right.equalTo(_postListContent).offset(-16);
             if (prev) {
-                make.top.equalTo(prev.mas_bottom).offset(20);
+                make.top.equalTo(prev.mas_bottom).offset(10);
             } else {
                 make.top.equalTo(_postListContent).offset(4);
             }

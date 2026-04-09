@@ -43,8 +43,20 @@ static CGFloat const kNavHeight = 48.0;
     return self.composerView.micButton;
 }
 
-- (UIButton *)galleryButton {
-    return self.composerView.galleryButton;
+- (UIButton *)plusButton {
+    return self.composerView.plusButton;
+}
+
+- (UIButton *)plusCameraButton {
+    return self.composerView.plusCameraButton;
+}
+
+- (UIButton *)plusAlbumButton {
+    return self.composerView.plusAlbumButton;
+}
+
+- (UIButton *)plusAICallButton {
+    return self.composerView.plusAICallButton;
 }
 
 - (UIButton *)sendButton {
@@ -94,6 +106,30 @@ static CGFloat const kNavHeight = 48.0;
 
 - (void)hideVoicePanel {
     [self.composerView hideVoicePanel];
+}
+
+- (BOOL)isPlusPanelVisible {
+    return self.composerView.isPlusPanelVisible;
+}
+
+- (void)showPlusPanel {
+    [self.composerView showPlusPanel];
+}
+
+- (void)hidePlusPanel {
+    [self.composerView hidePlusPanel];
+}
+
+- (UIButton *)stopButton {
+    return self.composerView.stopButton;
+}
+
+- (void)enterAILoadingMode {
+    [self.composerView enterAILoadingMode];
+}
+
+- (void)exitAILoadingMode {
+    [self.composerView exitAILoadingMode];
 }
 
 - (void)displayMessages:(NSArray<TLWAIAssistantMessage *> *)messages {

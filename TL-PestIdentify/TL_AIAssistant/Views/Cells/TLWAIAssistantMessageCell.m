@@ -7,17 +7,14 @@
 //
 #import "TLWAIAssistantMessageCell.h"
 #import "TLWAIAssistantMessage.h"
-#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/UIImageView+WebCache.h>
 
-static CGFloat const kAvatarSize = 32.0;
-static CGFloat const kAvatarGap = 10.0;
 static CGFloat const kMessageVerticalInset = 6.0;
+static CGFloat const kBubbleSidePad = 5.0;
 
 @interface TLWAIAssistantMessageCell ()
 @property (nonatomic, strong) UIView *container;
-@property (nonatomic, strong) UIImageView *avatarImageView;
 @property (nonatomic, strong) UIView *bubbleView;
 @property (nonatomic, strong) UILabel *messageLabel;
 @property (nonatomic, strong) UILabel *statusLabel;
@@ -57,9 +54,6 @@ static CGFloat const kMessageVerticalInset = 6.0;
     self.imageScrollView.contentSize = CGSizeZero;
     self.statusLabel.text = @"";
     self.statusLabel.hidden = YES;
-    [self.avatarImageView sd_cancelCurrentImageLoad];
-    self.avatarImageView.image = nil;
-    self.avatarImageView.backgroundColor = [UIColor clearColor];
     self.bubbleView.layer.borderWidth = 0;
     self.bubbleView.layer.borderColor = [UIColor clearColor].CGColor;
     [self.bubbleBottomConstraint deactivate];
@@ -68,22 +62,21 @@ static CGFloat const kMessageVerticalInset = 6.0;
 
 - (void)configureWithMessage:(TLWAIAssistantMessage *)message {
     BOOL isUser = (message.role == TLWAIAssistantMessageRoleUser);
-    [self tl_configureAvatarForUser:isUser];
 
     if (isUser) {
-        // 用户消息：蓝色填充背景
-        self.bubbleView.backgroundColor = [UIColor colorWithRed:0.29 green:0.56 blue:0.85 alpha:1.0]; // #4A90D9
+        // 用户消息：蓝色填充背景 #48BDF9
+        self.bubbleView.backgroundColor = [UIColor colorWithRed:0.282 green:0.741 blue:0.976 alpha:1.0];
         self.bubbleView.layer.borderWidth = 0;
         self.bubbleView.layer.borderColor = [UIColor clearColor].CGColor;
     } else {
-        // AI 回复：透明背景 + 橙黄色描边
-        self.bubbleView.backgroundColor = [UIColor clearColor];
-        self.bubbleView.layer.borderWidth = 1.5;
-        self.bubbleView.layer.borderColor = [UIColor colorWithRed:0.96 green:0.65 blue:0.14 alpha:1.0].CGColor; // #F5A623
+        // AI 回复：白色背景 + 橙黄色描边 #FFB524 2px
+        self.bubbleView.backgroundColor = [UIColor whiteColor];
+        self.bubbleView.layer.borderWidth = 2.0;
+        self.bubbleView.layer.borderColor = [UIColor colorWithRed:1.0 green:0.710 blue:0.141 alpha:1.0].CGColor;
     }
     self.messageLabel.textColor = isUser
         ? [UIColor whiteColor]
-        : [UIColor colorWithRed:0.12 green:0.16 blue:0.18 alpha:1.0];
+        : [UIColor colorWithRed:0.153 green:0.153 blue:0.153 alpha:1.0]; // #272727
     self.messageLabel.text = message.text;
 
     [self.statusLeadingConstraint deactivate];
@@ -153,15 +146,15 @@ static CGFloat const kMessageVerticalInset = 6.0;
 
     [self.bubbleView mas_remakeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.container);
-        make.width.lessThanOrEqualTo(self.container.mas_width).offset(-(kAvatarSize + kAvatarGap + 16.0));
+        make.width.lessThanOrEqualTo(self.container.mas_width).offset(-kBubbleSidePad * 2);
         if (isUser) {
-            make.right.equalTo(self.avatarImageView.mas_left).offset(-kAvatarGap);
+            make.right.equalTo(self.container).offset(-kBubbleSidePad);
         } else {
-            make.left.equalTo(self.avatarImageView.mas_right).offset(kAvatarGap);
+            make.left.equalTo(self.container).offset(kBubbleSidePad);
         }
         // 有图片时给气泡设最小宽度，防止 UIScrollView 无 intrinsicContentSize 导致气泡塌缩
         if (hasImages) {
-            CGFloat maxBubbleWidth = [UIScreen mainScreen].bounds.size.width - (kAvatarSize + kAvatarGap + 16.0);
+            CGFloat maxBubbleWidth = [UIScreen mainScreen].bounds.size.width - kBubbleSidePad * 2;
             CGFloat minW = MIN(imageAreaWidth + 24, maxBubbleWidth);
             make.width.mas_greaterThanOrEqualTo(minW);
         }
@@ -207,27 +200,14 @@ static CGFloat const kMessageVerticalInset = 6.0;
         make.bottom.equalTo(self.contentView).offset(-kMessageVerticalInset);
     }];
 
-    self.avatarImageView = [[UIImageView alloc] init];
-    self.avatarImageView.clipsToBounds = YES;
-    self.avatarImageView.layer.cornerRadius = kAvatarSize / 2.0;
-    self.avatarImageView.layer.borderWidth = 1.0;
-    self.avatarImageView.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.8].CGColor;
-    [self.container addSubview:self.avatarImageView];
-    [self.avatarImageView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.container);
-        make.left.equalTo(self.container);
-        make.width.height.mas_equalTo(kAvatarSize);
-    }];
-
     self.bubbleView = [[UIView alloc] init];
-    self.bubbleView.layer.cornerRadius = 18;
+    self.bubbleView.layer.cornerRadius = 16;
     self.bubbleView.layer.masksToBounds = YES;
     [self.container addSubview:self.bubbleView];
     [self.bubbleView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.container);
-        // 聊天气泡不铺满整行，并给头像留出明确的占位空间。
-        make.width.lessThanOrEqualTo(self.container.mas_width).offset(-(kAvatarSize + kAvatarGap + 16.0));
-        make.left.equalTo(self.avatarImageView.mas_right).offset(kAvatarGap);
+        make.width.lessThanOrEqualTo(self.container.mas_width).offset(-kBubbleSidePad * 2);
+        make.left.equalTo(self.container).offset(kBubbleSidePad);
     }];
 
     self.imageScrollView = [[UIScrollView alloc] init];
@@ -266,35 +246,6 @@ static CGFloat const kMessageVerticalInset = 6.0;
     [self.bubbleView mas_makeConstraints:^(MASConstraintMaker *make) {
         self.bubbleBottomConstraint = make.bottom.equalTo(self.container);
     }];
-}
-
-- (void)tl_configureAvatarForUser:(BOOL)isUser {
-    [self.avatarImageView mas_remakeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.container);
-        make.width.height.mas_equalTo(kAvatarSize);
-        if (isUser) {
-            make.right.equalTo(self.container);
-        } else {
-            make.left.equalTo(self.container);
-        }
-    }];
-
-    if (isUser) {
-        self.avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
-        self.avatarImageView.backgroundColor = [UIColor clearColor];
-        NSString *avatarURLString = [TLWSDKManager shared].cachedProfile.avatarUrl;
-        UIImage *placeholder = [UIImage imageNamed:@"hp_avatar.png"];
-        if (avatarURLString.length > 0) {
-            [self.avatarImageView sd_setImageWithURL:[NSURL URLWithString:avatarURLString]
-                                    placeholderImage:placeholder];
-        } else {
-            self.avatarImageView.image = placeholder;
-        }
-    } else {
-        self.avatarImageView.contentMode = UIViewContentModeScaleAspectFit;
-        self.avatarImageView.image = [UIImage imageNamed:@"iconSystem"];
-        self.avatarImageView.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.92];
-    }
 }
 
 - (void)tl_configureImageStripWithMessage:(TLWAIAssistantMessage *)message {

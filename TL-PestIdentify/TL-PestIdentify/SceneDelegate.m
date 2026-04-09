@@ -43,35 +43,9 @@
       [self.window makeKeyAndVisible];
 
       // 异步拉取资料，检查引导/偏好是否完成
-      [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
-          // 启动阶段资料校验失败时，认为本地登录态无效，清理并回到登录页
-          if (!profile) {
-              dispatch_async(dispatch_get_main_queue(), ^{
-                  [[TLWSDKManager shared] logout];
-                  [self tl_switchToLoginRoot];
-              });
-              return;
-          }
-
-          BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
-          BOOL hasCrops = (profile.followedCrops.count > 0);
-
-          if (hasElderSetting && hasCrops) {
-              return;
-          }
-
-          dispatch_async(dispatch_get_main_queue(), ^{
-              if (!hasElderSetting) {
-                  TLWGuideController *guideVC = [[TLWGuideController alloc] init];
-                  guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
-                  [self.window.rootViewController presentViewController:guideVC animated:YES completion:nil];
-              } else {
-                  TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
-                  prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
-                  [self.window.rootViewController presentViewController:prefVC animated:YES completion:nil];
-              }
-          });
-      }];
+      // 拉取失败不代表登录态无效，可能只是网络问题，3秒后自动重试。
+      // 只有 token refresh 也失败时，handleUnauthorizedWithRetry 内部会自动 logout 跳登录页。
+      [self tl_fetchProfileWithRetry:3];
   } else {
       // 没有登录态，进登录页
       TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
@@ -82,6 +56,52 @@
   }
 }
 
+
+- (void)tl_fetchProfileWithRetry:(NSInteger)remainingRetries {
+    __weak typeof(self) weakSelf = self;
+    [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+
+        if (!profile) {
+            // 网络或服务端异常，不登出，延迟重试
+            if (remainingRetries > 0) {
+                NSLog(@"[Launch] 拉取资料失败，%ld秒后重试（剩余%ld次）", (long)3, (long)remainingRetries);
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)),
+                               dispatch_get_main_queue(), ^{
+                    [strongSelf tl_fetchProfileWithRetry:remainingRetries - 1];
+                });
+            } else {
+                NSLog(@"[Launch] 拉取资料多次失败，保留登录态等待用户操作");
+            }
+            return;
+        }
+
+        NSInteger currentUserId = [TLWSDKManager shared].userId;
+        NSString *elderKey = [NSString stringWithFormat:@"TLW_elder_mode_set_%ld", (long)currentUserId];
+        BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:elderKey];
+        if (!hasElderSetting) {
+            hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
+        }
+        BOOL hasCrops = (profile.followedCrops.count > 0);
+
+        if (hasElderSetting && hasCrops) {
+            return;
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!hasElderSetting) {
+                TLWGuideController *guideVC = [[TLWGuideController alloc] init];
+                guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                [strongSelf.window.rootViewController presentViewController:guideVC animated:YES completion:nil];
+            } else {
+                TLWPreferenceController *prefVC = [[TLWPreferenceController alloc] init];
+                prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
+                [strongSelf.window.rootViewController presentViewController:prefVC animated:YES completion:nil];
+            }
+        });
+    }];
+}
 
 - (void)sceneDidDisconnect:(UIScene *)scene {
   // Called as the scene is being released by the system.

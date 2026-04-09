@@ -49,7 +49,7 @@
     panelBlur.layer.masksToBounds = YES;
     [self addSubview:panelBlur];
     [panelBlur mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(52);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(62);
         make.left.right.bottom.equalTo(self);
     }];
 
@@ -71,7 +71,7 @@
     _currentPwdBox.hidden = YES;
     [self addSubview:_currentPwdBox];
     [_currentPwdBox mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(70);
+        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(80);
         make.left.equalTo(self).offset(20);
         make.right.equalTo(self).offset(-20);
         make.height.mas_equalTo(52);

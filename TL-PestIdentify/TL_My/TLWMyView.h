@@ -15,6 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UILabel     *favCountLabel;
 @property (nonatomic, strong, readonly) UIView      *favStatView;
 @property (nonatomic, strong, readonly) UILabel     *recordCountLabel;
+@property (nonatomic, strong, readonly) UIView      *recordStatView;
 @property (nonatomic, strong, readonly) UIButton    *editProfileButton;
 @property (nonatomic, strong, readonly) UIButton    *settingButton;
 @property (nonatomic, strong, readonly) UIButton    *shareButton;
