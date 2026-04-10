@@ -5,7 +5,6 @@
 
 #import "TLWPasswordLoginController.h"
 #import "TLWPasswordLoginView.h"
-#import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
 #import "TLWSDKManager.h"
 #import "TLWSmsLoginController.h"
@@ -43,10 +42,6 @@
                                           action:@selector(handleBack)
                                 forControlEvents:UIControlEventTouchUpInside];
 
-    [self.passwordLoginView.wechatLoginButton addTarget:self
-                                                 action:@selector(handleWechatLogin)
-                                       forControlEvents:UIControlEventTouchUpInside];
-
     [self.passwordLoginView.qqLoginButton addTarget:self
                                              action:@selector(handleQQLogin)
                                    forControlEvents:UIControlEventTouchUpInside];
@@ -54,10 +49,6 @@
     [self.passwordLoginView.phoneLoginButton addTarget:self
                                                action:@selector(handleSwitchToSms)
                                      forControlEvents:UIControlEventTouchUpInside];
-
-    [self.passwordLoginView.skipButton addTarget:self
-                                          action:@selector(handleSkip)
-                                forControlEvents:UIControlEventTouchUpInside];
 
     // 点击空白处收起键盘
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
@@ -96,7 +87,11 @@
                 [self showAlertWithMessage: output.message ?: @"登录失败"];
                 return;
             }
-            [[TLWSDKManager shared] saveAuthResponse:output.data];
+            BOOL saved = [[TLWSDKManager shared].sessionManager saveAuthResponse:output.data];
+            if (!saved) {
+                [self showAlertWithMessage:@"登录信息异常，请重试"];
+                return;
+            }
             [self navigateAfterLogin];
         });
     }];
@@ -116,23 +111,6 @@
     [self.navigationController popViewControllerAnimated:YES];
 }
 
-- (void)handleSkip {
-    TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
-    UIWindow *window = [TLWSDKManager tl_activeWindow];
-    window.rootViewController = tabBar;
-    [UIView transitionWithView:window
-                      duration:0.35
-                       options:UIViewAnimationOptionTransitionCrossDissolve
-                    animations:nil
-                    completion:nil];
-}
-
-- (void)handleWechatLogin {
-    TLWWechatBindController *bindVC = [[TLWWechatBindController alloc] init];
-    bindVC.modalPresentationStyle = UIModalPresentationFullScreen;
-    [self presentViewController:bindVC animated:YES completion:nil];
-}
-
 - (void)handleQQLogin {
     NSLog(@"QQ登录");
 }
@@ -144,7 +122,7 @@
 #pragma mark - 登录后导航
 
 - (void)navigateAfterLogin {
-    NSInteger currentUserId = [TLWSDKManager shared].userId;
+    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
     NSString *elderKey = [NSString stringWithFormat:@"TLW_elder_mode_set_%ld", (long)currentUserId];
     BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:elderKey];
     // 兼容读取旧版全局 key（首次迁移）
@@ -153,7 +131,7 @@
     }
 
     // 请求用户资料并缓存，检查是否已设置偏好
-    [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+    [[TLWSDKManager shared].sessionManager fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
         if (!profile) {
             // 网络失败拉不到资料，兜底直接进主页
             [TLWToast show:@"资料加载失败，已进入主页"];

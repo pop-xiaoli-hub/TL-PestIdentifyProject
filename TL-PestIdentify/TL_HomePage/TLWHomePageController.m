@@ -61,11 +61,13 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)applyProfile {
-  AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
-  NSString *name = profile.fullName ?: profile.username ?: [TLWSDKManager shared].username;
+  AGUserProfileDto *profile = [TLWSDKManager shared].sessionManager.cachedProfile;
+  NSString *name = profile.fullName ?: profile.username;
   [self.homePageView configureWithUserName:name];
   if (profile.avatarUrl.length > 0) {
     [self.homePageView.userAvatarImageView sd_setImageWithURL:[NSURL URLWithString:profile.avatarUrl]];
+  } else {
+    self.homePageView.userAvatarImageView.image = nil;
   }
 }
 

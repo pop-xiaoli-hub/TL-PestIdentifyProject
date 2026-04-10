@@ -70,7 +70,7 @@
             self->_myView.confirmButton.enabled = YES;
             if (error || output.code.integerValue != 200) {
                 if (!error && output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
                     return;
                 }
                 [TLWToast show:error.localizedDescription ?: output.message ?: @"修改失败"];

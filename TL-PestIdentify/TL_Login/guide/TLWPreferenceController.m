@@ -267,7 +267,7 @@ referenceSizeForHeaderInSection:(NSInteger)section {
             NSLog(@"偏好保存失败: %@", error.localizedDescription);
         }
         // 刷新缓存后进主页
-        [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+        [[TLWSDKManager shared].sessionManager fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
             [self navigateToMain];
         }];
     }];

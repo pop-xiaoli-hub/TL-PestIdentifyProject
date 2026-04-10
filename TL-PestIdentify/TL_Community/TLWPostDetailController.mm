@@ -326,7 +326,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
       if (error || !output || output.code.integerValue != 200) {
         if (!error && output.code.integerValue == 401) {
-          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [self fetchCommentsPage:page];
           }];
           return;
@@ -394,7 +394,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
       if (error || !output || output.code.integerValue != 200) {
         if (!error && output.code.integerValue == 401) {
-          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [self fetchPostDetail];
           }];
           return;
@@ -487,7 +487,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       self.sendButton.enabled = YES;
       if (error || !output || output.code.integerValue != 200) {
         if (!error && output.code.integerValue == 401) {
-          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [self sendComment];
           }];
           return;
@@ -503,7 +503,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       if (!newComment) {
         // 服务端未返回 data，本地构造占位
         newComment = [[AGCommentResponseDto alloc] init];
-        newComment.authorName = [TLWSDKManager shared].username ?: @"我";
+        newComment.authorName = [TLWSDKManager shared].sessionManager.username ?: @"我";
         newComment.content    = text;
         newComment.createdAt  = [NSDate date];
       }
@@ -618,7 +618,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       sender.enabled = YES;
       if (error || !output || output.code.integerValue != 200) {
         if (!error && output.code.integerValue == 401) {
-          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf submitCollectTargetState:shouldCollect
                                    previousState:previousState
                                    previousCount:previousCount
@@ -674,7 +674,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       sender.enabled = YES;
       if (error || !output || output.code.integerValue != 200) {
         if (!error && output.code.integerValue == 401) {
-          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf submitLikeTargetState:shouldLike
                                 previousState:previousState
                                 previousCount:previousCount

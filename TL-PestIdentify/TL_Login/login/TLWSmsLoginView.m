@@ -30,10 +30,8 @@
 @property (nonatomic, strong, readwrite) UIButton    *sendCodeButton;
 @property (nonatomic, strong, readwrite) UITextField *codeField;
 @property (nonatomic, strong, readwrite) UIButton    *loginTapButton;
-@property (nonatomic, strong, readwrite) UIButton    *wechatLoginButton;
 @property (nonatomic, strong, readwrite) UIButton    *qqLoginButton;
 @property (nonatomic, strong, readwrite) UIButton    *localPhoneLoginButton;
-@property (nonatomic, strong, readwrite) UIButton    *skipButton;
 
 @end
 
@@ -64,7 +62,6 @@
     [self setupLogoArea];
     [self setupForm];
     [self setupTermsRow];
-    [self setupSkipButton];
     [self setupBottomSection];
 }
 
@@ -307,18 +304,6 @@
     }];
 }
 
-- (void)setupSkipButton {
-    _skipButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    [_skipButton setTitle:@"跳过登录，直接进入首页 →" forState:UIControlStateNormal];
-    [_skipButton setTitleColor:[UIColor colorWithWhite:1.0 alpha:0.55] forState:UIControlStateNormal];
-    _skipButton.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    [self addSubview:_skipButton];
-    [_skipButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_loginTapButton.mas_bottom).offset(56);
-        make.centerX.equalTo(self);
-    }];
-}
-
 #pragma mark - 底部区域
 
 - (void)setupBottomSection {
@@ -359,11 +344,10 @@
         make.height.mas_equalTo(0.5);
     }];
 
-    // ── 微信登录 ──
-    _wechatLoginButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    _wechatLoginButton.backgroundColor = UIColor.clearColor;
-    [self addSubview:_wechatLoginButton];
-    [_wechatLoginButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    // ── 微信登录（仅展示图标，无点击响应）──
+    UIView *wechatPlaceholder = [[UIView alloc] init];
+    [self addSubview:wechatPlaceholder];
+    [wechatPlaceholder mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-20);
         make.centerX.equalTo(self).offset(-90);
         make.width.mas_equalTo(90);
@@ -374,11 +358,10 @@
     wechatIcon.contentMode = UIViewContentModeScaleAspectFit;
     wechatIcon.clipsToBounds = YES;
     wechatIcon.layer.cornerRadius = 27;
-    wechatIcon.userInteractionEnabled = NO;
-    [_wechatLoginButton addSubview:wechatIcon];
+    [wechatPlaceholder addSubview:wechatIcon];
     [wechatIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_wechatLoginButton);
-        make.centerX.equalTo(_wechatLoginButton);
+        make.top.equalTo(wechatPlaceholder);
+        make.centerX.equalTo(wechatPlaceholder);
         make.width.height.mas_equalTo(58);
     }];
 
@@ -387,12 +370,11 @@
     wechatLabel.font          = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
     wechatLabel.textColor     = [UIColor colorWithRed:0.298 green:0.298 blue:0.298 alpha:0.8];
     wechatLabel.textAlignment = NSTextAlignmentCenter;
-    wechatLabel.userInteractionEnabled = NO;
-    [_wechatLoginButton addSubview:wechatLabel];
+    [wechatPlaceholder addSubview:wechatLabel];
     [wechatLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(wechatIcon.mas_bottom).offset(2);
-        make.centerX.equalTo(_wechatLoginButton);
-        make.bottom.equalTo(_wechatLoginButton);
+        make.centerX.equalTo(wechatPlaceholder);
+        make.bottom.equalTo(wechatPlaceholder);
     }];
 
     // ── QQ登录 ──

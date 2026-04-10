@@ -45,157 +45,192 @@
 #pragma mark - Public CRUD
 //插入单条
 - (BOOL)upsertCollectedPostFromDto:(AGPostResponseDto *)postDto {
-    [self setupCollectedTableIfNeeded];
-    if (!postDto || !postDto._id) {
-        return NO;
-    }
-    TLWDBCollectedModel *model = [self buildModelFromDto:postDto];
-    if (!model) {
-        return NO;
-    }
+    @synchronized (self) {
+        [self setupCollectedTableIfNeeded];
+        if (!postDto || !postDto._id) {
+            return NO;
+        }
+        TLWDBCollectedModel *model = [self buildModelFromDto:postDto];
+        if (!model) {
+            return NO;
+        }
 
-    TLWDBCollectedModel *existingModel = [self fetchCollectedPostByPostId:postDto._id];
-    BOOL success = NO;
-    if (existingModel) {
-        model.localId = existingModel.localId;
-        success = [self.collectedTable insertOrReplaceObject:model];
-    } else {
-        model.localId = [self generateNextLocalId];
-        success = [self.collectedTable insertObject:model];
+        TLWDBCollectedModel *existingModel = [self fetchCollectedPostByPostId_unlocked:postDto._id];
+        BOOL success = NO;
+        if (existingModel) {
+            model.localId = existingModel.localId;
+            success = [self.collectedTable insertOrReplaceObject:model];
+        } else {
+            model.localId = [self generateNextLocalId];
+            success = [self.collectedTable insertObject:model];
+        }
+        if (!success) {
+            NSLog(@"[DB] upsert 单条收藏失败");
+            return NO;
+        }
+        return YES;
     }
-    if (!success) {
-        NSLog(@"[DB] upsert 单条收藏失败");
-        return NO;
-    }
-    return YES;
 }
 
 //批量插入
 - (BOOL)upsertCollectedPostsFromDtos:(NSArray<AGPostResponseDto *> *)postDtos {
-    [self setupCollectedTableIfNeeded];
-    if (postDtos.count == 0) {
-        return YES;
-    }
+    @synchronized (self) {
+        [self setupCollectedTableIfNeeded];
+        if (postDtos.count == 0) {
+            return YES;
+        }
 
-    NSMutableArray<TLWDBCollectedModel *> *insertModels = [NSMutableArray array];
-    NSMutableArray<TLWDBCollectedModel *> *replaceModels = [NSMutableArray array];
-    for (AGPostResponseDto *dto in postDtos) {
-        TLWDBCollectedModel *model = [self buildModelFromDto:dto];
-        if (model) {
-            TLWDBCollectedModel *existingModel = [self fetchCollectedPostByPostId:dto._id];
-            if (existingModel) {
-                model.localId = existingModel.localId;
-                [replaceModels addObject:model];
-            } else {
-                model.localId = [self generateNextLocalId];
-                [insertModels addObject:model];
+        NSMutableArray<TLWDBCollectedModel *> *insertModels = [NSMutableArray array];
+        NSMutableArray<TLWDBCollectedModel *> *replaceModels = [NSMutableArray array];
+        for (AGPostResponseDto *dto in postDtos) {
+            TLWDBCollectedModel *model = [self buildModelFromDto:dto];
+            if (model) {
+                TLWDBCollectedModel *existingModel = [self fetchCollectedPostByPostId_unlocked:dto._id];
+                if (existingModel) {
+                    model.localId = existingModel.localId;
+                    [replaceModels addObject:model];
+                } else {
+                    model.localId = [self generateNextLocalId];
+                    [insertModels addObject:model];
+                }
             }
         }
-    }
-    if (insertModels.count == 0 && replaceModels.count == 0) {
-        return NO;
-    }
+        if (insertModels.count == 0 && replaceModels.count == 0) {
+            return NO;
+        }
 
-    BOOL insertSuccess = YES;
-    if (insertModels.count > 0) {
-        insertSuccess = [self.collectedTable insertObjects:insertModels];
-    }
+        BOOL insertSuccess = YES;
+        if (insertModels.count > 0) {
+            insertSuccess = [self.collectedTable insertObjects:insertModels];
+        }
 
-    BOOL replaceSuccess = YES;
-    if (replaceModels.count > 0) {
-        replaceSuccess = [self.collectedTable insertOrReplaceObjects:replaceModels];
-    }
+        BOOL replaceSuccess = YES;
+        if (replaceModels.count > 0) {
+            replaceSuccess = [self.collectedTable insertOrReplaceObjects:replaceModels];
+        }
 
-    if (!insertSuccess || !replaceSuccess) {
-        NSLog(@"[DB] upsert 批量收藏失败");
-        return NO;
+        if (!insertSuccess || !replaceSuccess) {
+            NSLog(@"[DB] upsert 批量收藏失败");
+            return NO;
+        }
+        return YES;
     }
-    return YES;
 }
 
 - (NSArray<TLWDBCollectedModel *> *)fetchAllCollectedPosts {
-    [self setupCollectedTableIfNeeded];
-    NSArray<TLWDBCollectedModel *> *result = [self.collectedTable getObjectsOrders:TLWDBCollectedModel.collectedAt.asOrder(WCTOrderedDescending)];
-    return result ?: @[];
+    @synchronized (self) {
+        [self setupCollectedTableIfNeeded];
+        NSArray<TLWDBCollectedModel *> *result = [self.collectedTable getObjectsOrders:TLWDBCollectedModel.collectedAt.asOrder(WCTOrderedDescending)];
+        return result ?: @[];
+    }
 }
 
 - (nullable TLWDBCollectedModel *)fetchCollectedPostByPostId:(NSNumber *)postId {
+    @synchronized (self) {
+        return [self fetchCollectedPostByPostId_unlocked:postId];
+    }
+}
+
+/// 内部无锁版本，供已持有锁的方法调用
+- (nullable TLWDBCollectedModel *)fetchCollectedPostByPostId_unlocked:(NSNumber *)postId {
     [self setupCollectedTableIfNeeded];
     if (!postId) {
         return nil;
     }
-    TLWDBCollectedModel *model = [self.collectedTable getObjectWhere:TLWDBCollectedModel.postId == postId];
-    return model;
+    return [self.collectedTable getObjectWhere:TLWDBCollectedModel.postId == postId];
 }
 
 - (BOOL)isCollectedPost:(NSNumber *)postId {
-    return [self fetchCollectedPostByPostId:postId] != nil;
+    @synchronized (self) {
+        return [self fetchCollectedPostByPostId_unlocked:postId] != nil;
+    }
 }
 
 - (BOOL)deleteCollectedPostByPostId:(NSNumber *)postId {
-    [self setupCollectedTableIfNeeded];
-    if (!postId) {
-        return NO;
+    @synchronized (self) {
+        [self setupCollectedTableIfNeeded];
+        if (!postId) {
+            return NO;
+        }
+        return [self.collectedTable deleteObjectsWhere:TLWDBCollectedModel.postId == postId];
     }
-    return [self.collectedTable deleteObjectsWhere:TLWDBCollectedModel.postId == postId];
 }
 
 - (BOOL)deleteAllCollectedPosts {
-    [self setupCollectedTableIfNeeded];
-    return [self.collectedTable deleteObjects];
+    @synchronized (self) {
+        [self setupCollectedTableIfNeeded];
+        return [self.collectedTable deleteObjects];
+    }
 }
 
 - (BOOL)insertIdentificationRecord:(TLWDBIdentificationModel *)record {
-    [self setupIdentificationTableIfNeeded];
-    TLWDBIdentificationModel *normalizedRecord = [self normalizedIdentificationRecordFromRecord:record];
-    if (!normalizedRecord) {
-        return NO;
+    @synchronized (self) {
+        [self setupIdentificationTableIfNeeded];
+        TLWDBIdentificationModel *normalizedRecord = [self normalizedIdentificationRecordFromRecord:record];
+        if (!normalizedRecord) {
+            return NO;
+        }
+        normalizedRecord.localId = [self generateNextIdentificationLocalId];
+        return [self.identificationTable insertObject:normalizedRecord];
     }
-    normalizedRecord.localId = [self generateNextIdentificationLocalId];
-    return [self.identificationTable insertObject:normalizedRecord];
 }
 
 - (BOOL)updateIdentificationRecord:(TLWDBIdentificationModel *)record {
-    [self setupIdentificationTableIfNeeded];
-    TLWDBIdentificationModel *normalizedRecord = [self normalizedIdentificationRecordFromRecord:record];
-    if (!normalizedRecord || normalizedRecord.localId <= 0) {
-        return NO;
+    @synchronized (self) {
+        [self setupIdentificationTableIfNeeded];
+        TLWDBIdentificationModel *normalizedRecord = [self normalizedIdentificationRecordFromRecord:record];
+        if (!normalizedRecord || normalizedRecord.localId <= 0) {
+            return NO;
+        }
+        return [self.identificationTable insertOrReplaceObject:normalizedRecord];
     }
-    return [self.identificationTable insertOrReplaceObject:normalizedRecord];
 }
 
 - (BOOL)upsertIdentificationRecord:(TLWDBIdentificationModel *)record {
-    [self setupIdentificationTableIfNeeded];
-    TLWDBIdentificationModel *normalizedRecord = [self normalizedIdentificationRecordFromRecord:record];
-    if (!normalizedRecord) {
-        return NO;
-    }
+    @synchronized (self) {
+        [self setupIdentificationTableIfNeeded];
+        TLWDBIdentificationModel *normalizedRecord = [self normalizedIdentificationRecordFromRecord:record];
+        if (!normalizedRecord) {
+            return NO;
+        }
 
-    TLWDBIdentificationModel *existingRecord = [self fetchIdentificationRecordByImageUrl:normalizedRecord.imageUrl];
-    if (existingRecord) {
-        normalizedRecord.localId = existingRecord.localId;
-        return [self.identificationTable insertOrReplaceObject:normalizedRecord];
-    }
+        TLWDBIdentificationModel *existingRecord = [self fetchIdentificationRecordByImageUrl_unlocked:normalizedRecord.imageUrl];
+        if (existingRecord) {
+            normalizedRecord.localId = existingRecord.localId;
+            return [self.identificationTable insertOrReplaceObject:normalizedRecord];
+        }
 
-    normalizedRecord.localId = [self generateNextIdentificationLocalId];
-    return [self.identificationTable insertObject:normalizedRecord];
+        normalizedRecord.localId = [self generateNextIdentificationLocalId];
+        return [self.identificationTable insertObject:normalizedRecord];
+    }
 }
 
 - (NSArray<TLWDBIdentificationModel *> *)fetchAllIdentificationRecords {
-    [self setupIdentificationTableIfNeeded];
-    NSArray<TLWDBIdentificationModel *> *result = [self.identificationTable getObjectsOrders:TLWDBIdentificationModel.identifiedAt.asOrder(WCTOrderedDescending)];
-    return result ?: @[];
+    @synchronized (self) {
+        [self setupIdentificationTableIfNeeded];
+        NSArray<TLWDBIdentificationModel *> *result = [self.identificationTable getObjectsOrders:TLWDBIdentificationModel.identifiedAt.asOrder(WCTOrderedDescending)];
+        return result ?: @[];
+    }
 }
 
 - (nullable TLWDBIdentificationModel *)fetchIdentificationRecordByLocalId:(NSInteger)localId {
-    [self setupIdentificationTableIfNeeded];
-    if (localId <= 0) {
-        return nil;
+    @synchronized (self) {
+        [self setupIdentificationTableIfNeeded];
+        if (localId <= 0) {
+            return nil;
+        }
+        return [self.identificationTable getObjectWhere:TLWDBIdentificationModel.localId == localId];
     }
-    return [self.identificationTable getObjectWhere:TLWDBIdentificationModel.localId == localId];
 }
 
 - (nullable TLWDBIdentificationModel *)fetchIdentificationRecordByImageUrl:(NSString *)imageUrl {
+    @synchronized (self) {
+        return [self fetchIdentificationRecordByImageUrl_unlocked:imageUrl];
+    }
+}
+
+/// 内部无锁版本，供已持有锁的方法调用
+- (nullable TLWDBIdentificationModel *)fetchIdentificationRecordByImageUrl_unlocked:(NSString *)imageUrl {
     [self setupIdentificationTableIfNeeded];
     if (![imageUrl isKindOfClass:[NSString class]] || imageUrl.length == 0) {
         return nil;
@@ -204,63 +239,87 @@
 }
 
 - (BOOL)deleteIdentificationRecordByLocalId:(NSInteger)localId {
-    [self setupIdentificationTableIfNeeded];
-    if (localId <= 0) {
-        return NO;
+    @synchronized (self) {
+        [self setupIdentificationTableIfNeeded];
+        if (localId <= 0) {
+            return NO;
+        }
+        return [self.identificationTable deleteObjectsWhere:TLWDBIdentificationModel.localId == localId];
     }
-    return [self.identificationTable deleteObjectsWhere:TLWDBIdentificationModel.localId == localId];
 }
 
 - (BOOL)deleteIdentificationRecordByImageUrl:(NSString *)imageUrl {
-    [self setupIdentificationTableIfNeeded];
-    if (![imageUrl isKindOfClass:[NSString class]] || imageUrl.length == 0) {
-        return NO;
+    @synchronized (self) {
+        [self setupIdentificationTableIfNeeded];
+        if (![imageUrl isKindOfClass:[NSString class]] || imageUrl.length == 0) {
+            return NO;
+        }
+        return [self.identificationTable deleteObjectsWhere:TLWDBIdentificationModel.imageUrl == imageUrl];
     }
-    return [self.identificationTable deleteObjectsWhere:TLWDBIdentificationModel.imageUrl == imageUrl];
 }
 
 - (BOOL)deleteAllIdentificationRecords {
-    [self setupIdentificationTableIfNeeded];
-    return [self.identificationTable deleteObjects];
+    @synchronized (self) {
+        [self setupIdentificationTableIfNeeded];
+        return [self.identificationTable deleteObjects];
+    }
+}
+
+- (void)reopenForCurrentUser {
+    @synchronized (self) {
+        [self.database close:^{}];
+        self.database = nil;
+        self.collectedTable = nil;
+        self.identificationTable = nil;
+        self.didSetupCollectedTable = NO;
+        self.didSetupIdentificationTable = NO;
+        [self setupDatabase];
+    }
 }
 
 #pragma mark - Private
 
 - (void)setupDatabase {
-    if (self.database) {//初始化创建数据库
-        return;
+    @synchronized (self) {
+        if (self.database) {//初始化创建数据库
+            return;
+        }
+        NSString *dbPath = [self dbPath];//获取数据库路径
+        self.database = [[WCTDatabase alloc] initWithPath:dbPath];
     }
-    NSString *dbPath = [self dbPath];//获取数据库路径
-    self.database = [[WCTDatabase alloc] initWithPath:dbPath];
 }
 
 //创建收藏帖子列表
 - (void)setupCollectedTableIfNeeded {
-    if (self.didSetupCollectedTable) {//如果已经建表返回
-        return;
-    }
+    @synchronized (self) {
+        if (self.didSetupCollectedTable) {//如果已经建表返回
+            return;
+        }
 
-    [self setupDatabase];//防御性变成，防止数据库建立失败。
-    TLWDBCollectedModel *tableObject = [[TLWDBCollectedModel alloc] init];
-    NSString *tableName = [self tableNameForObject:tableObject];//获取表名
-    [self.database createTable:tableName withClass:TLWDBCollectedModel.class];//建表
-    self.collectedTable = [self.database getTable:tableName withClass:TLWDBCollectedModel.class];//持有表
-    self.didSetupCollectedTable = YES;//标记
-    self.nextGeneratedLocalId = [self loadNextLocalId];//该方法会将当前表里已有的记录扫一遍，找到最大的localId，然后+1
+        [self setupDatabase];//防御性变成，防止数据库建立失败。
+        TLWDBCollectedModel *tableObject = [[TLWDBCollectedModel alloc] init];
+        NSString *tableName = [self tableNameForObject:tableObject];//获取表名
+        [self.database createTable:tableName withClass:TLWDBCollectedModel.class];//建表
+        self.collectedTable = [self.database getTable:tableName withClass:TLWDBCollectedModel.class];//持有表
+        self.didSetupCollectedTable = YES;//标记
+        self.nextGeneratedLocalId = [self loadNextLocalId];//该方法会将当前表里已有的记录扫一遍，找到最大的localId，然后+1
+    }
 }
 
 - (void)setupIdentificationTableIfNeeded {
-    if (self.didSetupIdentificationTable) {
-        return;
-    }
+    @synchronized (self) {
+        if (self.didSetupIdentificationTable) {
+            return;
+        }
 
-    [self setupDatabase];
-    TLWDBIdentificationModel *tableObject = [[TLWDBIdentificationModel alloc] init];
+        [self setupDatabase];
+        TLWDBIdentificationModel *tableObject = [[TLWDBIdentificationModel alloc] init];
     NSString *tableName = [self tableNameForObject:tableObject];
     [self.database createTable:tableName withClass:TLWDBIdentificationModel.class];
     self.identificationTable = [self.database getTable:tableName withClass:TLWDBIdentificationModel.class];
     self.didSetupIdentificationTable = YES;
     self.nextGeneratedIdentificationLocalId = [self loadNextIdentificationLocalId];
+    }
 }
 
 - (NSString *)tableNameForObject:(NSObject *)object {
@@ -272,7 +331,7 @@
 
 - (NSString *)dbPath {
     NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    NSInteger userId = [TLWSDKManager shared].userId;
+    NSInteger userId = [TLWSDKManager shared].sessionManager.userId;
     NSString *databaseName = [NSString stringWithFormat:@"tlw_database_%ld.db", (long)userId];
     return [documentsPath stringByAppendingPathComponent:databaseName];
 }

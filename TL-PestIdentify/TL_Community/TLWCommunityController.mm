@@ -279,7 +279,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 }
 
 - (BOOL)tl_isElderModeEnabled {
-  NSInteger currentUserId = [TLWSDKManager shared].userId;
+  NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
   NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
   NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
   if ([defaults objectForKey:elderModeKey] != nil) {//优先读取用户的专属key
@@ -320,7 +320,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
       if (error || !output || output.code.integerValue != 200 || !output.data) {
         if (!error && output.code.integerValue == 401) {
-          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_reloadPostWithId:postId];
           }];
           return;
@@ -394,7 +394,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       if (error || !output || output.code.integerValue != 200 || !output.data) {
         if (!error && output.code.integerValue == 401) {
           //鉴权过期失败重试
-          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_executeSearchWithQuery:trimmedQuery];
           }];
           return;
@@ -638,7 +638,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
       if (error || !output || output.code.integerValue != 200) {
         if (!error && output.code.integerValue == 401) {
-          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_requestSuggestionsForQuery:query];
           }];
           return;
@@ -753,7 +753,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
         NSLog(@"5");
         if (output.code.integerValue != 200) {
           if (output.code.integerValue == 401) {
-            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
               [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *r, NSError *e) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                   [TLWToast show:(r.code.integerValue == 200) ? @"帖子发布成功" : @"帖子发送失败"];

@@ -28,6 +28,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// 用真实帖子数据刷新"我的帖子"区域
 - (void)reloadPosts:(NSArray<AGPostResponseDto *> *)posts;
 
+/// 首次加载"我的帖子"时显示加载态
+- (void)showPostsLoading;
+
+/// "我的帖子"区域显示一段状态文案
+- (void)showPostsStatusText:(NSString *)text;
+
 @end
 
 NS_ASSUME_NONNULL_END

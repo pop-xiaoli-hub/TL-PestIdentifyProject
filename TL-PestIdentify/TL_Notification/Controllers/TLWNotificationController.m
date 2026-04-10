@@ -74,7 +74,7 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
         dispatch_async(dispatch_get_main_queue(), ^{
             if (error || output.code.integerValue != 200) {
                 if (!error && output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self fetchMessages]; }];
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self fetchMessages]; }];
                     return;
                 }
                 [TLWToast show:@"消息加载失败"];
@@ -187,7 +187,7 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
                     return;
                 }
                 if (output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [[TLWSDKManager shared].api markAsReadWithId:msgId
                                                    completionHandler:^(AGResultVoid *o, NSError *e) {
                             if (e || o.code.integerValue != 200) {

@@ -49,7 +49,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)loadAvatar {
-    AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
+    AGUserProfileDto *profile = [TLWSDKManager shared].sessionManager.cachedProfile;
     if (profile.avatarUrl.length > 0) {
         [_myView.avatarImageView sd_setImageWithURL:[NSURL URLWithString:profile.avatarUrl]];
     }
@@ -76,7 +76,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 #pragma mark - Setup
 
 - (void)applyProfile {
-    AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
+    AGUserProfileDto *profile = [TLWSDKManager shared].sessionManager.cachedProfile;
     if (!profile) return;
     _nickname = profile.fullName ?: profile.username ?: @"";
     _myView.nicknameValueLabel.text = _nickname.length > 0 ? _nickname : @"未设置";
@@ -133,7 +133,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         if (error || output.code.integerValue != 200) {
             if (!error && output.code.integerValue == 401) {
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:nil];
                     }];
                 });
@@ -150,7 +150,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (err || res.code.integerValue != 200) {
                     if (!err && res.code.integerValue == 401) {
-                        [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                        [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                             [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:nil];
                         }];
                         return;
@@ -160,7 +160,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
                 } else {
                     self.isUploadingAvatar = NO;
                     // 静默更新缓存，不发通知，避免闪烁
-                    [TLWSDKManager shared].cachedProfile.avatarUrl = output.data;
+                    [TLWSDKManager shared].sessionManager.cachedProfile.avatarUrl = output.data;
                     [TLWToast show:@"头像修改成功"];
                 }
             });
@@ -180,7 +180,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)onPasswordTap {
-    NSString *pwd = [TLWSDKManager shared].generatedPassword;
+    NSString *pwd = [TLWSDKManager shared].sessionManager.generatedPassword;
     TLWChangePasswordController *vc = [[TLWChangePasswordController alloc] initWithCurrentPassword:pwd];
     [self.navigationController pushViewController:vc animated:YES];
 }

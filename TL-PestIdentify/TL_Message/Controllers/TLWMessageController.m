@@ -61,9 +61,9 @@ static NSInteger const kMessagePageSize = 20;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    // TabBar 初始化时会一次性 addSubview 所有子页面，hidden 的页面也会收到 viewWillAppear，
-    // 此时发请求可能因 token 尚未就绪而失败，所以只在真正可见时才刷新。
-    if (!self.view.hidden) {
+    // 自定义 tab 容器会手动转发生命周期，可见性要以 navigationController.view
+    // 是否真正显示为准，不能只看当前 controller 的 self.view.hidden。
+    if ([TLWSDKManager shared].sessionManager.isLoggedIn) {
         [self tl_refreshMessages];
     }
 }
@@ -101,6 +101,12 @@ static NSInteger const kMessagePageSize = 20;
 - (void)fetchMessagesPage:(NSInteger)page reset:(BOOL)reset {
     if (self.isLoadingMessages) return;
     if (!reset && !self.hasMoreMessages) return;
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
+        [self.myView.tableView.refreshControl endRefreshing];
+        self.myView.tableView.tableFooterView = nil;
+        [self.footerSpinner stopAnimating];
+        return;
+    }
     self.isLoadingMessages = YES;
     if (!reset) {
         [self.footerSpinner startAnimating];
@@ -118,10 +124,14 @@ static NSInteger const kMessagePageSize = 20;
 
             if (error || output.code.integerValue != 200) {
                 if (!error && output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self fetchMessagesPage:page reset:reset]; }];
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self fetchMessagesPage:page reset:reset]; }];
                     return;
                 }
-                [TLWToast show:@"消息加载失败"];
+                if ([self tl_isActuallyVisible]) {
+                    [TLWToast show:@"消息加载失败"];
+                } else {
+                    NSLog(@"[Message] 隐藏状态下拉取消息失败，忽略 toast: %@", error.localizedDescription ?: output.message);
+                }
                 return;
             }
 
@@ -228,6 +238,14 @@ static NSInteger const kMessagePageSize = 20;
     [self fetchMessagesPage:0 reset:YES];
 }
 
+- (BOOL)tl_isActuallyVisible {
+    if (!self.isViewLoaded) return NO;
+    if (!self.view.window) return NO;
+    if (self.navigationController && self.navigationController.view.hidden) return NO;
+    if (self.navigationController.topViewController != self) return NO;
+    return YES;
+}
+
 - (void)tl_loadMoreMessagesIfNeeded {
     if (self.isLoadingMessages || !self.hasMoreMessages) return;
     [self fetchMessagesPage:self.currentPage + 1 reset:NO];
@@ -283,7 +301,7 @@ static NSInteger const kMessagePageSize = 20;
             [self tl_reloadMessageRowForMessageId:messageId preferredIndexPath:indexPath];
 
             if (!error && output.code.integerValue == 401) {
-                [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self tl_markMessageAsReadForItem:item preferredIndexPath:indexPath]; }];
+                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self tl_markMessageAsReadForItem:item preferredIndexPath:indexPath]; }];
             }
         });
     }];

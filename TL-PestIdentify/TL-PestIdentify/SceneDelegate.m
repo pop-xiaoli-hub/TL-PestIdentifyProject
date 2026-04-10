@@ -14,11 +14,43 @@
 
 @interface SceneDelegate ()
 
+@property (nonatomic, copy) NSString *launchProfileValidationID;
+@property (nonatomic, weak) UIViewController *launchProfileValidationRootController;
+@property (nonatomic, assign) NSInteger launchProfileValidationUserId;
+
 @end
 
 @implementation SceneDelegate
 
+- (void)tl_invalidateLaunchProfileValidation {
+    self.launchProfileValidationID = nil;
+    self.launchProfileValidationRootController = nil;
+    self.launchProfileValidationUserId = 0;
+}
+
+- (void)tl_beginLaunchProfileValidationForRootController:(UIViewController *)rootController {
+    self.launchProfileValidationID = [NSUUID UUID].UUIDString;
+    self.launchProfileValidationRootController = rootController;
+    self.launchProfileValidationUserId = [TLWSDKManager shared].sessionManager.userId;
+    [self tl_fetchProfileWithRetry:3
+                      validationID:self.launchProfileValidationID
+            expectedRootController:rootController
+                    expectedUserId:self.launchProfileValidationUserId];
+}
+
+- (BOOL)tl_isLaunchProfileValidationCurrent:(NSString *)validationID
+                     expectedRootController:(UIViewController *)rootController
+                             expectedUserId:(NSInteger)expectedUserId {
+    if (validationID.length == 0) return NO;
+    if (![self.launchProfileValidationID isEqualToString:validationID]) return NO;
+    if (!rootController || self.window.rootViewController != rootController) return NO;
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn) return NO;
+    if ([TLWSDKManager shared].sessionManager.userId != expectedUserId) return NO;
+    return YES;
+}
+
 - (void)tl_switchToLoginRoot {
+    [self tl_invalidateLaunchProfileValidation];
     TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
     nav.navigationBarHidden = YES;
@@ -36,7 +68,7 @@
   UIWindowScene *windowScene = (UIWindowScene *)scene;
   self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
 
-  if ([[TLWSDKManager shared] isLoggedIn]) {
+  if ([[TLWSDKManager shared].sessionManager isLoggedIn]) {
       // 有登录态，拉取用户资料后决定进哪个页面
       TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
       self.window.rootViewController = tabBar;
@@ -45,9 +77,10 @@
       // 异步拉取资料，检查引导/偏好是否完成
       // 拉取失败不代表登录态无效，可能只是网络问题，3秒后自动重试。
       // 只有 token refresh 也失败时，handleUnauthorizedWithRetry 内部会自动 logout 跳登录页。
-      [self tl_fetchProfileWithRetry:3];
+      [self tl_beginLaunchProfileValidationForRootController:tabBar];
   } else {
       // 没有登录态，进登录页
+      [self tl_invalidateLaunchProfileValidation];
       TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
       UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
       nav.navigationBarHidden = YES;
@@ -57,11 +90,25 @@
 }
 
 
-- (void)tl_fetchProfileWithRetry:(NSInteger)remainingRetries {
+- (void)tl_fetchProfileWithRetry:(NSInteger)remainingRetries
+                    validationID:(NSString *)validationID
+          expectedRootController:(UIViewController *)rootController
+                  expectedUserId:(NSInteger)expectedUserId {
+    if (![self tl_isLaunchProfileValidationCurrent:validationID
+                            expectedRootController:rootController
+                                    expectedUserId:expectedUserId]) {
+        return;
+    }
+
     __weak typeof(self) weakSelf = self;
-    [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+    [[TLWSDKManager shared].sessionManager fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
+        if (![strongSelf tl_isLaunchProfileValidationCurrent:validationID
+                                      expectedRootController:rootController
+                                              expectedUserId:expectedUserId]) {
+            return;
+        }
 
         if (!profile) {
             // 网络或服务端异常，不登出，延迟重试
@@ -69,15 +116,24 @@
                 NSLog(@"[Launch] 拉取资料失败，%ld秒后重试（剩余%ld次）", (long)3, (long)remainingRetries);
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)),
                                dispatch_get_main_queue(), ^{
-                    [strongSelf tl_fetchProfileWithRetry:remainingRetries - 1];
+                    if (![strongSelf tl_isLaunchProfileValidationCurrent:validationID
+                                                   expectedRootController:rootController
+                                                           expectedUserId:expectedUserId]) {
+                        return;
+                    }
+                    [strongSelf tl_fetchProfileWithRetry:remainingRetries - 1
+                                            validationID:validationID
+                                  expectedRootController:rootController
+                                          expectedUserId:expectedUserId];
                 });
             } else {
                 NSLog(@"[Launch] 拉取资料多次失败，保留登录态等待用户操作");
+                [strongSelf tl_invalidateLaunchProfileValidation];
             }
             return;
         }
 
-        NSInteger currentUserId = [TLWSDKManager shared].userId;
+        NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
         NSString *elderKey = [NSString stringWithFormat:@"TLW_elder_mode_set_%ld", (long)currentUserId];
         BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:elderKey];
         if (!hasElderSetting) {
@@ -86,10 +142,16 @@
         BOOL hasCrops = (profile.followedCrops.count > 0);
 
         if (hasElderSetting && hasCrops) {
+            [strongSelf tl_invalidateLaunchProfileValidation];
             return;
         }
 
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (![strongSelf tl_isLaunchProfileValidationCurrent:validationID
+                                          expectedRootController:rootController
+                                                  expectedUserId:expectedUserId]) {
+                return;
+            }
             if (!hasElderSetting) {
                 TLWGuideController *guideVC = [[TLWGuideController alloc] init];
                 guideVC.modalPresentationStyle = UIModalPresentationFullScreen;
@@ -99,6 +161,7 @@
                 prefVC.modalPresentationStyle = UIModalPresentationFullScreen;
                 [strongSelf.window.rootViewController presentViewController:prefVC animated:YES completion:nil];
             }
+            [strongSelf tl_invalidateLaunchProfileValidation];
         });
     }];
 }

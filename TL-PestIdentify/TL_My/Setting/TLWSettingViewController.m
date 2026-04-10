@@ -25,11 +25,6 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    // 设置页返回按钮有特殊的圆形白底样式
-    self.navBar.backButton.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.3];
-    self.navBar.backButton.layer.cornerRadius = 20;
-    self.navBar.backButton.layer.masksToBounds = YES;
-
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
@@ -61,7 +56,7 @@
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-        [[TLWSDKManager shared] logout];
+        [[TLWSDKManager shared].sessionManager logout];
         UIWindow *window = self.view.window;
         TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];

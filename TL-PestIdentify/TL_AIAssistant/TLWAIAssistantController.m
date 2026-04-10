@@ -384,7 +384,7 @@
 
             // 401 token 过期，自动续期后重试
             if (output.code && output.code.integerValue == 401) {
-                [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                     [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *retryOutput, NSError *retryError) {
                         dispatch_async(dispatch_get_main_queue(), ^{
                             __strong typeof(weakSelf) strongSelf2 = weakSelf;

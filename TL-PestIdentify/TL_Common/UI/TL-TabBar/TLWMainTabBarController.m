@@ -34,12 +34,16 @@ static CGFloat const kDefaultTabBarHeight = 96.0;
 // 胶囊外围的白色半透明背景，用遮罩挖掉胶囊区域
 @property (nonatomic, strong) UIView *whiteBg;
 @property (nonatomic, strong) CAShapeLayer *whiteBgMask;
+
+// 记录已加载过 view 的 tab 下标，首次切到时才触发 viewDidLoad
+@property (nonatomic, strong) NSMutableSet<NSNumber *> *loadedTabIndexes;
 @end
 
 @implementation TLWMainTabBarController
 
 /*
- 系统自带的tabBar是懒加载，而我们这里一次性全量加载
+ 子 VC 的 view 采用懒加载：首次切到某个 tab 时才 addSubview，
+ 避免隐藏 tab 的页面提前收到 viewWillAppear 而发出幽灵请求。
  */
 
 - (void)viewDidLoad {
@@ -69,22 +73,14 @@ static CGFloat const kDefaultTabBarHeight = 96.0;
         nav.delegate = self;
     }
 
-    // ── 2. 注册子 VC，走正确的生命周期 ──────────────────────────
-    // addChildViewController 会让子 VC 正确收到 viewWillAppear 等回调
+    // ── 2. 注册子 VC（不访问 .view，不触发子 VC 的 viewDidLoad）──
     for (UIViewController *vc in _childVCs) {
         [self addChildViewController:vc];
         [vc didMoveToParentViewController:self];
     }
 
-    // ── 3. 一次性添加所有子 VC 的 view，切换时只改 hidden ──────
-    for (NSInteger i = 0; i < _childVCs.count; i++) {
-        UIView *childView = _childVCs[i].view;
-        childView.hidden = (i != 0);
-        [self.view addSubview:childView];
-        [childView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.edges.equalTo(self.view);
-        }];
-    }
+    // ── 3. 懒加载：首次切到某个 tab 时才 addSubview 其 view ──────
+    _loadedTabIndexes = [NSMutableSet set];
     _selectedIndex = 0;
 
     // ── 4. 创建 TabBar，直接 addSubview，彻底脱离系统 UITabBar ──
@@ -116,6 +112,50 @@ static CGFloat const kDefaultTabBarHeight = 96.0;
         make.bottom.equalTo(self.view).offset(kTabBarBottomOffset);
         make.height.mas_equalTo(kDefaultTabBarHeight);
     }];
+
+    // ── 5. 加载初始 tab（首页） ──────────────────────────────
+    [self tl_loadTabAtIndex:0];
+}
+
+#pragma mark - Appearance forwarding
+
+- (BOOL)shouldAutomaticallyForwardAppearanceMethods {
+    return NO;
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [_childVCs[_selectedIndex] beginAppearanceTransition:YES animated:animated];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    [_childVCs[_selectedIndex] endAppearanceTransition];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [_childVCs[_selectedIndex] beginAppearanceTransition:NO animated:animated];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    [_childVCs[_selectedIndex] endAppearanceTransition];
+}
+
+#pragma mark - Lazy tab loading
+
+- (void)tl_loadTabAtIndex:(NSInteger)idx {
+    if (idx < 0 || idx >= _childVCs.count) return;
+    if ([_loadedTabIndexes containsObject:@(idx)]) return;
+
+    UIView *childView = _childVCs[idx].view;
+    childView.hidden = (idx != _selectedIndex);
+    [self.view insertSubview:childView belowSubview:_mainTabBar];
+    [childView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
+    [_loadedTabIndexes addObject:@(idx)];
 }
 
 #pragma mark - Layout
@@ -163,15 +203,21 @@ static CGFloat const kDefaultTabBarHeight = 96.0;
     if (idx < 0 || idx >= _childVCs.count) return;
     if (idx == _selectedIndex) return;
 
+    [self tl_loadTabAtIndex:idx];
+
     UIViewController *fromVC = _childVCs[_selectedIndex];
     UIViewController *toVC   = _childVCs[idx];
+
+    // 先取消目标 tab 的 hidden，再触发 viewWillAppear。
+    // 部分页面会在 viewWillAppear 里判断 navigationController.view.hidden
+    // 来决定是否真正可见；如果这里顺序反了，首次切入懒加载 tab 可能跳过首刷。
+    toVC.view.hidden = NO;
 
     // 正确触发 viewWillDisappear / viewWillAppear 等生命周期
     [fromVC beginAppearanceTransition:NO animated:NO];
     [toVC   beginAppearanceTransition:YES animated:NO];
 
     fromVC.view.hidden = YES;
-    toVC.view.hidden   = NO;
 
     [fromVC endAppearanceTransition];
     [toVC   endAppearanceTransition];

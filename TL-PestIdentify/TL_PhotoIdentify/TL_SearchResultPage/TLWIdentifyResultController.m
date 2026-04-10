@@ -24,7 +24,7 @@
   
   if (self) {
     _layoutStyleFlag = 1;//默认没有开启适老化
-    NSInteger currentUserId = [TLWSDKManager shared].userId;
+    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
     NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
     BOOL elderModeEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:elderModeKey];
     if (!elderModeEnabled) {
@@ -40,7 +40,6 @@
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.view.backgroundColor = [UIColor blackColor];
-  self.navigationController.navigationBarHidden = YES;
 
   TLWIdentifyResultView *myView = [[TLWIdentifyResultView alloc] initWithFrame:CGRectZero];
   [self.view addSubview:myView];
@@ -59,6 +58,12 @@
 
   [self.myView applyLayoutStyleFlag:self.layoutStyleFlag];
   [self.myView configureWithImage:self.image results:self.identifyResults ?: @[]];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self.navigationController setNavigationBarHidden:YES animated:animated];
+  self.navigationController.interactivePopGestureRecognizer.delegate = nil;
 }
 
 - (void)viewDidLayoutSubviews {

@@ -160,17 +160,16 @@ static NSInteger const kResultPageCount = 3;
     [backButton setTitle:@"<" forState:UIControlStateNormal];
     [backButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
   }
-  backButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.24];
-  backButton.layer.cornerRadius = 21.0;
-  backButton.layer.borderWidth = 1.0;
-  backButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.25].CGColor;
+  backButton.accessibilityLabel = @"返回";
+  backButton.accessibilityHint = @"返回上一页";
+  backButton.accessibilityIdentifier = @"tl_nav_back_button";
   [self addSubview:backButton];
   self.backButton = backButton;
 
   [backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(10.0);
+    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(8.0);
     make.left.equalTo(self).offset(16.0);
-    make.width.height.mas_equalTo(42.0);
+    make.width.height.mas_equalTo(44.0);
   }];
 }
 
@@ -580,9 +579,9 @@ static NSInteger const kResultPageCount = 3;
   }];
 
   [self.backButton mas_remakeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(self.mas_safeAreaLayoutGuideTop);
-    make.left.equalTo(self).offset(22.0);
-    make.width.height.mas_equalTo(40.0);
+    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(8.0);
+    make.left.equalTo(self).offset(16.0);
+    make.width.height.mas_equalTo(44.0);
   }];
 
   [self.headerTitleLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
@@ -624,6 +623,7 @@ static NSInteger const kResultPageCount = 3;
 
   [self.pageContentViews enumerateObjectsUsingBlock:^(UIView * _Nonnull contentView, NSUInteger idx, BOOL * _Nonnull stop) {
     if (idx >= self.pagePestTitleLabels.count ||
+        idx >= self.verticalPageScrollViews.count ||
         idx >= self.pageTagLabels.count ||
         idx >= self.pageConfidenceBadgeViews.count ||
         idx >= self.pageSolutionTitleLabels.count ||
@@ -633,6 +633,7 @@ static NSInteger const kResultPageCount = 3;
       return;
     }
 
+    UIScrollView *verticalScrollView = self.verticalPageScrollViews[idx];
     UILabel *pestTitleLabel = self.pagePestTitleLabels[idx];
     UILabel *tagLabel = self.pageTagLabels[idx];
     UIView *confidenceBadgeView = self.pageConfidenceBadgeViews[idx];
@@ -675,17 +676,6 @@ static NSInteger const kResultPageCount = 3;
       make.height.mas_equalTo(22.0);
     }];
 
-    [aiHintBackgroundView mas_remakeConstraints:^(MASConstraintMaker *make) {
-      make.top.equalTo(solutionLabel.mas_bottom).offset(20.0);
-      make.left.equalTo(contentView);
-      make.width.mas_equalTo(0.0);
-      make.height.mas_equalTo(0.0);
-    }];
-
-    [warnIconView mas_remakeConstraints:^(MASConstraintMaker *make) {
-      make.edges.equalTo(aiHintBackgroundView);
-    }];
-
     [solutionTitleLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
       make.top.equalTo(tagLabel.mas_bottom).offset(26.0);
       make.left.equalTo(contentView);
@@ -697,20 +687,11 @@ static NSInteger const kResultPageCount = 3;
       make.right.equalTo(contentView).offset(-6.0);
     }];
 
-    [contentView mas_updateConstraints:^(MASConstraintMaker *make) {
+    [contentView mas_remakeConstraints:^(MASConstraintMaker *make) {
+      make.top.left.right.equalTo(verticalScrollView);
+      make.width.equalTo(verticalScrollView);
       make.bottom.equalTo(solutionLabel.mas_bottom).offset(120.0);
     }];
-  }];
-
-  [self.aiButton mas_remakeConstraints:^(MASConstraintMaker *make) {
-    make.right.equalTo(self).offset(-34.0);
-    make.bottom.equalTo(self.retakeButton.mas_top).offset(-58.0);
-    make.width.height.mas_equalTo(64.0);
-  }];
-
-  [self.aiTextLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(self.aiButton.mas_bottom).offset(4.0);
-    make.centerX.equalTo(self.aiButton);
   }];
 
   [self.retakeButton mas_remakeConstraints:^(MASConstraintMaker *make) {
@@ -718,6 +699,17 @@ static NSInteger const kResultPageCount = 3;
     make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-20.0);
     make.width.mas_equalTo(190.0);
     make.height.mas_equalTo(58.0);
+  }];
+
+  [self.aiButton mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(self).offset(-34.0);
+    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-136.0);
+    make.width.height.mas_equalTo(64.0);
+  }];
+
+  [self.aiTextLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.aiButton.mas_bottom).offset(4.0);
+    make.centerX.equalTo(self.aiButton);
   }];
 
   [self setNeedsLayout];

@@ -24,7 +24,6 @@
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.view.backgroundColor = [UIColor clearColor];
-  self.navigationController.navigationBarHidden = YES;
 
   TLWAddPlantView *myView = [[TLWAddPlantView alloc] initWithFrame:CGRectZero];
   [self.view addSubview:myView];
@@ -40,7 +39,11 @@
   [self tl_setupDismissKeyboardGesture];
 }
 
-
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self.navigationController setNavigationBarHidden:YES animated:animated];
+  self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+}
 
 - (void)viewWillDisappear:(BOOL)animated {
   [super viewWillDisappear:animated];

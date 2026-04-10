@@ -34,6 +34,12 @@
   [self tl_setupSpeechRecognition];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self.navigationController setNavigationBarHidden:YES animated:animated];
+  self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+}
+
 - (void)viewWillDisappear:(BOOL)animated {
   [super viewWillDisappear:animated];
   [[TWLSpeechManager sharedManager] stopRecording];

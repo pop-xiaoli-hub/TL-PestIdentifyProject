@@ -12,7 +12,15 @@
 #import "TLWIdentifyResultController.h"
 #import "TLWSDKManager.h"
 #import <AgriPestClient/AGChatRequest.h>
+#import <AgriPestClient/AGResultChatProfileResponse.h>
 #import "TLWPhotoPickerController.h"
+#import "TLWLocalIdentifyManager.h"
+#import "TLWToast.h"
+
+static CGFloat const TLWIdentifyCloudJPEGQuality = 0.92f;
+static CGFloat const TLWIdentifyCloudMaxEdge = 2048.0f;
+static CGFloat const TLWIdentifyMinLocalFallbackConfidence = 0.60f;
+static NSInteger const TLWIdentifyDisplayResultCount = 3;
 
 @interface TLWIdentifyPageController ()<AVCapturePhotoCaptureDelegate>
 @property (nonatomic, strong) TLWIdentifyPageView *myView;
@@ -158,7 +166,11 @@
   }
 
   self.session = [[AVCaptureSession alloc] init];//创建相机会话
-  self.session.sessionPreset = AVCaptureSessionPresetHigh;//AVCaptureSession管理整个相机的数据流
+  if ([self.session canSetSessionPreset:AVCaptureSessionPresetPhoto]) {
+    self.session.sessionPreset = AVCaptureSessionPresetPhoto;
+  } else {
+    self.session.sessionPreset = AVCaptureSessionPresetHigh;
+  }
   AVCaptureDevice* device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];//创建相机的输入设备
   if (!device) {
     NSLog(@"没有找到相机设备");
@@ -202,6 +214,11 @@
   if (self.photoOutput.supportedFlashModes.count > 0) {//说明设备支持闪光灯模式
     settings.flashMode = self.myView.flashButton.selected ? AVCaptureFlashModeOn : AVCaptureFlashModeOff;
   }
+  if (@available(iOS 13.0, *)) {
+    AVCapturePhotoQualityPrioritization desired = AVCapturePhotoQualityPrioritizationQuality;
+    AVCapturePhotoQualityPrioritization maxSupported = self.photoOutput.maxPhotoQualityPrioritization;
+    settings.photoQualityPrioritization = MIN(desired, maxSupported);
+  }
   [self.photoOutput capturePhotoWithSettings:settings delegate:self];
 }
 
@@ -215,9 +232,10 @@
   if (!image) {
     return;
   }
+  UIImage *processedImage = [self tl_croppedCameraImageToPreview:image];
   dispatch_async(dispatch_get_main_queue(), ^{
-    self.capturedImage = image;
-    self.capturedImageView.image = image;
+    self.capturedImage = processedImage;
+    self.capturedImageView.image = processedImage;
     self.capturedImageView.hidden = NO;
     self.previewLayer.hidden = YES;
     [self tl_identifyFromAI];
@@ -225,84 +243,144 @@
 }
 
 - (void)tl_identifyFromAI {
-  [self tl_showLoadingIndicator];//展示加载动画
+  [self tl_showLoadingIndicator];
   UIImage *image = self.capturedImage;
   if (![image isKindOfClass:[UIImage class]]) {
     [self tl_stopLoadingIndicator];
     return;
   }
 
-  NSData *imageData = UIImageJPEGRepresentation(image, 0.9);//压缩
+  __weak typeof(self) weakSelf = self;
+  __block NSArray<NSDictionary *> *localResults = @[];
+  __block BOOL localFinished = NO;
+  __block BOOL waitingForLocalFallback = NO;
+
+  void (^presentLocalFallbackIfNeeded)(void) = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf || !waitingForLocalFallback || !localFinished) {
+      return;
+    }
+    waitingForLocalFallback = NO;
+    [strongSelf tl_stopLoadingIndicator];
+    [strongSelf tl_fallbackToLocalResults:localResults];
+  };
+
+  // ---- 1. 本地 CoreML 并行识别（作为云端失败的兜底） ----
+  [[TLWLocalIdentifyManager shared] identifyImage:image completion:^(NSArray<TLWLocalIdentifyResult *> *results, NSError *error) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+
+    if (!error && results.count > 0) {
+      NSLog(@"========== [CoreML] 本地识别结果 ==========");
+      for (NSInteger i = 0; i < results.count; i++) {
+        TLWLocalIdentifyResult *r = results[i];
+        NSLog(@"[CoreML] Top%ld: %@ | 标签: %@ | 作物: %@ | 置信度: %.2f%%", (long)(i + 1), r.name, r.label, r.crop, r.confidence * 100);
+      }
+      NSLog(@"============================================");
+      localResults = [strongSelf tl_buildLocalFallbackResultsFromIdentifyResults:results];
+      if (localResults.count == 0) {
+        NSLog(@"[CoreML] 本地结果未通过兜底阈值，跳过展示");
+      }
+    } else {
+      NSLog(@"[CoreML] 本地识别失败: %@", error.localizedDescription);
+    }
+
+    localFinished = YES;
+    presentLocalFallbackIfNeeded();
+  }];
+
+  // ---- 2. 云端 SDK 识别（主路径） ----
+  NSData *imageData = [self tl_cloudImageDataForIdentify:image];
   if (imageData.length == 0) {
-    [self tl_stopLoadingIndicator];
+    waitingForLocalFallback = YES;
+    presentLocalFallbackIfNeeded();
     return;
   }
 
-  NSString *fileName = [NSString stringWithFormat:@"identify_%@.jpg", [[NSUUID UUID] UUIDString]];//生成一个全局唯一的标识符，避免文件命名冲突
-  NSString *tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];//拼接一个临时的完整路径
-  NSURL *fileURL = [NSURL fileURLWithPath:tempPath];//将字符串路径改为file://类型的本地文件URL
-  BOOL writeSuccess = [imageData writeToURL:fileURL atomically:YES];
-  if (!writeSuccess) {
-    [self tl_stopLoadingIndicator];
-    return;
-  }
+  AGChatRequest *request = [[AGChatRequest alloc] init];
+  request.text = [self tl_identifyPrompt];
+  request.imageUrl = [NSString stringWithFormat:@"data:image/jpeg;base64,%@",
+                      [imageData base64EncodedStringWithOptions:0]];
+  request.useSingleModel = @(NO);
 
   TLWSDKManager *manager = [TLWSDKManager shared];
-  __weak typeof(self) weakSelf = self;
-  NSLog(@"开始上传图片");
-  [manager uploadFileWithFile:fileURL prefix:@"uploads/identify/" completionHandler:^(AGResultString *output, NSError *error) {
+  NSLog(@"AI识别：开始识别，payload=%lu bytes", (unsigned long)imageData.length);
+  [manager.api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *chatOutput, NSError *chatError) {
     dispatch_async(dispatch_get_main_queue(), ^{
-      NSLog(@"AI识别：进入回调");
       __strong typeof(weakSelf) strongSelf = weakSelf;
       if (!strongSelf) {
-        NSLog(@"AI识别：传入空对象");
-        [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
         return;
       }
 
-      if (error || !output || output.code.integerValue != 200 || output.data.length == 0) {
-        NSLog(@"AI识别：分析失败 %@", output.code);
-        [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
-        [strongSelf tl_stopLoadingIndicator];
-        NSString *message = error.localizedDescription ?: output.message ?: @"图片上传失败";
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:message preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
-        [strongSelf presentViewController:alert animated:YES completion:nil];
+      if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.answer.length == 0) {
+        NSLog(@"========== [云端] AI识别失败 ==========");
+        NSLog(@"[云端] chatError: %@", chatError.localizedDescription);
+        NSLog(@"[云端] code: %@, message: %@", chatOutput.code, chatOutput.message);
+        NSLog(@"============================================");
+        waitingForLocalFallback = YES;
+        presentLocalFallbackIfNeeded();
         return;
       }
-      NSLog(@"AI识别：图片正确返回");
-      NSString *imageURLString = output.data;
-      AGChatRequest *request = [[AGChatRequest alloc] init];
-      request.text = @"请根据图片识别结果，返回3个最可能的病害，并严格使用JSON格式输出，不要输出任何额外文字。每个结果只返回1个病害名称，并按结果一、结果二、结果三对应3个结果。格式为：{\"results\":[{\"title\":\"结果一\",\"name\":\"病害名称\",\"confidence\":\"百分比\",\"reason\":\"判断依据\",\"advice\":\"处理建议\"},{\"title\":\"结果二\",\"name\":\"病害名称\",\"confidence\":\"百分比\",\"reason\":\"判断依据\",\"advice\":\"处理建议\"},{\"title\":\"结果三\",\"name\":\"病害名称\",\"confidence\":\"百分比\",\"reason\":\"判断依据\",\"advice\":\"处理建议\"}]}";
-      request.imageUrl = imageURLString;
-      request.useSingleModel = @(YES);
-      NSLog(@"AI识别：开始识别病害");
-      [manager.api chatWithChatRequest:request completionHandler:^(AGResultString *chatOutput, NSError *chatError) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          NSLog(@"AI识别：进入识别回调");
-          [[NSFileManager defaultManager] removeItemAtURL:fileURL error:nil];
-          [strongSelf tl_stopLoadingIndicator];
 
-          if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.length == 0) {
-            NSLog(@"AI识别：识别失败");
-            NSString *message = chatError.localizedDescription ?: chatOutput.message ?: @"AI识别失败";
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:message preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
-            [strongSelf presentViewController:alert animated:YES completion:nil];
-            return;
-          }
-          NSLog(@"AI识别：识别成功");
-          NSLog(@"[IdentifyAI] %@", chatOutput.data);
-          NSArray<NSDictionary *> *parsedResults = [strongSelf tl_parseIdentifyResultsFromJSONString:chatOutput.data];
-          TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
-          vc.image = strongSelf.capturedImage;
-          vc.identifyResults = parsedResults;
-          vc.hidesBottomBarWhenPushed = YES;
-          [strongSelf.navigationController pushViewController:vc animated:YES];
-        });
-      }];
+      NSLog(@"========== [云端] AI识别成功 ==========");
+      NSLog(@"[云端] 原始返回: %@", chatOutput.data.answer);
+      if (chatOutput.data.profile) {
+        NSLog(@"[云端] profile: singleModel=%@, imageType=%@, imageLength=%@, totalMs=%@",
+              chatOutput.data.profile.singleModel,
+              chatOutput.data.profile.imageUrlType,
+              chatOutput.data.profile.imageUrlLength,
+              chatOutput.data.profile.totalMs);
+      }
+
+      NSArray<NSDictionary *> *parsedResults = [strongSelf tl_normalizedIdentifyResultsForDisplay:
+                                                [strongSelf tl_parseIdentifyResultsFromJSONString:chatOutput.data.answer]];
+      if (parsedResults.count == 0) {
+        NSLog(@"[云端] 结构化结果解析失败，回退本地识别");
+        waitingForLocalFallback = YES;
+        presentLocalFallbackIfNeeded();
+        return;
+      }
+
+      for (NSInteger i = 0; i < parsedResults.count; i++) {
+        NSDictionary *r = parsedResults[i];
+        NSLog(@"[云端] Top%ld: %@ | 置信度: %@ | 依据: %@", (long)(i + 1), r[@"name"], r[@"confidence"], r[@"reason"]);
+      }
+      NSLog(@"============================================");
+
+      [strongSelf tl_stopLoadingIndicator];
+      TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
+      vc.image = strongSelf.capturedImage;
+      vc.identifyResults = parsedResults;
+      vc.hidesBottomBarWhenPushed = YES;
+      [strongSelf.navigationController pushViewController:vc animated:YES];
     });
   }];
+}
+
+#pragma mark - 本地识别兜底
+
+- (void)tl_fallbackToLocalResults:(NSArray<NSDictionary *> *)localResults {
+  if (localResults.count > 0) {
+    NSLog(@"========== [兜底] 使用本地 CoreML 结果 ==========");
+    for (NSInteger i = 0; i < localResults.count; i++) {
+      NSDictionary *r = localResults[i];
+      NSLog(@"[兜底] Top%ld: %@ | 置信度: %@", (long)(i + 1), r[@"name"], r[@"confidence"]);
+    }
+    NSLog(@"=================================================");
+    [TLWToast show:@"云端识别失败，已使用本地识别结果"];
+    TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
+    vc.image = self.capturedImage;
+    vc.identifyResults = localResults;
+    vc.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:vc animated:YES];
+  } else {
+    NSLog(@"[兜底] 本地 CoreML 也无结果，双路均失败");
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:@"识别失败，请检查网络后重试" preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+  }
 }
 
 - (NSArray<NSDictionary *> *)tl_parseIdentifyResultsFromJSONString:(NSString *)jsonString {
@@ -311,12 +389,13 @@
   }
 
   NSString *normalized = [jsonString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-  if ([normalized hasPrefix:@"```"]) {
-    NSRange firstBraceRange = [normalized rangeOfString:@"{"];
-    NSRange lastBraceRange = [normalized rangeOfString:@"}" options:NSBackwardsSearch];
-    if (firstBraceRange.location != NSNotFound && lastBraceRange.location != NSNotFound && lastBraceRange.location > firstBraceRange.location) {
-      normalized = [normalized substringWithRange:NSMakeRange(firstBraceRange.location, lastBraceRange.location - firstBraceRange.location + 1)];
-    }
+  NSRange firstBraceRange = [normalized rangeOfString:@"{"];
+  NSRange lastBraceRange = [normalized rangeOfString:@"}" options:NSBackwardsSearch];
+  if (firstBraceRange.location != NSNotFound &&
+      lastBraceRange.location != NSNotFound &&
+      lastBraceRange.location > firstBraceRange.location) {
+    normalized = [normalized substringWithRange:NSMakeRange(firstBraceRange.location,
+                                                            lastBraceRange.location - firstBraceRange.location + 1)];
   }
 
   NSData *data = [normalized dataUsingEncoding:NSUTF8StringEncoding];
@@ -359,7 +438,12 @@
       }
     }
 
-    NSString *confidence = [result[@"confidence"] isKindOfClass:[NSString class]] ? result[@"confidence"] : @"--";
+    NSString *confidence = nil;
+    if ([result[@"confidence"] isKindOfClass:[NSString class]]) {
+      confidence = result[@"confidence"];
+    } else if ([result[@"confidence"] isKindOfClass:[NSNumber class]]) {
+      confidence = [NSString stringWithFormat:@"%.1f%%", [result[@"confidence"] floatValue]];
+    }
     NSString *advice = [result[@"advice"] isKindOfClass:[NSString class]] ? result[@"advice"] : @"";
     NSString *reason = [result[@"reason"] isKindOfClass:[NSString class]] ? result[@"reason"] : @"";
     if (advice.length == 0 && reason.length > 0) {
@@ -377,6 +461,177 @@
   }
 
   return [parsedResults copy];
+}
+
+- (NSData *)tl_cloudImageDataForIdentify:(UIImage *)image {
+  if (![image isKindOfClass:[UIImage class]]) {
+    return nil;
+  }
+
+  CGFloat width = image.size.width;
+  CGFloat height = image.size.height;
+  UIImage *workingImage = image;
+  if (width > TLWIdentifyCloudMaxEdge || height > TLWIdentifyCloudMaxEdge) {
+    CGFloat scale = (width > height) ? (TLWIdentifyCloudMaxEdge / width) : (TLWIdentifyCloudMaxEdge / height);
+    CGSize newSize = CGSizeMake(MAX(1.0, floor(width * scale)),
+                                MAX(1.0, floor(height * scale)));
+    UIGraphicsBeginImageContextWithOptions(newSize, YES, 1.0);
+    [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+    UIImage *resized = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    if (resized) {
+      workingImage = resized;
+    }
+  }
+
+  return UIImageJPEGRepresentation(workingImage, TLWIdentifyCloudJPEGQuality);
+}
+
+- (UIImage *)tl_croppedCameraImageToPreview:(UIImage *)image {
+  UIImage *normalizedImage = [self tl_normalizedImageForProcessing:image];
+  if (!normalizedImage || !self.previewLayer) {
+    return normalizedImage ?: image;
+  }
+
+  CGRect visibleRect = [self.previewLayer metadataOutputRectOfInterestForRect:self.previewLayer.bounds];
+  if (CGRectIsEmpty(visibleRect) || CGRectIsNull(visibleRect)) {
+    return normalizedImage;
+  }
+
+  CGFloat imageWidth = normalizedImage.size.width;
+  CGFloat imageHeight = normalizedImage.size.height;
+  CGRect cropRect = CGRectMake(CGRectGetMinX(visibleRect) * imageWidth,
+                               CGRectGetMinY(visibleRect) * imageHeight,
+                               CGRectGetWidth(visibleRect) * imageWidth,
+                               CGRectGetHeight(visibleRect) * imageHeight);
+  CGRect imageBounds = CGRectMake(0, 0, imageWidth, imageHeight);
+  cropRect = CGRectIntersection(CGRectIntegral(cropRect), imageBounds);
+  if (CGRectIsEmpty(cropRect) || CGRectIsNull(cropRect)) {
+    return normalizedImage;
+  }
+
+  CGImageRef croppedCGImage = CGImageCreateWithImageInRect(normalizedImage.CGImage, cropRect);
+  if (!croppedCGImage) {
+    return normalizedImage;
+  }
+
+  UIImage *croppedImage = [UIImage imageWithCGImage:croppedCGImage scale:normalizedImage.scale orientation:UIImageOrientationUp];
+  CGImageRelease(croppedCGImage);
+  return croppedImage ?: normalizedImage;
+}
+
+- (UIImage *)tl_normalizedImageForProcessing:(UIImage *)image {
+  if (![image isKindOfClass:[UIImage class]]) {
+    return nil;
+  }
+  if (image.imageOrientation == UIImageOrientationUp) {
+    return image;
+  }
+
+  UIGraphicsBeginImageContextWithOptions(image.size, YES, image.scale);
+  [image drawInRect:CGRectMake(0, 0, image.size.width, image.size.height)];
+  UIImage *normalizedImage = UIGraphicsGetImageFromCurrentImageContext();
+  UIGraphicsEndImageContext();
+  return normalizedImage ?: image;
+}
+
+- (NSString *)tl_identifyPrompt {
+  return @"请只根据图片中可见的农作物症状进行判断，不要为了凑满结果而猜测。"
+         @"结论可以是病害、虫害、健康，或“待确认”。"
+         @"如果证据不足、图像不清晰、主体不明确，必须返回“待确认”，不要编造具体病名。"
+         @"严格返回 JSON，不要输出任何额外文字。"
+         @"格式为：{\"results\":[{\"title\":\"结果一\",\"name\":\"结论名称\",\"confidence\":\"百分比\",\"reason\":\"只写图像中可见依据\",\"advice\":\"给出简短处理建议\"}]}"
+         @"。results 按置信度从高到低返回 1 到 3 项。";
+}
+
+- (NSArray<NSDictionary *> *)tl_buildLocalFallbackResultsFromIdentifyResults:(NSArray<TLWLocalIdentifyResult *> *)results {
+  if (results.count == 0) {
+    return @[];
+  }
+
+  TLWLocalIdentifyResult *topResult = results.firstObject;
+  if (![topResult isKindOfClass:[TLWLocalIdentifyResult class]]) {
+    return @[];
+  }
+  if ([topResult.label isEqualToString:@"Background_without_leaves"] ||
+      topResult.confidence < TLWIdentifyMinLocalFallbackConfidence) {
+    return @[];
+  }
+
+  NSMutableArray<NSDictionary *> *parsed = [NSMutableArray array];
+  NSInteger count = MIN(results.count, TLWIdentifyDisplayResultCount);
+  for (NSInteger i = 0; i < count; i++) {
+    TLWLocalIdentifyResult *result = results[i];
+    NSString *reason = result.crop.length > 0
+        ? [NSString stringWithFormat:@"本地离线模型预判（作物：%@）", result.crop]
+        : @"本地离线模型预判";
+    [parsed addObject:@{
+      @"title": [self tl_identifyTitleForIndex:i],
+      @"name": result.name ?: @"待确认",
+      @"names": result.name.length > 0 ? @[result.name] : @[],
+      @"confidence": [NSString stringWithFormat:@"%.1f%%", result.confidence * 100.0f],
+      @"reason": reason,
+      @"advice": @"当前为离线兜底结果，建议补拍叶片近景、病斑细节或联网后再次识别。"
+    }];
+  }
+  return parsed.copy;
+}
+
+- (NSArray<NSDictionary *> *)tl_normalizedIdentifyResultsForDisplay:(NSArray<NSDictionary *> *)results {
+  if (results.count == 0) {
+    return @[];
+  }
+
+  NSMutableArray<NSDictionary *> *normalized = [NSMutableArray array];
+  NSInteger count = MIN(results.count, TLWIdentifyDisplayResultCount);
+  for (NSInteger idx = 0; idx < count; idx++) {
+    NSDictionary *result = results[idx];
+    NSString *title = [result[@"title"] isKindOfClass:[NSString class]] && [result[@"title"] length] > 0
+        ? result[@"title"]
+        : [self tl_identifyTitleForIndex:idx];
+    NSString *name = [result[@"name"] isKindOfClass:[NSString class]] && [result[@"name"] length] > 0
+        ? result[@"name"]
+        : @"待确认";
+    NSString *confidence = [result[@"confidence"] isKindOfClass:[NSString class]] && [result[@"confidence"] length] > 0
+        ? result[@"confidence"]
+        : @"--";
+    NSString *reason = [result[@"reason"] isKindOfClass:[NSString class]] ? result[@"reason"] : @"";
+    NSString *advice = [result[@"advice"] isKindOfClass:[NSString class]] ? result[@"advice"] : @"";
+    if (advice.length == 0) {
+      advice = reason.length > 0 ? reason : @"建议补拍叶片近景、叶背或虫体细节后再次识别。";
+    }
+
+    [normalized addObject:@{
+      @"title": title,
+      @"name": name,
+      @"names": @[name],
+      @"confidence": confidence,
+      @"reason": reason ?: @"",
+      @"advice": advice
+    }];
+  }
+
+  while (normalized.count < TLWIdentifyDisplayResultCount) {
+    NSInteger idx = normalized.count;
+    [normalized addObject:@{
+      @"title": [self tl_identifyTitleForIndex:idx],
+      @"name": @"待确认",
+      @"names": @[@"待确认"],
+      @"confidence": @"--",
+      @"reason": @"当前图片证据不足。",
+      @"advice": @"建议补拍叶片近景、病斑局部、叶背或虫体细节后再次识别。"
+    }];
+  }
+
+  return normalized.copy;
+}
+
+- (NSString *)tl_identifyTitleForIndex:(NSInteger)index {
+  NSArray<NSString *> *titles = @[@"结果一", @"结果二", @"结果三"];
+  if (index >= 0 && index < titles.count) {
+    return titles[index];
+  }
+  return [NSString stringWithFormat:@"结果%ld", (long)index + 1];
 }
 
 
