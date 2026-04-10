@@ -215,7 +215,9 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
     settings.flashMode = self.myView.flashButton.selected ? AVCaptureFlashModeOn : AVCaptureFlashModeOff;
   }
   if (@available(iOS 13.0, *)) {
-    settings.photoQualityPrioritization = AVCapturePhotoQualityPrioritizationQuality;
+    AVCapturePhotoQualityPrioritization desired = AVCapturePhotoQualityPrioritizationQuality;
+    AVCapturePhotoQualityPrioritization maxSupported = self.photoOutput.maxPhotoQualityPrioritization;
+    settings.photoQualityPrioritization = MIN(desired, maxSupported);
   }
   [self.photoOutput capturePhotoWithSettings:settings delegate:self];
 }

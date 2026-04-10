@@ -6,7 +6,10 @@
 #import "TLWMyFavoriteController.h"
 #import "TLWMyFavoriteView.h"
 #import "TLWFavoriteCell.h"
+#import "TLWPostDetailController.h"
+#import "TLWCommunityPost.h"
 #import "TLWSDKManager.h"
+#import <AgriPestClient/AGPostResponseDto.h>
 #import <Masonry/Masonry.h>
 
 static NSString * const kFavoriteCellID = @"TLWFavoriteCell";
@@ -93,6 +96,7 @@ static NSInteger  const kPageSize       = 20;
     _currentPage = 0;
     _hasMore     = YES;
     [_favorites removeAllObjects];
+    [self.favoriteView.collectionView reloadData];
     [self fetchPage:0];
 }
 
@@ -141,6 +145,40 @@ static NSInteger  const kPageSize       = 20;
 
 #pragma mark - Actions
 
+- (void)tl_openPostDetailAtIndex:(NSInteger)index {
+    if (index < 0 || index >= self.favorites.count) return;
+
+    AGPostResponseDto *postDto = self.favorites[index];
+    NSNumber *postId = postDto._id;
+    if (!postId) return;
+
+    TLWPostDetailController *detailVC = [[TLWPostDetailController alloc] init];
+    detailVC._id = postId;
+    detailVC.post = [self tl_communityPostFromDto:postDto];
+    detailVC.hasCollectedPosts = self.favorites;
+    detailVC.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:detailVC animated:YES];
+}
+
+- (TLWCommunityPost *)tl_communityPostFromDto:(AGPostResponseDto *)dto {
+    if (!dto) return nil;
+
+    TLWCommunityPost *post = [[TLWCommunityPost alloc] init];
+    post._id = dto._id;
+    post.title = dto.title ?: @"";
+    post.content = dto.content ?: @"";
+    post.images = dto.images ?: @[];
+    post.tags = dto.tags ?: @[];
+    post.authorName = dto.authorName ?: @"";
+    post.authorAvatar = dto.authorAvatar ?: @"";
+    post.likeCount = dto.likeCount ?: @0;
+    post.isLiked = dto.isLiked.boolValue;
+    post.isCollected = YES;
+    post.favoriteCount = dto.favoriteCount ?: @0;
+    post.imageAspectRatio = 4.0 / 3.0;
+    return post;
+}
+
 #pragma mark - UICollectionViewDataSource
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
@@ -153,6 +191,12 @@ static NSInteger  const kPageSize       = 20;
                                                                      forIndexPath:indexPath];
     [cell configureWithPostDto:_favorites[indexPath.item]];
     return cell;
+}
+
+#pragma mark - UICollectionViewDelegate
+
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    [self tl_openPostDetailAtIndex:indexPath.item];
 }
 
 #pragma mark - UIScrollViewDelegate (上拉加载更多)

@@ -25,11 +25,6 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    // 设置页返回按钮有特殊的圆形白底样式
-    self.navBar.backButton.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.3];
-    self.navBar.backButton.layer.cornerRadius = 20;
-    self.navBar.backButton.layer.masksToBounds = YES;
-
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);

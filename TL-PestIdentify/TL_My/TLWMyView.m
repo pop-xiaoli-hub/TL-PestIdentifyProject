@@ -129,10 +129,10 @@
     _editProfileButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
     [statsRow addSubview:_editProfileButton];
     [_editProfileButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.equalTo(self).offset(38);
-        make.centerY.equalTo(statsRow).offset(10);
-        make.width.mas_equalTo(216);
-        make.height.mas_equalTo(72);
+        make.right.equalTo(statsRow);
+        make.centerY.equalTo(statsRow);
+        make.width.mas_equalTo(93);
+        make.height.mas_equalTo(50);
     }];
 
     return statsRow;
