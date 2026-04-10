@@ -20,6 +20,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 @interface TLWMyController ()
 
 @property (nonatomic, strong) TLWMyView *myView;
+@property (nonatomic, assign) BOOL hasLoadedMyPostsOnce;
 
 @end
 
@@ -53,11 +54,11 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    if (![self tl_isActuallyVisible] || ![TLWSDKManager shared].isLoggedIn) {
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
         return;
     }
     __weak typeof(self) weakSelf = self;
-    [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+    [[TLWSDKManager shared].sessionManager fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
         // TLWProfileDidUpdateNotification 会自动触发 applyProfile，无需额外处理
         (void)weakSelf;
     }];
@@ -73,7 +74,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)applyProfile {
-    AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
+    AGUserProfileDto *profile = [TLWSDKManager shared].sessionManager.cachedProfile;
     if (!profile) return;
     NSString *displayName = profile.fullName ?: profile.username ?: @"未设置昵称";
     _myView.userNameLabel.text = displayName;
@@ -82,6 +83,9 @@ extern NSString * const TLWProfileDidUpdateNotification;
         NSURL *avatarURL = [NSURL URLWithString:profile.avatarUrl];
         [_myView.avatarImageView sd_setImageWithURL:avatarURL];
         [_myView.postAvatarImageView sd_setImageWithURL:avatarURL];
+    } else {
+        _myView.avatarImageView.image = nil;
+        _myView.postAvatarImageView.image = nil;
     }
     _myView.favCountLabel.text    = [NSString stringWithFormat:@"%@", profile.favoriteCount ?: @(0)];
     _myView.recordCountLabel.text = [NSString stringWithFormat:@"%@", profile.historyRecognitionCount ?: @(0)];
@@ -97,14 +101,6 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
     UITapGestureRecognizer *recordTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onRecord)];
     [_myView.recordStatView addGestureRecognizer:recordTap];
-}
-
-- (BOOL)tl_isActuallyVisible {
-    if (!self.isViewLoaded) return NO;
-    if (!self.view.window) return NO;
-    if (self.navigationController && self.navigationController.view.hidden) return NO;
-    if (self.navigationController.topViewController != self) return NO;
-    return YES;
 }
 
 - (TLWMyView *)myView {
@@ -132,21 +128,39 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)fetchMyPosts {
-    if (![TLWSDKManager shared].isLoggedIn) return;
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn) return;
+    if (!self.hasLoadedMyPostsOnce) {
+        [self.myView showPostsLoading];
+    }
     __weak typeof(self) weakSelf = self;
     [[TLWSDKManager shared] getMyPostsWithPage:@(0) size:@(20) completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
-        if (error || !output) return;
+        if (error || !output) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (!strongSelf.hasLoadedMyPostsOnce) {
+                    [strongSelf.myView showPostsStatusText:@"帖子加载失败，请稍后重试"];
+                }
+            });
+            return;
+        }
         if (output.code.integerValue == 401) {
-            [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+            [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                 [strongSelf fetchMyPosts];
             }];
             return;
         }
-        if (output.code.integerValue != 200) return;
+        if (output.code.integerValue != 200) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (!strongSelf.hasLoadedMyPostsOnce) {
+                    [strongSelf.myView showPostsStatusText:@"帖子加载失败，请稍后重试"];
+                }
+            });
+            return;
+        }
         NSArray<AGPostResponseDto *> *posts = output.data.list ?: @[];
         dispatch_async(dispatch_get_main_queue(), ^{
+            strongSelf.hasLoadedMyPostsOnce = YES;
             [strongSelf.myView reloadPosts:posts];
         });
     }];

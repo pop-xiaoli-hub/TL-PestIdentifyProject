@@ -22,6 +22,8 @@
 @property (nonatomic, strong, readwrite) UILabel     *_postNameLabelLabel;
 @property (nonatomic, strong) UIView                          *postListContent;
 @property (nonatomic, strong) NSArray<AGPostResponseDto *>    *cachedPosts;
+@property (nonatomic, strong) UIActivityIndicatorView         *postsLoadingIndicator;
+@property (nonatomic, strong) UILabel                         *postsStatusLabel;
 
 @end
 
@@ -69,7 +71,7 @@
 #pragma mark - 头像 / 昵称 / 统计行
 
 - (UIView *)setupHeader {
-    _avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"avatar"]];
+    _avatarImageView = [[UIImageView alloc] init];
     _avatarImageView.contentMode      = UIViewContentModeScaleAspectFill;
     _avatarImageView.clipsToBounds    = YES;
     _avatarImageView.layer.cornerRadius = 42;
@@ -219,14 +221,60 @@
 
 #pragma mark - 我的帖子（真实数据）
 
+- (void)showPostsLoading {
+    _cachedPosts = nil;
+    [self tl_resetPostListContent];
+
+    if (!_postsLoadingIndicator) {
+        _postsLoadingIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+        _postsLoadingIndicator.color = [UIColor colorWithRed:0.55 green:0.55 blue:0.55 alpha:1.0];
+    }
+    if (!_postsStatusLabel) {
+        _postsStatusLabel = [UILabel new];
+        _postsStatusLabel.font = [UIFont systemFontOfSize:14];
+        _postsStatusLabel.textColor = [UIColor colorWithRed:0.60 green:0.60 blue:0.60 alpha:1.0];
+        _postsStatusLabel.textAlignment = NSTextAlignmentCenter;
+    }
+
+    _postsStatusLabel.text = @"加载中...";
+    [_postListContent addSubview:_postsLoadingIndicator];
+    [_postListContent addSubview:_postsStatusLabel];
+    [_postsLoadingIndicator startAnimating];
+
+    [_postsLoadingIndicator mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_postListContent).offset(36);
+        make.centerX.equalTo(_postListContent);
+    }];
+    [_postsStatusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(_postsLoadingIndicator.mas_bottom).offset(12);
+        make.centerX.equalTo(_postListContent);
+        make.bottom.equalTo(_postListContent).offset(-36);
+    }];
+}
+
+- (void)showPostsStatusText:(NSString *)text {
+    _cachedPosts = nil;
+    [self tl_resetPostListContent];
+
+    if (!_postsStatusLabel) {
+        _postsStatusLabel = [UILabel new];
+        _postsStatusLabel.font = [UIFont systemFontOfSize:14];
+        _postsStatusLabel.textColor = [UIColor colorWithRed:0.60 green:0.60 blue:0.60 alpha:1.0];
+        _postsStatusLabel.textAlignment = NSTextAlignmentCenter;
+    }
+
+    _postsStatusLabel.text = [text copy];
+    [_postListContent addSubview:_postsStatusLabel];
+    [_postsStatusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.mas_equalTo(40);
+        make.centerX.equalTo(_postListContent);
+        make.bottom.equalTo(_postListContent).offset(-40);
+    }];
+}
+
 - (void)reloadPosts:(NSArray<AGPostResponseDto *> *)posts {
     _cachedPosts = posts;
-    [_postListContent.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
-    [_postListContent mas_remakeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(_postListContent.superview);
-        make.width.equalTo(_postListContent.superview);
-        make.height.mas_greaterThanOrEqualTo(1);
-    }];
+    [self tl_resetPostListContent];
 
     if (posts.count == 0) {
         UILabel *empty = [UILabel new];
@@ -280,6 +328,16 @@
         }];
         prev = item;
     }
+}
+
+- (void)tl_resetPostListContent {
+    [_postsLoadingIndicator stopAnimating];
+    [_postListContent.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
+    [_postListContent mas_remakeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(_postListContent.superview);
+        make.width.equalTo(_postListContent.superview);
+        make.height.mas_greaterThanOrEqualTo(1);
+    }];
 }
 
 - (void)tl_postItemTapped:(UITapGestureRecognizer *)tap {
