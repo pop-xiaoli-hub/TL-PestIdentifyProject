@@ -19,7 +19,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) UIView *middleCardView;
 @property (nonatomic, strong, readonly) UICollectionView *imagesCollectionView;
 @property (nonatomic, strong, readonly) UIScrollView *scrollView;
-@property (nonatomic, strong) UIActivityIndicatorView *indicator;
 @property (nonatomic, strong) UIView *loadingView;
 /// 根据是否有选中的作物，切换顶部卡片的占位文案 / 标签列表展示
 - (void)tl_updateCropSelectionVisible:(BOOL)hasSelection;

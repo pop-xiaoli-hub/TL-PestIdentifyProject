@@ -7,6 +7,7 @@
 #import "TLWCommunityPost.h"
 #import <SDWebImage/UIImageView+WebCache.h>
 #import <Masonry/Masonry.h>
+#import "TLWLoadingIndicator.h"
 
 @interface TLWCommunityCell ()
 
@@ -174,11 +175,19 @@
     make.edges.equalTo(self.contentView);
   }];
 
-  // 遮罩上的「发布中」文字 + 菊花
-  UIActivityIndicatorView *spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
-  spinner.color = [UIColor colorWithWhite:0.15 alpha:1.0];
-  [spinner startAnimating];
-  [self.pendingBlurView.contentView addSubview:spinner];
+  // 遮罩上的「发布中」旋转 loading + 文字
+  UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+  UIImageView *loadingIV = [[UIImageView alloc] initWithImage:loadingImage];
+  loadingIV.contentMode = UIViewContentModeScaleAspectFit;
+  [self.pendingBlurView.contentView addSubview:loadingIV];
+
+  CABasicAnimation *rotation = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+  rotation.fromValue = @(0);
+  rotation.toValue = @(M_PI * 2);
+  rotation.duration = 1.0;
+  rotation.repeatCount = HUGE_VALF;
+  rotation.removedOnCompletion = NO;
+  [loadingIV.layer addAnimation:rotation forKey:@"tl_loading_rotate"];
 
   self.pendingLabel = [[UILabel alloc] init];
   self.pendingLabel.text = @"发布中...";
@@ -186,13 +195,14 @@
   self.pendingLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
   [self.pendingBlurView.contentView addSubview:self.pendingLabel];
 
-  [spinner mas_makeConstraints:^(MASConstraintMaker *make) {
+  [loadingIV mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self.pendingBlurView);
     make.centerY.equalTo(self.pendingBlurView).offset(-10);
+    make.width.height.mas_equalTo(30);
   }];
   [self.pendingLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self.pendingBlurView);
-    make.top.equalTo(spinner.mas_bottom).offset(6);
+    make.top.equalTo(loadingIV.mas_bottom).offset(6);
   }];
 }
 
