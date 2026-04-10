@@ -51,8 +51,9 @@
 }
 
 - (void)tl_applyCurrentUserInfo {
-  AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
-  NSString *displayName = profile.fullName ?: profile.username ?: [TLWSDKManager shared].username;
+  TLWSessionManager *sessionManager = [TLWSDKManager shared].sessionManager;
+  AGUserProfileDto *profile = sessionManager.cachedProfile;
+  NSString *displayName = profile.fullName ?: profile.username ?: sessionManager.username;
   self.titleLabel.text = displayName.length > 0 ? displayName : @"用户";
 
   UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar.png"];
