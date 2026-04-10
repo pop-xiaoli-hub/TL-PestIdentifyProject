@@ -59,14 +59,14 @@ extern NSString * const TLWProfileDidUpdateNotification;
             self->_myView.confirmButton.enabled = YES;
             if (error || output.code.integerValue != 200) {
                 if (!error && output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
                     return;
                 }
                 NSLog(@"修改昵称失败: %@", error.localizedDescription ?: output.message);
                 return;
             }
             // 直接改缓存，立刻通知所有页面
-            [TLWSDKManager shared].cachedProfile.fullName = newName;
+            [TLWSDKManager shared].sessionManager.cachedProfile.fullName = newName;
             [[NSNotificationCenter defaultCenter] postNotificationName:TLWProfileDidUpdateNotification object:nil];
             [self.delegate editNicknameController:self didSaveNickname:newName];
             [self.navigationController popViewControllerAnimated:YES];

@@ -112,7 +112,7 @@ static NSInteger  const kPageSize       = 20;
 
             if (error || output.code.integerValue != 200) {
                 if (output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [self fetchPage:page];
                     }];
                     return;

@@ -61,7 +61,7 @@
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
-        [[TLWSDKManager shared] logout];
+        [[TLWSDKManager shared].sessionManager logout];
         UIWindow *window = self.view.window;
         TLWPasswordLoginController *loginVC = [[TLWPasswordLoginController alloc] init];
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];

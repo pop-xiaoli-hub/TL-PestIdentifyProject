@@ -56,7 +56,7 @@
 #pragma mark - Setup
 
 - (void)applyCurrentPhone {
-    NSString *phone = [TLWSDKManager shared].cachedProfile.phone;
+    NSString *phone = [TLWSDKManager shared].sessionManager.cachedProfile.phone;
     if (phone.length >= 11) {
         // 脱敏：138****1234
         NSString *masked = [NSString stringWithFormat:@"%@****%@",
@@ -97,7 +97,7 @@
             }
             if (output.code.integerValue != 200) {
                 if (output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onSendCode]; }];
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self onSendCode]; }];
                     return;
                 }
                 self.myView.sendCodeButton.enabled = YES;
@@ -157,7 +157,7 @@
             }
             if (output.code.integerValue != 200) {
                 if (output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
                     return;
                 }
                 [self showAlert:output.message ?: @"换绑失败"];
@@ -165,7 +165,7 @@
             }
 
             // 刷新缓存
-            [[TLWSDKManager shared] fetchProfileWithCompletion:nil];
+            [[TLWSDKManager shared].sessionManager fetchProfileWithCompletion:nil];
             [self showAlert:@"换绑成功" completion:^{
                 [self.navigationController popViewControllerAnimated:YES];
             }];

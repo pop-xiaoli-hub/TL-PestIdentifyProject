@@ -24,7 +24,7 @@
   
   if (self) {
     _layoutStyleFlag = 1;//默认没有开启适老化
-    NSInteger currentUserId = [TLWSDKManager shared].userId;
+    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
     NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
     BOOL elderModeEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:elderModeKey];
     if (!elderModeEnabled) {

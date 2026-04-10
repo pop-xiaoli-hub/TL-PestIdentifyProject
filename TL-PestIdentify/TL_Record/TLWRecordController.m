@@ -78,7 +78,7 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
                 return;
             }
             if (output.code.integerValue == 401) {
-                [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                     [self tl_fetchRecords];
                 }];
                 return;

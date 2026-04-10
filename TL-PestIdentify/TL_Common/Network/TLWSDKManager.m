@@ -5,31 +5,12 @@
 //
 
 #import "TLWSDKManager.h"
-#import "TLWDBManager.h"
 #import <UIKit/UIKit.h>
-#import <Security/Security.h>
-
-static NSString * const kKeychainService = @"com.tl.pestidentify.auth";
-static NSString * const kKeychainAccessToken  = @"access_token";
-static NSString * const kKeychainRefreshToken = @"refresh_token";
-
-NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotification";
-
-static NSString * const kTokenKey    = @"TLW_access_token";
-static NSString * const kRefreshKey  = @"TLW_refresh_token";
-static NSString * const kUserIdKey   = @"TLW_user_id";
-static NSString * const kUsernameKey = @"TLW_username";
-static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 @interface TLWSDKManager ()
-@property (nonatomic, strong, readwrite) AGUserProfileDto *cachedProfile;
+@property (nonatomic, strong, readwrite) AGApiService *api;
+@property (nonatomic, strong, readwrite) TLWSessionManager *sessionManager;
 @property (nonatomic, strong, readwrite) NSArray<AGPostResponseDto *> *cachedFavoritedPosts;
-/// 是否正在刷新 token（防止并发多次刷新请求）
-@property (nonatomic, assign) BOOL isRefreshing;
-/// 等待 token 刷新完成后重试的 block 队列
-@property (nonatomic, strong) NSMutableArray<dispatch_block_t> *pendingRetryBlocks;
-/// 认证会话版本号。登出时递增，用于丢弃过期 refresh 回调。
-@property (nonatomic, assign) NSUInteger authStateVersion;
 @end
 
 @implementation TLWSDKManager
@@ -67,56 +48,6 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
     return window;
 }
 
-#pragma mark - Keychain Helpers
-
-+ (BOOL)_keychainSave:(NSString *)value forAccount:(NSString *)account {
-    if (!value) return NO;
-    NSData *data = [value dataUsingEncoding:NSUTF8StringEncoding];
-    // 先删除旧值
-    NSDictionary *delQuery = @{
-        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
-        (__bridge id)kSecAttrService: kKeychainService,
-        (__bridge id)kSecAttrAccount: account,
-    };
-    SecItemDelete((__bridge CFDictionaryRef)delQuery);
-    // 写入新值
-    NSDictionary *addQuery = @{
-        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
-        (__bridge id)kSecAttrService: kKeychainService,
-        (__bridge id)kSecAttrAccount: account,
-        (__bridge id)kSecValueData:   data,
-        (__bridge id)kSecAttrAccessible: (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-    };
-    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)addQuery, NULL);
-    return status == errSecSuccess;
-}
-
-+ (nullable NSString *)_keychainLoadForAccount:(NSString *)account {
-    NSDictionary *query = @{
-        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
-        (__bridge id)kSecAttrService: kKeychainService,
-        (__bridge id)kSecAttrAccount: account,
-        (__bridge id)kSecReturnData:  @YES,
-        (__bridge id)kSecMatchLimit:  (__bridge id)kSecMatchLimitOne,
-    };
-    CFTypeRef result = NULL;
-    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
-    if (status == errSecSuccess && result) {
-        NSString *value = [[NSString alloc] initWithData:(__bridge_transfer NSData *)result encoding:NSUTF8StringEncoding];
-        return value;
-    }
-    return nil;
-}
-
-+ (void)_keychainDeleteForAccount:(NSString *)account {
-    NSDictionary *query = @{
-        (__bridge id)kSecClass:       (__bridge id)kSecClassGenericPassword,
-        (__bridge id)kSecAttrService: kKeychainService,
-        (__bridge id)kSecAttrAccount: account,
-    };
-    SecItemDelete((__bridge CFDictionaryRef)query);
-}
-
 #pragma mark - Singleton
 
 + (instancetype)shared {
@@ -128,178 +59,25 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
   return instance;
 }
 
-- (void)tl_resetInMemorySession {
-    [AGDefaultConfiguration sharedConfig].accessToken = @"";
-    _userId = 0;
-    _username = nil;
-    self.cachedProfile = nil;
-    self.cachedFavoritedPosts = @[];
-}
-
-- (void)tl_clearPersistedSessionArtifacts {
-    [TLWSDKManager _keychainDeleteForAccount:kKeychainAccessToken];
-    [TLWSDKManager _keychainDeleteForAccount:kKeychainRefreshToken];
-
-    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    [ud removeObjectForKey:kTokenKey];
-    [ud removeObjectForKey:kRefreshKey];
-    [ud removeObjectForKey:kUserIdKey];
-    [ud removeObjectForKey:kUsernameKey];
-    [ud removeObjectForKey:kGenPwdKey];
-}
-
 - (instancetype)init {
     self = [super init];
     if (self) {
-        // 配置 SDK
         AGDefaultConfiguration *config = [AGDefaultConfiguration sharedConfig];
         config.host = @"http://115.191.67.35:8080";
-        // 从 Keychain 恢复登录态。只有 accessToken + refreshToken + userId 完整时才恢复；
-        // 遇到残缺登录态则统一清理，避免冷启动出现"幽灵账号"。
-        NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-        NSString *token = [TLWSDKManager _keychainLoadForAccount:kKeychainAccessToken];
-        NSString *refreshToken = [TLWSDKManager _keychainLoadForAccount:kKeychainRefreshToken];
-        NSInteger persistedUserId = [ud integerForKey:kUserIdKey];
-
-        BOOL hasCompleteSession = token.length > 0
-            && refreshToken.length > 0
-            && persistedUserId > 0;
-
-        if (hasCompleteSession) {
-            config.accessToken = token;
-            _userId   = persistedUserId;
-            _username = [ud stringForKey:kUsernameKey];
-        } else {
-            BOOL hasStalePersistedAuth = token.length > 0
-                || refreshToken.length > 0
-                || persistedUserId > 0
-                || [ud stringForKey:kTokenKey].length > 0
-                || [ud stringForKey:kRefreshKey].length > 0
-                || [ud stringForKey:kUsernameKey].length > 0
-                || [ud stringForKey:kGenPwdKey].length > 0;
-            if (hasStalePersistedAuth) {
-                NSLog(@"[Token] cold start detected stale auth, clearing local credentials");
-                [self tl_clearPersistedSessionArtifacts];
-            }
-            [self tl_resetInMemorySession];
-        }
-        _cachedFavoritedPosts = @[];
-        //  api服务入口，所有接口都从这里走
-        _api = [[AGApiService alloc] init];
-        _pendingRetryBlocks = [NSMutableArray array];
-        _authStateVersion = 0;
+        self.cachedFavoritedPosts = @[];
+        self.api = [[AGApiService alloc] init];
+        self.sessionManager = [[TLWSessionManager alloc] initWithAPIService:self.api];
+        __weak typeof(self) weakSelf = self;
+        self.sessionManager.sessionInvalidationHandler = ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+            [strongSelf _navigateToLogin];
+        };
     }
     return self;
 }
 
 #pragma mark - Public
-
-- (BOOL)isLoggedIn {
-  return [AGDefaultConfiguration sharedConfig].accessToken.length > 0
-      && [TLWSDKManager _keychainLoadForAccount:kKeychainRefreshToken].length > 0
-      && _userId > 0;
-}
-
-- (BOOL)saveAuthResponse:(AGAuthResponse *)auth {
-  // 关键字段 nil 防护：token 和 userId 必须有效，否则不写入
-  if (!auth.token.length) {
-      NSLog(@"[Token] saveAuthResponse: token 为空，跳过保存");
-      return NO;
-  }
-  if (auth.userId.integerValue <= 0) {
-      NSLog(@"[Token] saveAuthResponse: userId 无效（%@），跳过保存", auth.userId);
-      return NO;
-  }
-  if (!auth.refreshToken.length) {
-      NSLog(@"[Token] saveAuthResponse: refreshToken 为空，跳过保存");
-      return NO;
-  }
-
-  // Token 存入 Keychain
-  BOOL tokenSaved = [TLWSDKManager _keychainSave:auth.token forAccount:kKeychainAccessToken];
-  if (!tokenSaved) {
-      NSLog(@"[Token] ⚠️ accessToken 写入 Keychain 失败，重启后可能丢失登录态");
-      return NO;
-  }
-  BOOL rtSaved = [TLWSDKManager _keychainSave:auth.refreshToken forAccount:kKeychainRefreshToken];
-  if (!rtSaved) {
-      NSLog(@"[Token] ⚠️ refreshToken 写入 Keychain 失败，回滚 accessToken");
-      [TLWSDKManager _keychainDeleteForAccount:kKeychainAccessToken];
-      [TLWSDKManager _keychainDeleteForAccount:kKeychainRefreshToken];
-      return NO;
-  }
-  [AGDefaultConfiguration sharedConfig].accessToken = auth.token;
-
-  // 非敏感信息存 NSUserDefaults
-  NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-  [ud setInteger:auth.userId.integerValue forKey:kUserIdKey];
-  if (auth.username.length > 0) {
-      [ud setObject:auth.username forKey:kUsernameKey];
-  } else {
-      [ud removeObjectForKey:kUsernameKey];
-  }
-  if (auth.generatedPassword.length > 0) {
-      [ud setObject:auth.generatedPassword forKey:kGenPwdKey];
-  } else {
-      [ud removeObjectForKey:kGenPwdKey];
-  }
-
-  _userId   = auth.userId.integerValue;
-  _username = auth.username;
-
-  // 切换到当前用户的本地数据库
-  [[TLWDBManager shared] reopenForCurrentUser];
-  return YES;
-}
-
-- (nullable NSString *)refreshToken {
-  return [TLWSDKManager _keychainLoadForAccount:kKeychainRefreshToken];
-}
-
-- (nullable NSString *)generatedPassword {
-  return [[NSUserDefaults standardUserDefaults] stringForKey:kGenPwdKey];
-}
-
-- (void)fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion {
-    __weak typeof(self) weakSelf = self;
-    [_api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            __strong typeof(weakSelf) self = weakSelf;
-            if (!self) return;
-
-            if (!error && output.code.integerValue == 200) {
-                self.cachedProfile = output.data;
-                [[NSNotificationCenter defaultCenter] postNotificationName:TLWProfileDidUpdateNotification object:nil];
-                if (completion) completion(self.cachedProfile);
-                return;
-            }
-
-            // 401 时自动走 refresh 兜底，刷新成功后重试拉取资料
-            if (!error && output.code.integerValue == 401) {
-                [self handleUnauthorizedWithRetry:^{
-                    [self fetchProfileWithCompletion:completion];
-                }];
-                return;
-            }
-
-            if (completion) completion(nil);
-        });
-    }];
-}
-
-- (void)logout {
-  @synchronized (self) {
-      self.authStateVersion += 1;
-      self.isRefreshing = NO;
-      [self.pendingRetryBlocks removeAllObjects];
-  }
-
-  [self tl_clearPersistedSessionArtifacts];
-  [self tl_resetInMemorySession];
-
-  // 切到游客态数据库，防止下次登录新账号时读到旧数据
-  [[TLWDBManager shared] reopenForCurrentUser];
-}
 
 - (NSURLSessionTask* )uploadImages:(NSArray<UIImage* >* )images prefix:(NSString* )prefix completion:(void(^)(NSArray<NSString* > *urls, NSError* error))completion {
   //图片数组为空，返回空的urls数组
@@ -422,7 +200,7 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 - (void)fetchAllFavoritedPostsWithCompletion:(void (^)(NSArray<AGPostResponseDto *> * _Nullable posts, NSError * _Nullable error))completion {
   NSLog(@"开始拉取用户收藏的贴子");
-  if (![self isLoggedIn]) {
+  if (![self.sessionManager isLoggedIn]) {
     self.cachedFavoritedPosts = @[];
     if (completion) {
       dispatch_async(dispatch_get_main_queue(), ^{
@@ -497,93 +275,10 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
   return [self.api unlikePostWithId:_id completionHandler:handler];
 }
 
-- (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock {
-    NSString *rt = nil;
-    NSUInteger requestVersion = 0;
-    BOOL shouldStartRefresh = NO;
-    BOOL shouldForceLogout = NO;
-
-    @synchronized (self) {
-        // 把重试 block 入队（nil 也可以，只需要触发刷新）
-        if (retryBlock) {
-            [self.pendingRetryBlocks addObject:[retryBlock copy]];
-        }
-        // 已在刷新中，等结果就行，不重复发请求
-        if (self.isRefreshing) {
-            return;
-        }
-
-        rt = [self refreshToken];
-        if (!rt.length) {
-            shouldForceLogout = YES;
-            [self.pendingRetryBlocks removeAllObjects];
-        } else {
-            self.isRefreshing = YES;
-            requestVersion = self.authStateVersion;
-            shouldStartRefresh = YES;
-        }
-    }
-
-    if (shouldForceLogout) {
-        // 没有 refresh token，直接跳登录
-        [self logout];
-        [self _navigateToLogin];
-        return;
-    }
-    if (!shouldStartRefresh) return;
-
-    AGRefreshTokenRequest *req = [[AGRefreshTokenRequest alloc] init];
-    req.refreshToken = rt;
-
-    __weak typeof(self) weakSelf = self;
-    [_api refreshWithRefreshTokenRequest:req completionHandler:^(AGResultAuthResponse *output, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            __strong typeof(weakSelf) self = weakSelf;
-            if (!self) return;
-
-            BOOL shouldIgnore = NO;
-            @synchronized (self) {
-                self.isRefreshing = NO;
-                if (requestVersion != self.authStateVersion) {
-                    // 用户已登出/切换会话，丢弃过期 refresh 回调
-                    [self.pendingRetryBlocks removeAllObjects];
-                    shouldIgnore = YES;
-                }
-            }
-            if (shouldIgnore) return;
-
-            if (!error && output.code.integerValue == 200) {
-                // 刷新成功：更新双 token，执行所有排队重试
-                BOOL saved = [self saveAuthResponse:output.data];
-                if (saved) {
-                    NSArray<dispatch_block_t> *blocks = nil;
-                    @synchronized (self) {
-                        blocks = [self.pendingRetryBlocks copy];
-                        [self.pendingRetryBlocks removeAllObjects];
-                    }
-                    for (dispatch_block_t block in blocks) { block(); }
-                } else {
-                    // 认证数据无效（如 userId 缺失），视为刷新失败
-                    NSLog(@"[Token] refresh 返回 200 但认证数据无效，强制登出");
-                    @synchronized (self) {
-                        [self.pendingRetryBlocks removeAllObjects];
-                    }
-                    [self logout];
-                    [self _navigateToLogin];
-                }
-            } else {
-                // 刷新失败：清除凭证，跳回登录页
-                NSLog(@"[Token] refresh 失败，强制登出: %@", error ?: output.message);
-                @synchronized (self) {
-                    [self.pendingRetryBlocks removeAllObjects];
-                }
-                [self logout];
-                [self _navigateToLogin];
-            }
-        });
-    }];
+- (void)setApi:(AGApiService *)api {
+    _api = api;
+    [self.sessionManager updateAPIService:api];
 }
-
 
 - (void)_navigateToLogin {
     Class loginClass = NSClassFromString(@"TLWPasswordLoginController");

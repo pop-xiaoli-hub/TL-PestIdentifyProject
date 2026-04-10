@@ -163,7 +163,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [self tl_assertRuntimeAccessTokenCleared];
 }
 
-- (void)testColdStartMigratesLegacyTokensIntoKeychain {
+- (void)testColdStartWithLegacyPersistedTokensClearsStaleSessionArtifacts {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     [ud setObject:@"legacy_access_token" forKey:kLegacyTokenKey];
     [ud setObject:@"legacy_refresh_token" forKey:kLegacyRefreshKey];
@@ -172,12 +172,17 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 
     TLWSDKManager *coldStartManager = [[TLWSDKManager alloc] init];
 
-    XCTAssertTrue([coldStartManager isLoggedIn]);
-    XCTAssertEqual(coldStartManager.userId, 8080);
-    XCTAssertEqualObjects(coldStartManager.username, @"legacy_user");
-    XCTAssertEqualObjects([coldStartManager refreshToken], @"legacy_refresh_token");
+    XCTAssertFalse([coldStartManager isLoggedIn]);
+    XCTAssertEqual(coldStartManager.userId, 0);
+    XCTAssertNil(coldStartManager.username);
+    XCTAssertNil([coldStartManager refreshToken]);
+    XCTAssertNil([self tl_keychainValueForAccount:kAccessTokenAccount]);
+    XCTAssertNil([self tl_keychainValueForAccount:kRefreshTokenAccount]);
     XCTAssertNil([ud stringForKey:kLegacyTokenKey]);
     XCTAssertNil([ud stringForKey:kLegacyRefreshKey]);
+    XCTAssertNil([ud objectForKey:kUserIdKey]);
+    XCTAssertNil([ud stringForKey:kUsernameKey]);
+    [self tl_assertRuntimeAccessTokenCleared];
 }
 
 - (void)testSaveAuthResponseClearsStaleOptionalIdentityFields {

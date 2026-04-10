@@ -158,7 +158,7 @@
                 [self showAlertWithMessage:output.message ?: @"登录失败"];
                 return;
             }
-            BOOL saved = [[TLWSDKManager shared] saveAuthResponse:output.data];
+            BOOL saved = [[TLWSDKManager shared].sessionManager saveAuthResponse:output.data];
             if (!saved) {
                 [self showAlertWithMessage:@"登录信息异常，请重试"];
                 return;
@@ -188,7 +188,7 @@
 #pragma mark - 登录后导航
 
 - (void)navigateAfterLogin {
-    NSInteger currentUserId = [TLWSDKManager shared].userId;
+    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
     NSString *elderKey = [NSString stringWithFormat:@"TLW_elder_mode_set_%ld", (long)currentUserId];
     BOOL hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:elderKey];
     // 兼容读取旧版全局 key（首次迁移）
@@ -196,7 +196,7 @@
         hasElderSetting = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode_set"];
     }
 
-    [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+    [[TLWSDKManager shared].sessionManager fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
         if (!profile) {
             [TLWToast show:@"资料加载失败，已进入主页"];
             [self goToMain];

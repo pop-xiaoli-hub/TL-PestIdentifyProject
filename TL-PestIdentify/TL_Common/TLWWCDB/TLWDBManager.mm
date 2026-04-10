@@ -331,7 +331,7 @@
 
 - (NSString *)dbPath {
     NSString *documentsPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    NSInteger userId = [TLWSDKManager shared].userId;
+    NSInteger userId = [TLWSDKManager shared].sessionManager.userId;
     NSString *databaseName = [NSString stringWithFormat:@"tlw_database_%ld.db", (long)userId];
     return [documentsPath stringByAppendingPathComponent:databaseName];
 }

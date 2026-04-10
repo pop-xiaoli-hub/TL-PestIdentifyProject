@@ -83,7 +83,7 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
 
       if (error || !output || output.code.integerValue != 200 || !output.data) {
         if (!error && output.code.integerValue == 401) {
-          [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_reloadPostWithId:postId];
           }];
           return;

@@ -258,7 +258,7 @@
 
   TLWCommunityPost* post = [[TLWCommunityPost alloc] init];
   TLWSDKManager* manager = [TLWSDKManager shared];
-  AGUserProfileDto* userData = manager.cachedProfile;
+  AGUserProfileDto* userData = manager.sessionManager.cachedProfile;
   post.images = [NSArray arrayWithArray:self.selectedImages];
   post.authorName = [userData.username copy];
   post.title = [title copy];
