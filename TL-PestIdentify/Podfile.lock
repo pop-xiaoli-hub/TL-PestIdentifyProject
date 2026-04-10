@@ -24,9 +24,9 @@ PODS:
     - LookinServer/Core (= 1.2.8)
   - LookinServer/Core (1.2.8)
   - Masonry (1.1.0)
-  - SDWebImage (5.21.5):
-    - SDWebImage/Core (= 5.21.5)
-  - SDWebImage/Core (5.21.5)
+  - SDWebImage (5.21.7):
+    - SDWebImage/Core (= 5.21.7)
+  - SDWebImage/Core (5.21.7)
   - SocketRocket (0.6.1)
   - SpeechEngineToB (0.0.14.2-bugfix):
     - SocketRocket
@@ -72,7 +72,7 @@ CHECKOUT OPTIONS:
     :git: https://github.com/Biscoffee/AgriPest-IOS-SDK.git
     :tag: v1.0.109
   WCDB.objc:
-    :commit: df808591b9f9a9ab42156006819c3550d5af13a3
+    :commit: a859680cebd25cadf448861e905caa850b06f1e8
     :git: https://github.com/Tencent/wcdb.git
 
 SPEC CHECKSUMS:
@@ -82,10 +82,10 @@ SPEC CHECKSUMS:
   JSONModel: 02ab723958366a3fd27da57ea2af2113658762e9
   LookinServer: 1b2b61c6402ae29fa22182d48f5cd067b4e99e80
   Masonry: 678fab65091a9290e40e2832a55e7ab731aad201
-  SDWebImage: e9c98383c7572d713c1a0d7dd2783b10599b9838
+  SDWebImage: e9fc87c1aab89a8ab1bbd74eba378c6f53be8abf
   SocketRocket: f32cd54efbe0f095c4d7594881e52619cfe80b17
   SpeechEngineToB: 9fc39cb57e4614a727bf6e80287cb3ee861915a4
-  WCDB.objc: d88dd9184fc7797b10890efadd593b8ce1d062dc
+  WCDB.objc: f14f946e45d44baa3d946695e3119243da380748
   WCDBOptimizedSQLCipher: 871994f7f620302fdf87a2729c099a1efa2223da
   YYModel: 2a7fdd96aaa4b86a824e26d0c517de8928c04b30
 

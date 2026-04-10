@@ -7,7 +7,6 @@
 
 #import "TLWSmsLoginController.h"
 #import "TLWSmsLoginView.h"
-#import "TLWWechatBindController.h"
 #import "TLWMainTabBarController.h"
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
@@ -48,10 +47,6 @@
                                       action:@selector(handleLogin)
                             forControlEvents:UIControlEventTouchUpInside];
 
-    [self.loginView.wechatLoginButton addTarget:self
-                                         action:@selector(handleWechatLogin)
-                               forControlEvents:UIControlEventTouchUpInside];
-
     [self.loginView.qqLoginButton addTarget:self
                                      action:@selector(handleQQLogin)
                            forControlEvents:UIControlEventTouchUpInside];
@@ -59,10 +54,6 @@
     [self.loginView.localPhoneLoginButton addTarget:self
                                              action:@selector(handleLocalPhoneLogin)
                                    forControlEvents:UIControlEventTouchUpInside];
-
-    [self.loginView.skipButton addTarget:self
-                                  action:@selector(handleSkip)
-                        forControlEvents:UIControlEventTouchUpInside];
 
     [self.loginView.termsCheckButton addTarget:self
                                         action:@selector(handleToggleTerms)
@@ -167,7 +158,11 @@
                 [self showAlertWithMessage:output.message ?: @"登录失败"];
                 return;
             }
-            [[TLWSDKManager shared] saveAuthResponse:output.data];
+            BOOL saved = [[TLWSDKManager shared] saveAuthResponse:output.data];
+            if (!saved) {
+                [self showAlertWithMessage:@"登录信息异常，请重试"];
+                return;
+            }
             // generatedPassword 非空 = 服务端自动注册了新账号
             if (output.data.generatedPassword.length > 0) {
                 [TLWToast show:@"已为您自动注册账号"];
@@ -175,23 +170,6 @@
             [self navigateAfterLogin];
         });
     }];
-}
-
-- (void)handleSkip {
-    TLWMainTabBarController *tabBar = [[TLWMainTabBarController alloc] init];
-    UIWindow *window = [TLWSDKManager tl_activeWindow];
-    window.rootViewController = tabBar;
-    [UIView transitionWithView:window
-                      duration:0.35
-                       options:UIViewAnimationOptionTransitionCrossDissolve
-                    animations:nil
-                    completion:nil];
-}
-
-- (void)handleWechatLogin {
-    TLWWechatBindController *bindVC = [[TLWWechatBindController alloc] init];
-    bindVC.modalPresentationStyle = UIModalPresentationFullScreen;
-    [self presentViewController:bindVC animated:YES completion:nil];
 }
 
 - (void)handleQQLogin {

@@ -56,7 +56,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 - (void)applyProfile {
   AGUserProfileDto *profile = [TLWSDKManager shared].cachedProfile;
-  NSString *name = profile.fullName ?: profile.username ?: [TLWSDKManager shared].username;
+  NSString *name = profile.fullName ?: profile.username ?: [TLWSDKManager shared].username ?: @"用户";
   [self.homePageView configureWithUserName:name];
   if (profile.avatarUrl.length > 0) {
     [self.homePageView.userAvatarImageView sd_setImageWithURL:[NSURL URLWithString:profile.avatarUrl]];

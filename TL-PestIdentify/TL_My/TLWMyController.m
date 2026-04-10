@@ -41,7 +41,6 @@ extern NSString * const TLWProfileDidUpdateNotification;
                                                  name:TLWAvatarDidUpdateNotification
                                                object:nil];
     [self applyProfile];
-    [self fetchMyPosts];
 
     __weak typeof(self) weakSelf = self;
     self.myView.onPostTapped = ^(NSNumber *postId) {
@@ -54,6 +53,9 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    if (![self tl_isActuallyVisible] || ![TLWSDKManager shared].isLoggedIn) {
+        return;
+    }
     __weak typeof(self) weakSelf = self;
     [[TLWSDKManager shared] fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
         // TLWProfileDidUpdateNotification 会自动触发 applyProfile，无需额外处理
@@ -97,6 +99,14 @@ extern NSString * const TLWProfileDidUpdateNotification;
     [_myView.recordStatView addGestureRecognizer:recordTap];
 }
 
+- (BOOL)tl_isActuallyVisible {
+    if (!self.isViewLoaded) return NO;
+    if (!self.view.window) return NO;
+    if (self.navigationController && self.navigationController.view.hidden) return NO;
+    if (self.navigationController.topViewController != self) return NO;
+    return YES;
+}
+
 - (TLWMyView *)myView {
     if (!_myView) {
         _myView = [[TLWMyView alloc] initWithFrame:CGRectZero];
@@ -122,6 +132,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)fetchMyPosts {
+    if (![TLWSDKManager shared].isLoggedIn) return;
     __weak typeof(self) weakSelf = self;
     [[TLWSDKManager shared] getMyPostsWithPage:@(0) size:@(20) completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
         __strong typeof(weakSelf) strongSelf = weakSelf;

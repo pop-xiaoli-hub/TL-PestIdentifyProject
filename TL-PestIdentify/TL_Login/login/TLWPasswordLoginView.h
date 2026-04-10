@@ -13,10 +13,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UITextField *passwordField;
 @property (nonatomic, strong, readonly) UIButton *togglePasswordButton;
 @property (nonatomic, strong, readonly) UIButton *loginTapButton;
-@property (nonatomic, strong, readonly) UIButton *wechatLoginButton;
 @property (nonatomic, strong, readonly) UIButton *qqLoginButton;
 @property (nonatomic, strong, readonly) UIButton *phoneLoginButton;
-@property (nonatomic, strong, readonly) UIButton *skipButton;
 @property (nonatomic, strong, readonly) UIButton *backButton;
 
 @end

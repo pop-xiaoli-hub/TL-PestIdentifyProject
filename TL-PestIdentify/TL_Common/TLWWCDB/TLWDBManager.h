@@ -65,6 +65,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 清空识别记录表
 - (BOOL)deleteAllIdentificationRecords;
 
+/// 切换用户后重新打开对应的数据库文件（按当前 userId 重建路径）
+- (void)reopenForCurrentUser;
+
 @end
 
 NS_ASSUME_NONNULL_END

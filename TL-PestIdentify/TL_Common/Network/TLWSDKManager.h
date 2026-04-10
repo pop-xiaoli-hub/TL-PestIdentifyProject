@@ -57,8 +57,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 是否已登录
 - (BOOL)isLoggedIn;
 
-/// 保存登录成功后的认证信息（Token + 用户信息持久化到 NSUserDefaults）
-- (void)saveAuthResponse:(AGAuthResponse *)auth;
+/// 保存登录成功后的认证信息（双 token + 用户信息）
+/// @return YES 表示保存成功，NO 表示认证数据无效或关键凭证持久化失败
+- (BOOL)saveAuthResponse:(AGAuthResponse *)auth;
 
 /// 拉取用户资料并缓存，完成后发送 TLWProfileDidUpdateNotification
 - (void)fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion;

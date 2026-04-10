@@ -62,8 +62,9 @@ static NSInteger const kMessagePageSize = 20;
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     // TabBar 初始化时会一次性 addSubview 所有子页面，hidden 的页面也会收到 viewWillAppear，
-    // 此时发请求可能因 token 尚未就绪而失败，所以只在真正可见时才刷新。
-    if (!self.view.hidden) {
+    // 但真正被隐藏的是 UINavigationController 的 view，不是当前 controller 的 view。
+    // 如果这里判断 self.view.hidden，会误把隐藏 tab 当成可见页，触发“幽灵请求”。
+    if ([self tl_isActuallyVisible] && [TLWSDKManager shared].isLoggedIn) {
         [self tl_refreshMessages];
     }
 }
@@ -101,6 +102,12 @@ static NSInteger const kMessagePageSize = 20;
 - (void)fetchMessagesPage:(NSInteger)page reset:(BOOL)reset {
     if (self.isLoadingMessages) return;
     if (!reset && !self.hasMoreMessages) return;
+    if (![TLWSDKManager shared].isLoggedIn) {
+        [self.myView.tableView.refreshControl endRefreshing];
+        self.myView.tableView.tableFooterView = nil;
+        [self.footerSpinner stopAnimating];
+        return;
+    }
     self.isLoadingMessages = YES;
     if (!reset) {
         [self.footerSpinner startAnimating];
@@ -121,7 +128,11 @@ static NSInteger const kMessagePageSize = 20;
                     [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self fetchMessagesPage:page reset:reset]; }];
                     return;
                 }
-                [TLWToast show:@"消息加载失败"];
+                if ([self tl_isActuallyVisible]) {
+                    [TLWToast show:@"消息加载失败"];
+                } else {
+                    NSLog(@"[Message] 隐藏状态下拉取消息失败，忽略 toast: %@", error.localizedDescription ?: output.message);
+                }
                 return;
             }
 
@@ -226,6 +237,14 @@ static NSInteger const kMessagePageSize = 20;
 
 - (void)tl_refreshMessages {
     [self fetchMessagesPage:0 reset:YES];
+}
+
+- (BOOL)tl_isActuallyVisible {
+    if (!self.isViewLoaded) return NO;
+    if (!self.view.window) return NO;
+    if (self.navigationController && self.navigationController.view.hidden) return NO;
+    if (self.navigationController.topViewController != self) return NO;
+    return YES;
 }
 
 - (void)tl_loadMoreMessagesIfNeeded {
