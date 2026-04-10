@@ -11,6 +11,18 @@
 #import "TLWGuideController.h"
 #import "TLWPreferenceController.h"
 #import "TLWSDKManager.h"
+#import "TLWToast.h"
+
+static const NSInteger kLaunchProfileRetryCount = 3;
+static const NSTimeInterval kLaunchProfileRetryDelay = 1.0;
+
+static inline void TLWLaunchDebugToast(NSString *message) {
+#if DEBUG
+    [TLWToast show:message];
+#else
+    (void)message;
+#endif
+}
 
 @interface SceneDelegate ()
 
@@ -32,7 +44,7 @@
     self.launchProfileValidationID = [NSUUID UUID].UUIDString;
     self.launchProfileValidationRootController = rootController;
     self.launchProfileValidationUserId = [TLWSDKManager shared].sessionManager.userId;
-    [self tl_fetchProfileWithRetry:3
+    [self tl_fetchProfileWithRetry:kLaunchProfileRetryCount
                       validationID:self.launchProfileValidationID
             expectedRootController:rootController
                     expectedUserId:self.launchProfileValidationUserId];
@@ -74,9 +86,8 @@
       self.window.rootViewController = tabBar;
       [self.window makeKeyAndVisible];
 
-      // 异步拉取资料，检查引导/偏好是否完成
-      // 拉取失败不代表登录态无效，可能只是网络问题，3秒后自动重试。
-      // 只有 token refresh 也失败时，handleUnauthorizedWithRetry 内部会自动 logout 跳登录页。
+      // 异步拉取资料，检查引导/偏好是否完成。
+      // 普通资料接口失败只做短重试；真正的鉴权失败由 sessionManager 在 401/refresh 失败时统一登出。
       [self tl_beginLaunchProfileValidationForRootController:tabBar];
   } else {
       // 没有登录态，进登录页
@@ -111,10 +122,13 @@
         }
 
         if (!profile) {
-            // 网络或服务端异常，不登出，延迟重试
+            // 启动阶段资料为空时做短重试；重试耗尽后保留现有登录态，避免把普通接口失败误判成鉴权失效。
             if (remainingRetries > 0) {
-                NSLog(@"[Launch] 拉取资料失败，%ld秒后重试（剩余%ld次）", (long)3, (long)remainingRetries);
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)),
+                NSLog(@"[Launch] 拉取资料失败，%.0f秒后重试（剩余%ld次）", kLaunchProfileRetryDelay, (long)remainingRetries);
+                TLWLaunchDebugToast([NSString stringWithFormat:@"启动资料拉取失败，%.0f秒后重试（剩余%ld次）",
+                                     kLaunchProfileRetryDelay,
+                                     (long)remainingRetries]);
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kLaunchProfileRetryDelay * NSEC_PER_SEC)),
                                dispatch_get_main_queue(), ^{
                     if (![strongSelf tl_isLaunchProfileValidationCurrent:validationID
                                                    expectedRootController:rootController
@@ -127,7 +141,8 @@
                                           expectedUserId:expectedUserId];
                 });
             } else {
-                NSLog(@"[Launch] 拉取资料多次失败，保留登录态等待用户操作");
+                NSLog(@"[Launch] 拉取资料多次失败，保留登录态等待后续接口自行恢复");
+                TLWLaunchDebugToast(@"启动校验失败，已保留登录状态");
                 [strongSelf tl_invalidateLaunchProfileValidation];
             }
             return;
