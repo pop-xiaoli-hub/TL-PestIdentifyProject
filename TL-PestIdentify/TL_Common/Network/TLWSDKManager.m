@@ -36,13 +36,21 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
 
 #pragma mark - Window
 
+//  这段代码用于拿到当前应用里"正在使用的窗口"，也就是通常想暂时弹窗、找根控制器时会用到的 UIWindow
+/*
+ 为什么非得要这样呢，。因为在 iOS 13 之前，很多代码直接这么拿窗口：[UIApplication sharedApplication].keyWindow。但是13之后的多场景机制开始，这种全局取窗口就不再准确
+
+ */
 + (UIWindow *)tl_activeWindow {
     UIWindow *window = nil;
+    //  因为iOS13引入了scene机制，一个app可能会不止一个窗口场景，所以不能再简单的只取UIApplication.windows
+    // 因此，我们需要遍历connectedScenes，找出处于ForegroundActive的场景，判断是不是UIWinowScene，再便利这个场景的windows
     if (@available(iOS 13.0, *)) {
         for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
             if (scene.activationState == UISceneActivationStateForegroundActive &&
                 [scene isKindOfClass:[UIWindowScene class]]) {
                 UIWindowScene *windowScene = (UIWindowScene *)scene;
+                //  遍历当前app链接的所有场景需满足 再前台活跃 && 这个场景确实是窗口场景 UIWindow Scene
                 for (UIWindow *w in windowScene.windows) {
                     if (w.isKeyWindow) {
                         window = w;
@@ -146,46 +154,31 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
         // 配置 SDK
         AGDefaultConfiguration *config = [AGDefaultConfiguration sharedConfig];
         config.host = @"http://115.191.67.35:8080";
-        // 从本地恢复登录态。只有 accessToken + refreshToken + userId 完整时才恢复；
-        // 遇到残缺登录态则统一清理，避免冷启动出现“幽灵账号”。
+        // 从 Keychain 恢复登录态。只有 accessToken + refreshToken + userId 完整时才恢复；
+        // 遇到残缺登录态则统一清理，避免冷启动出现"幽灵账号"。
         NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
         NSString *token = [TLWSDKManager _keychainLoadForAccount:kKeychainAccessToken];
         NSString *refreshToken = [TLWSDKManager _keychainLoadForAccount:kKeychainRefreshToken];
-        NSString *legacyToken = [ud stringForKey:kTokenKey];
-        NSString *legacyRefresh = [ud stringForKey:kRefreshKey];
         NSInteger persistedUserId = [ud integerForKey:kUserIdKey];
-
-        if (!token.length && legacyToken.length) {
-            token = legacyToken;
-        }
-        if (!refreshToken.length && legacyRefresh.length) {
-            refreshToken = legacyRefresh;
-        }
 
         BOOL hasCompleteSession = token.length > 0
             && refreshToken.length > 0
             && persistedUserId > 0;
 
         if (hasCompleteSession) {
-            if (legacyToken.length || legacyRefresh.length) {
-                [TLWSDKManager _keychainSave:token forAccount:kKeychainAccessToken];
-                [TLWSDKManager _keychainSave:refreshToken forAccount:kKeychainRefreshToken];
-                [ud removeObjectForKey:kTokenKey];
-                [ud removeObjectForKey:kRefreshKey];
-            }
             config.accessToken = token;
             _userId   = persistedUserId;
             _username = [ud stringForKey:kUsernameKey];
         } else {
             BOOL hasStalePersistedAuth = token.length > 0
                 || refreshToken.length > 0
-                || legacyToken.length > 0
-                || legacyRefresh.length > 0
                 || persistedUserId > 0
+                || [ud stringForKey:kTokenKey].length > 0
+                || [ud stringForKey:kRefreshKey].length > 0
                 || [ud stringForKey:kUsernameKey].length > 0
                 || [ud stringForKey:kGenPwdKey].length > 0;
             if (hasStalePersistedAuth) {
-                NSLog(@"[Token] cold start 检测到残缺登录态，清理本地凭证");
+                NSLog(@"[Token] cold start detected stale auth, clearing local credentials");
                 [self tl_clearPersistedSessionArtifacts];
             }
             [self tl_resetInMemorySession];
