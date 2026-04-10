@@ -6,6 +6,7 @@
 #import "TLWPlantDetailView.h"
 #import "TLWPlantDetailInfoCardView.h"
 #import "TLWPlantDetailSegmentTabView.h"
+#import "TLWPlantDetailFertilizerView.h"
 #import "TLWPlantDetailWateringView.h"
 #import "TLWPlantDetailPlaceholderView.h"
 #import "../ViewModels/TLWPlantDetailViewModel.h"
@@ -28,7 +29,7 @@
 @property (nonatomic, strong, readwrite) TLWPlantDetailInfoCardView *dateInfoCardView;
 @property (nonatomic, strong, readwrite) TLWPlantDetailSegmentTabView *segmentTabView;
 @property (nonatomic, strong, readwrite) TLWPlantDetailWateringView *wateringView;
-@property (nonatomic, strong, readwrite) TLWPlantDetailPlaceholderView *fertilizerView;
+@property (nonatomic, strong, readwrite) TLWPlantDetailFertilizerView *fertilizerView;
 @property (nonatomic, strong, readwrite) TLWPlantDetailPlaceholderView *medicineView;
 @property (nonatomic, strong, readwrite) TLWPlantDetailPlaceholderView *noteView;
 
@@ -85,7 +86,7 @@
   self.backButton = backButton;
 
   UIButton *imageTagButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [imageTagButton setTitle:@"  要使用它  " forState:UIControlStateNormal];
+  [imageTagButton setTitle:@"  更换图片  " forState:UIControlStateNormal];
   [imageTagButton setTitleColor:[UIColor colorWithWhite:0.32 alpha:1.0] forState:UIControlStateNormal];
   imageTagButton.titleLabel.font = [UIFont systemFontOfSize:12.0 weight:UIFontWeightSemibold];
   imageTagButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.82];
@@ -142,8 +143,7 @@
   [contentContainerView addSubview:wateringView];
   self.wateringView = wateringView;
 
-  TLWPlantDetailPlaceholderView *fertilizerView = [[TLWPlantDetailPlaceholderView alloc] init];
-  [fertilizerView configureWithTitle:@"施肥记录" message:@"可在这里接入施肥计划、历史记录和提醒。"];
+  TLWPlantDetailFertilizerView *fertilizerView = [[TLWPlantDetailFertilizerView alloc] init];
   [contentContainerView addSubview:fertilizerView];
   self.fertilizerView = fertilizerView;
 
@@ -230,6 +230,26 @@
       make.edges.equalTo(contentContainerView);
     }];
   }
+
+  __weak typeof(self) weakSelf = self;
+  fertilizerView.previousMonthBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (strongSelf.wateringView.previousMonthBlock) {
+      strongSelf.wateringView.previousMonthBlock();
+    }
+  };
+  fertilizerView.nextMonthBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (strongSelf.wateringView.nextMonthBlock) {
+      strongSelf.wateringView.nextMonthBlock();
+    }
+  };
+  fertilizerView.dateSelectionBlock = ^(NSDate *date) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (strongSelf.wateringView.dateSelectionBlock) {
+      strongSelf.wateringView.dateSelectionBlock(date);
+    }
+  };
 }
 
 - (void)configureWithViewModel:(TLWPlantDetailViewModel *)viewModel {
@@ -238,6 +258,7 @@
   [self.dateInfoCardView configureWithTitle:@"种植日期" value:[viewModel plantingDateText] emphasizeValue:NO];
   [self.segmentTabView configureWithTitles:[viewModel tabTitles]];
   [self.wateringView configureWithViewModel:viewModel];
+  [self.fertilizerView configureWithViewModel:viewModel];
   [self updateSelectedTab:viewModel.selectedTabType contentHeight:[viewModel preferredContentHeightForSelectedTab]];
 }
 

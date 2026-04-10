@@ -9,6 +9,7 @@
 @class TLWPlantDetailInfoCardView;
 @class TLWPlantDetailSegmentTabView;
 @class TLWPlantDetailWateringView;
+@class TLWPlantDetailFertilizerView;
 @class TLWPlantDetailPlaceholderView;
 
 NS_ASSUME_NONNULL_BEGIN
@@ -22,7 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) TLWPlantDetailInfoCardView *dateInfoCardView;
 @property (nonatomic, strong, readonly) TLWPlantDetailSegmentTabView *segmentTabView;
 @property (nonatomic, strong, readonly) TLWPlantDetailWateringView *wateringView;
-@property (nonatomic, strong, readonly) TLWPlantDetailPlaceholderView *fertilizerView;
+@property (nonatomic, strong, readonly) TLWPlantDetailFertilizerView *fertilizerView;
 @property (nonatomic, strong, readonly) TLWPlantDetailPlaceholderView *medicineView;
 @property (nonatomic, strong, readonly) TLWPlantDetailPlaceholderView *noteView;
 
