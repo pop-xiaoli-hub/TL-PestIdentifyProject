@@ -17,6 +17,7 @@
 #import "TLWAIAssistantController.h"
 #import "TLWWarningModel.h"
 #import "TLWSDKManager.h"
+#import "TLWToast.h"
 #import <Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 
@@ -29,11 +30,16 @@ extern NSString * const TLWProfileDidUpdateNotification;
 @property (nonatomic, assign) BOOL warningExpanded;
 @property (nonatomic, strong) NSMutableArray<TLWPlantModel *> *managedPlants;
 @property (nonatomic, assign) BOOL isLoadingCrops;
+@property (nonatomic, assign) BOOL elderModeEnabled;
 
 @end
 
 @implementation TLWHomePageController
 
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self tl_applyElderModeState];
+}
 
 - (void)viewDidLoad {
   [super viewDidLoad];
@@ -95,6 +101,8 @@ extern NSString * const TLWProfileDidUpdateNotification;
   [tableView registerClass:[TLWHomeCardCell class] forCellReuseIdentifier:@"kTLWHomeCardCellIdentifier2"];
   [tableView registerClass:[TLWHomeCustomCell class] forCellReuseIdentifier:@"kTLWHomeCustomCellIdentifier"];
   tableView.estimatedRowHeight = 160.0;
+  [self.homePageView.userVersionButton addTarget:self action:@selector(tl_toggleElderMode) forControlEvents:UIControlEventTouchUpInside];
+  [self tl_applyElderModeState];
 }
 
 - (TLWHomePageView *)homePageView {
@@ -102,6 +110,40 @@ extern NSString * const TLWProfileDidUpdateNotification;
     _homePageView = [[TLWHomePageView alloc] initWithFrame:CGRectZero];
   }
   return _homePageView;
+}
+
+- (BOOL)tl_isElderModeEnabled {
+  NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+  if ([defaults objectForKey:elderModeKey] != nil) {
+    return [defaults boolForKey:elderModeKey];
+  }
+  if ([defaults objectForKey:@"TLW_elder_mode"] != nil) {
+    return [defaults boolForKey:@"TLW_elder_mode"];
+  }
+  return NO;
+}
+
+- (void)tl_applyElderModeState {
+  self.elderModeEnabled = [self tl_isElderModeEnabled];
+  [self.homePageView configureElderModeEnabled:self.elderModeEnabled];
+}
+
+- (void)tl_toggleElderMode {
+  BOOL elderModeEnabled = !self.elderModeEnabled;
+  NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+  NSString *elderSetKey = [NSString stringWithFormat:@"TLW_elder_mode_set_%ld", (long)currentUserId];
+  [defaults setBool:elderModeEnabled forKey:elderModeKey];
+  [defaults setBool:elderModeEnabled forKey:@"TLW_elder_mode"];
+  [defaults setBool:YES forKey:elderSetKey];
+  [defaults setBool:YES forKey:@"TLW_elder_mode_set"];
+
+  self.elderModeEnabled = elderModeEnabled;
+  [self.homePageView configureElderModeEnabled:elderModeEnabled];
+  [TLWToast show:(elderModeEnabled ? @"已切换为老年版" : @"已切换为青年版")];
 }
 
 #pragma mark - UITableViewDataSource

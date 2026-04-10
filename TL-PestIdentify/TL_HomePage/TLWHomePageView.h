@@ -13,7 +13,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, readonly) UITableView *tableView;
 @property (nonatomic, strong, readonly) UIImageView *userAvatarImageView;
+@property (nonatomic, strong, readonly) UIButton *userVersionButton;
 - (void)configureWithUserName:(NSString* )name;
+- (void)configureElderModeEnabled:(BOOL)enabled;
 @end
 
 NS_ASSUME_NONNULL_END
