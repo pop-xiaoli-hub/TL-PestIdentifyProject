@@ -12,6 +12,7 @@
 #import "TLWNotificationController.h"
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
+#import "TLWLoadingIndicator.h"
 #import <AgriPestClient/AGResultPostResponseDto.h>
 #import <AgriPestClient/AGPostResponseDto.h>
 #import "TLWPostDetailController.h"
@@ -31,7 +32,8 @@ static NSInteger const kMessagePageSize = 20;
 @property (nonatomic, copy) NSString *latestAlertTitle;
 @property (nonatomic, strong) NSNumber *alertUnreadCount;
 @property (nonatomic, strong) NSNumber *systemUnreadCount;
-@property (nonatomic, strong) UIActivityIndicatorView *footerSpinner;
+@property (nonatomic, strong) UIView *footerLoadingView;
+@property (nonatomic, assign) BOOL hasPerformedInitialLoad;
 
 @end
 
@@ -64,7 +66,12 @@ static NSInteger const kMessagePageSize = 20;
     // 自定义 tab 容器会手动转发生命周期，可见性要以 navigationController.view
     // 是否真正显示为准，不能只看当前 controller 的 self.view.hidden。
     if ([TLWSDKManager shared].sessionManager.isLoggedIn) {
-        [self tl_refreshMessages];
+        if (!self.hasPerformedInitialLoad) {
+            [self fetchMessages];
+            self.hasPerformedInitialLoad = YES;
+        } else {
+            [self fetchMessagesPage:0 reset:YES];
+        }
     }
 }
 
@@ -103,14 +110,17 @@ static NSInteger const kMessagePageSize = 20;
     if (!reset && !self.hasMoreMessages) return;
     if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
         [self.myView.tableView.refreshControl endRefreshing];
+        [TLWLoadingIndicator hideInView:self.myView.tableView];
         self.myView.tableView.tableFooterView = nil;
-        [self.footerSpinner stopAnimating];
         return;
     }
     self.isLoadingMessages = YES;
+    if (reset && !self.hasPerformedInitialLoad && !self.myView.tableView.refreshControl.refreshing) {
+        [TLWLoadingIndicator showInView:self.myView.tableView];
+    }
     if (!reset) {
-        [self.footerSpinner startAnimating];
-        self.myView.tableView.tableFooterView = self.footerSpinner;
+        self.footerLoadingView = [TLWLoadingIndicator footerLoadingViewWithWidth:self.myView.tableView.bounds.size.width height:44];
+        self.myView.tableView.tableFooterView = self.footerLoadingView;
     }
 
     [[TLWSDKManager shared].api getMyMessagesWithPage:@(page)
@@ -119,8 +129,11 @@ static NSInteger const kMessagePageSize = 20;
         dispatch_async(dispatch_get_main_queue(), ^{
             self.isLoadingMessages = NO;
             [self.myView.tableView.refreshControl endRefreshing];
+            [TLWLoadingIndicator hideInView:self.myView.tableView];
+            if (self.footerLoadingView) {
+                [TLWLoadingIndicator stopFooterLoadingView:self.footerLoadingView];
+            }
             self.myView.tableView.tableFooterView = nil;
-            [self.footerSpinner stopAnimating];
 
             if (error || output.code.integerValue != 200) {
                 if (!error && output.code.integerValue == 401) {
@@ -230,11 +243,13 @@ static NSInteger const kMessagePageSize = 20;
 
 - (UIRefreshControl *)tl_buildRefreshControl {
     UIRefreshControl *refreshControl = [[UIRefreshControl alloc] init];
+    refreshControl.tintColor = [UIColor clearColor]; // 隐藏系统菊花
     [refreshControl addTarget:self action:@selector(tl_refreshMessages) forControlEvents:UIControlEventValueChanged];
     return refreshControl;
 }
 
 - (void)tl_refreshMessages {
+    [TLWLoadingIndicator showPullToRefreshInScrollView:self.myView.tableView size:40];
     [self fetchMessagesPage:0 reset:YES];
 }
 
@@ -379,15 +394,6 @@ static NSInteger const kMessagePageSize = 20;
         _myView = [[TLWMessageView alloc] initWithFrame:CGRectZero];
     }
     return _myView;
-}
-
-- (UIActivityIndicatorView *)footerSpinner {
-    if (!_footerSpinner) {
-        _footerSpinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
-        _footerSpinner.frame = CGRectMake(0, 0, self.myView.tableView.bounds.size.width, 44);
-        _footerSpinner.color = [UIColor colorWithWhite:0.6 alpha:1.0];
-    }
-    return _footerSpinner;
 }
 
 @end

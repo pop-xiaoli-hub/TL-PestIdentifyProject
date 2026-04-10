@@ -8,7 +8,7 @@
 #import "TLWIdentifyResultView.h"
 #import <Masonry/Masonry.h>
 
-static CGFloat const kTopPhotoHeight = 300.0;
+static CGFloat const kTopPhotoHeight = 326.0;
 static CGFloat const kCardCornerRadius = 22.0;
 static NSInteger const kResultPageCount = 3;
 
@@ -41,6 +41,8 @@ static NSInteger const kResultPageCount = 3;
 @property (nonatomic, strong) NSMutableArray<UILabel *> *pageSolutionLabels;
 @property (nonatomic, strong) NSMutableArray<UIImageView *> *pageAIHintBackgroundViews;
 @property (nonatomic, strong) NSMutableArray<UIImageView *> *pageWarnIconViews;
+@property (nonatomic, strong) NSMutableArray<UIView *> *pageTagContainerViews;
+@property (nonatomic, strong) NSMutableArray<CAGradientLayer *> *pageTagGradientLayers;
 @property (nonatomic, strong) UIView *firstPageContentView;
 @property (nonatomic, strong) UILabel *firstPagePestTitleLabel;
 @property (nonatomic, strong) UIView *firstPageConfidenceBadgeView;
@@ -517,6 +519,61 @@ static NSInteger const kResultPageCount = 3;
   }
 
   self.usesRecordStyleLayout = NO;
+  self.backgroundGradientLayer.hidden = YES;
+  self.headerTitleLabel.hidden = YES;
+  self.backgroundColor = [UIColor blackColor];
+  self.photoView.layer.cornerRadius = 0.0;
+  self.photoView.layer.masksToBounds = YES;
+  self.cardView.effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialLight];
+  self.cardView.backgroundColor = [UIColor clearColor];
+  self.cardOverlayView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.58];
+  self.tabContainer.backgroundColor = [[UIColor colorWithRed:0.74 green:0.86 blue:0.86 alpha:1.0] colorWithAlphaComponent:0.42];
+  self.tabContainer.layer.cornerRadius = 13.0;
+  self.tabContainer.layer.borderWidth = 1.0;
+  self.tabContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.26].CGColor;
+  self.aiTextLabel.textColor = [UIColor colorWithRed:1.0 green:0.69 blue:0.18 alpha:1.0];
+  self.aiTextLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+
+  [self.photoView mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.top.left.right.equalTo(self);
+    make.height.mas_equalTo(kTopPhotoHeight);
+  }];
+
+  [self.cardView mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.photoView.mas_bottom).offset(-30.0);
+    make.left.right.bottom.equalTo(self);
+  }];
+
+  [self.tabContainer mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.cardView.contentView).offset(16.0);
+    make.left.equalTo(self.cardView.contentView).offset(18.0);
+    make.right.equalTo(self.cardView.contentView).offset(-18.0);
+    make.height.mas_equalTo(48.0);
+  }];
+
+  [self.resultScrollView mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.tabContainer.mas_bottom).offset(12.0);
+    make.left.right.bottom.equalTo(self.cardView.contentView);
+  }];
+
+  [self.retakeButton mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(self).offset(-20.0);
+    make.bottom.equalTo(self).offset(-28.0);
+    make.width.mas_equalTo(204.0);
+    make.height.mas_equalTo(72.0);
+  }];
+
+  [self.aiButton mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self).offset(18.0);
+    make.bottom.equalTo(self).offset(-54.0);
+    make.width.height.mas_equalTo(55.0);
+  }];
+
+  [self.aiTextLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.aiButton.mas_bottom).offset(4.0);
+    make.centerX.equalTo(self.aiButton);
+  }];
+
   [self.pageSolutionLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
     [self tl_applySolutionStyleToLabel:label];
   }];
@@ -539,6 +596,31 @@ static NSInteger const kResultPageCount = 3;
   [self tl_applyTabVisualStateAnimated:animated];
 }
 
+- (NSString *)currentPestName {
+  if (self.selectedTabIndex < 0 || self.selectedTabIndex >= self.pageTagLabels.count) {
+    return @"";
+  }
+  return self.pageTagLabels[self.selectedTabIndex].text ?: @"";
+}
+
+- (NSString *)currentConfidenceText {
+  if (self.selectedTabIndex < 0 || self.selectedTabIndex >= self.pageConfidenceLabels.count) {
+    return @"";
+  }
+  return self.pageConfidenceLabels[self.selectedTabIndex].text ?: @"";
+}
+
+- (NSString *)currentAdviceText {
+  if (self.selectedTabIndex < 0 || self.selectedTabIndex >= self.pageSolutionLabels.count) {
+    return @"";
+  }
+  UILabel *label = self.pageSolutionLabels[self.selectedTabIndex];
+  if (label.attributedText.string.length > 0) {
+    return label.attributedText.string;
+  }
+  return label.text ?: @"";
+}
+
 - (void)applyRecordStyleLayout {
   self.usesRecordStyleLayout = YES;
   if (!self.backgroundGradientLayer) {
@@ -554,6 +636,7 @@ static NSInteger const kResultPageCount = 3;
     [self.layer insertSublayer:gradientLayer atIndex:0];
     self.backgroundGradientLayer = gradientLayer;
   }
+  self.backgroundGradientLayer.hidden = NO;
 
   self.backgroundColor = [UIColor colorWithRed:0.95 green:0.98 blue:0.97 alpha:1.0];
   self.headerTitleLabel.hidden = NO;

@@ -6,6 +6,7 @@
 #import "TLWMyView.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
+#import "TLWLoadingIndicator.h"
 
 @interface TLWMyView ()
 
@@ -20,9 +21,10 @@
 @property (nonatomic, strong, readwrite) UIButton    *shareButton;
 @property (nonatomic, strong, readwrite) UIImageView *postAvatarImageView;
 @property (nonatomic, strong, readwrite) UILabel     *_postNameLabelLabel;
+@property (nonatomic, strong) UIScrollView                    *postsScrollView;
+@property (nonatomic, strong) UIRefreshControl                *postsRefreshControl;
 @property (nonatomic, strong) UIView                          *postListContent;
 @property (nonatomic, strong) NSArray<AGPostResponseDto *>    *cachedPosts;
-@property (nonatomic, strong) UIActivityIndicatorView         *postsLoadingIndicator;
 @property (nonatomic, strong) UILabel                         *postsStatusLabel;
 
 @end
@@ -204,6 +206,13 @@
     // 可滚动的帖子列表
     UIScrollView *sv = [UIScrollView new];
     sv.showsVerticalScrollIndicator = NO;
+    _postsScrollView = sv;
+
+    _postsRefreshControl = [[UIRefreshControl alloc] init];
+    _postsRefreshControl.tintColor = [UIColor clearColor];
+    [_postsRefreshControl addTarget:self action:@selector(tl_handleRefresh:) forControlEvents:UIControlEventValueChanged];
+    sv.refreshControl = _postsRefreshControl;
+
     [card.contentView addSubview:sv];
     [sv mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(titleLabel.mas_bottom).offset(12);
@@ -225,10 +234,6 @@
     _cachedPosts = nil;
     [self tl_resetPostListContent];
 
-    if (!_postsLoadingIndicator) {
-        _postsLoadingIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
-        _postsLoadingIndicator.color = [UIColor colorWithRed:0.55 green:0.55 blue:0.55 alpha:1.0];
-    }
     if (!_postsStatusLabel) {
         _postsStatusLabel = [UILabel new];
         _postsStatusLabel.font = [UIFont systemFontOfSize:14];
@@ -237,18 +242,14 @@
     }
 
     _postsStatusLabel.text = @"加载中...";
-    [_postListContent addSubview:_postsLoadingIndicator];
     [_postListContent addSubview:_postsStatusLabel];
-    [_postsLoadingIndicator startAnimating];
 
-    [_postsLoadingIndicator mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_postListContent).offset(36);
-        make.centerX.equalTo(_postListContent);
-    }];
+    [TLWLoadingIndicator showAtTopOfView:_postListContent topOffset:24 size:40];
+
     [_postsStatusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_postsLoadingIndicator.mas_bottom).offset(12);
+        make.top.equalTo(_postListContent).offset(74); // 24 top + 40 size + 10 gap
         make.centerX.equalTo(_postListContent);
-        make.bottom.equalTo(_postListContent).offset(-36);
+        make.bottom.equalTo(_postListContent).offset(-20);
     }];
 }
 
@@ -331,13 +332,25 @@
 }
 
 - (void)tl_resetPostListContent {
-    [_postsLoadingIndicator stopAnimating];
+    [TLWLoadingIndicator hideInView:_postListContent];
     [_postListContent.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
     [_postListContent mas_remakeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(_postListContent.superview);
         make.width.equalTo(_postListContent.superview);
         make.height.mas_greaterThanOrEqualTo(1);
     }];
+}
+
+- (void)tl_handleRefresh:(UIRefreshControl *)sender {
+    [TLWLoadingIndicator showPullToRefreshInScrollView:_postsScrollView size:40];
+    if (self.onRefreshPosts) {
+        self.onRefreshPosts();
+    }
+}
+
+- (void)endRefreshingPosts {
+    [_postsRefreshControl endRefreshing];
+    [TLWLoadingIndicator hideInView:_postsScrollView];
 }
 
 - (void)tl_postItemTapped:(UITapGestureRecognizer *)tap {

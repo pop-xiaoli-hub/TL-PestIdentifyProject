@@ -5,6 +5,7 @@
 
 #import "TLWPublishView.h"
 #import <Masonry/Masonry.h>
+#import "TLWLoadingIndicator.h"
 
 static CGFloat const kCardCornerRadius = 14.0;
 
@@ -366,21 +367,30 @@ static CGFloat const kCardCornerRadius = 14.0;
   container.layer.cornerRadius = 16;
   container.clipsToBounds = YES;
 
-  // 4. loading
-  UIActivityIndicatorView *indicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
-  indicator.center = CGPointMake(container.bounds.size.width/2, container.bounds.size.height/2 - 10);
-  indicator.color = [UIColor whiteColor];
-  [indicator startAnimating];
+  // 4. 旋转 loading 图标
+  UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+  UIImageView *loadingIV = [[UIImageView alloc] initWithImage:loadingImage];
+  loadingIV.contentMode = UIViewContentModeScaleAspectFit;
+  loadingIV.frame = CGRectMake(0, 0, 50, 50);
+  loadingIV.center = CGPointMake(container.bounds.size.width/2, container.bounds.size.height/2 - 10);
+
+  CABasicAnimation *rotation = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
+  rotation.fromValue = @(0);
+  rotation.toValue = @(M_PI * 2);
+  rotation.duration = 1.0;
+  rotation.repeatCount = HUGE_VALF;
+  rotation.removedOnCompletion = NO;
+  [loadingIV.layer addAnimation:rotation forKey:@"tl_loading_rotate"];
 
   // 5. 文字（可选）
   UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(0, container.bounds.size.height - 40, container.bounds.size.width, 20)];
-  label.text = @"Loading...";
+  label.text = @"发布中...";
   label.textColor = [UIColor whiteColor];
   label.font = [UIFont systemFontOfSize:14];
   label.textAlignment = NSTextAlignmentCenter;
 
   // 6. 组装
-  [container addSubview:indicator];
+  [container addSubview:loadingIV];
   [container addSubview:label];
   [blurView.contentView addSubview:container];
   blurView.userInteractionEnabled = YES;

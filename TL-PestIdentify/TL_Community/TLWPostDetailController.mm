@@ -13,6 +13,7 @@
 #import <AgriPestClient/AGPostResponseDto.h>
 #import "TLWSDKManager.h"
 #import "TLWDBManager.h"
+#import "TLWLoadingIndicator.h"
 #import "TLWToast.h"
 
 static NSString *const kCommentCellID = @"TLWCommentCell";
@@ -41,7 +42,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 @property (nonatomic, assign) NSInteger currentPage;
 @property (nonatomic, assign) BOOL isLoadingComments;
 @property (nonatomic, assign) BOOL hasMoreComments;
-@property (nonatomic, strong) UIActivityIndicatorView *footerSpinner;
+@property (nonatomic, strong) UIView *footerLoadingView;
 
 - (void)submitCollectTargetState:(BOOL)shouldCollect
                      previousState:(BOOL)previousState
@@ -59,6 +60,14 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 @end
 
 @implementation TLWPostDetailController
+
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    self.hideNavBar = YES;
+  }
+  return self;
+}
 
 //- (void)viewDidLoad {
 //  TLWSDKManager* manager = TLW
@@ -82,12 +91,6 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   self.view.layer.contents = (__bridge id)image.CGImage;
 }
 
-
-- (void)viewWillAppear:(BOOL)animated {
-  [super viewWillAppear:animated];
-  // 详情页使用自定义导航栏，隐藏系统 navigationBar
-  [self.navigationController setNavigationBarHidden:YES animated:NO];
-}
 
 - (void)viewDidLayoutSubviews {
   [super viewDidLayoutSubviews];
@@ -311,8 +314,8 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
   // 显示底部加载指示器
   if (page > 0) {
-    [self.footerSpinner startAnimating];
-    self.tableView.tableFooterView = self.footerSpinner;
+    self.footerLoadingView = [TLWLoadingIndicator footerLoadingViewWithWidth:self.tableView.bounds.size.width height:44];
+    self.tableView.tableFooterView = self.footerLoadingView;
   }
 
   [[TLWSDKManager shared] getCommentsWithId:postId
@@ -321,8 +324,10 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
                           completionHandler:^(AGResultPageResultCommentResponseDto *output, NSError *error) {
     dispatch_async(dispatch_get_main_queue(), ^{
       self.isLoadingComments = NO;
+      if (self.footerLoadingView) {
+        [TLWLoadingIndicator stopFooterLoadingView:self.footerLoadingView];
+      }
       self.tableView.tableFooterView = nil;
-      [self.footerSpinner stopAnimating];
 
       if (error || !output || output.code.integerValue != 200) {
         if (!error && output.code.integerValue == 401) {
@@ -420,14 +425,6 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   }];
 }
 
-- (UIActivityIndicatorView *)footerSpinner {
-  if (!_footerSpinner) {
-    _footerSpinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
-    _footerSpinner.frame = CGRectMake(0, 0, self.tableView.bounds.size.width, 44);
-    _footerSpinner.color = [UIColor colorWithWhite:0.6 alpha:1.0];
-  }
-  return _footerSpinner;
-}
 
 #pragma mark - UITableViewDataSource
 

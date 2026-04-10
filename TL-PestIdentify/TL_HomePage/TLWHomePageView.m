@@ -18,7 +18,7 @@
 @property (nonatomic, strong) UILabel* temperatureDigitalLabel;
 @property (nonatomic, strong) UILabel* temperatureSuffixLabel;
 @property (nonatomic, strong) UIImageView* userAvatarImageView;
-@property (nonatomic, strong) UIImageView* userVersionImageView;
+@property (nonatomic, strong) UIButton *userVersionButton;
 @property (nonatomic, strong) UIImageView* weatherCardImageView;
 @property (nonatomic, strong) UIImageView* bottomOfUserNameImageView;
 @property (nonatomic, strong) UIImageView* bambooImageView;
@@ -126,10 +126,10 @@
 
 
 - (void)tl_setUserVersionImageView {
-  UIImageView* imageView = self.userVersionImageView;
-  imageView.image = [[UIImage imageNamed:@"hp_version.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
-  [self.headerContainer addSubview:imageView];
-  [imageView mas_makeConstraints:^(MASConstraintMaker *make) {
+  UIButton *button = self.userVersionButton;
+  [self configureElderModeEnabled:NO];
+  [self.headerContainer addSubview:button];
+  [button mas_makeConstraints:^(MASConstraintMaker *make) {
       make.right.equalTo(self.headerContainer.mas_right).offset(-100);
       make.top.equalTo(self.headerContainer).offset(45);
       make.height.mas_equalTo(51);
@@ -154,6 +154,14 @@
 
 - (void)configureWithUserName:(NSString* )name {
   self.userNameLabel.text = [name copy];
+}
+
+- (void)configureElderModeEnabled:(BOOL)enabled {
+  NSString *imageName = enabled ? @"oldMode" : @"hp_version.png";
+  UIImage *image = [[UIImage imageNamed:imageName] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  [self.userVersionButton setImage:image forState:UIControlStateNormal];
+  [self.userVersionButton setImage:image forState:UIControlStateHighlighted];
+  self.userVersionButton.selected = enabled;
 }
 
 - (void)tl_setHelloLabel {
@@ -255,12 +263,13 @@
   return _userAvatarImageView;
 }
 
-- (UIImageView *)userVersionImageView {
-  if (!_userVersionImageView) {
-    _userVersionImageView = [[UIImageView alloc] init];
-    _userVersionImageView.contentMode = UIViewContentModeScaleAspectFit;
+- (UIButton *)userVersionButton {
+  if (!_userVersionButton) {
+    _userVersionButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    _userVersionButton.adjustsImageWhenHighlighted = NO;
+    _userVersionButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   }
-  return _userVersionImageView;
+  return _userVersionButton;
 }
 
 - (UIImageView *)weatherCardImageView {

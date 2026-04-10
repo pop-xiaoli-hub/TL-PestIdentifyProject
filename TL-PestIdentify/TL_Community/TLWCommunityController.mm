@@ -17,6 +17,7 @@
 #import <Masonry/Masonry.h>
 #import "TLWDBManager.h"
 #import "TLWCommunitySuggestionCell.h"
+#import "TLWLoadingIndicator.h"
 static NSString *const kCommunityCellID = @"TLWCommunityCell";
 static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell";
 static NSInteger const kCommunityFeedPageSize = 20;
@@ -77,6 +78,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   [self.myView.suggestionTableView registerClass:[TLWCommunitySuggestionCell class] forCellReuseIdentifier:kCommunitySuggestionCellID];
   [self.myView.voiceButton addTarget:self action:@selector(tl_voiceButtonTapped) forControlEvents:UIControlEventTouchUpInside];
   UIRefreshControl *refreshControl = [[UIRefreshControl alloc] init];
+  refreshControl.tintColor = [UIColor clearColor]; // 隐藏系统菊花
   [refreshControl addTarget:self action:@selector(tl_handlePullToRefresh) forControlEvents:UIControlEventValueChanged];
   self.myView.collectionView.refreshControl = refreshControl;
   self.refreshControl = refreshControl;
@@ -161,6 +163,9 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
     return;
   }
   self.tl_isFetchingFeed = YES;
+  if (self.posts.count == 0 && !self.refreshControl.refreshing) {
+    [TLWLoadingIndicator showInView:self.myView.collectionView];
+  }
 
   TLWSDKManager *sdk = [TLWSDKManager shared];
   NSInteger nextPage = self.currentFeedPage + 1;
@@ -176,6 +181,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
     strongSelf.feedRequestToken += 1;
     strongSelf.tl_isFetchingFeed = NO;
     [strongSelf.refreshControl endRefreshing];
+    [TLWLoadingIndicator hideInView:strongSelf.myView.collectionView];
     NSLog(@"[Community] page=%ld 请求超时，保持当前帖子列表不变", (long)nextPage);
   });
   [sdk getAllPostsWithTag:nil
@@ -192,6 +198,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       }
       strongSelf.tl_isFetchingFeed = NO;
       [strongSelf.refreshControl endRefreshing];
+    [TLWLoadingIndicator hideInView:strongSelf.myView.collectionView];
 
       NSLog(@"[Community] page=%ld error=%@ code=%@ message=%@ listCount=%lu",
             (long)nextPage, error, output.code, output.message,
@@ -226,6 +233,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
     [self.refreshControl endRefreshing];
     return;
   }
+  [TLWLoadingIndicator showPullToRefreshInScrollView:self.myView.collectionView size:40];
   [self tl_fetchCommunityFeed];
 }
 

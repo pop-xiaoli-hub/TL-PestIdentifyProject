@@ -11,6 +11,7 @@
 #import "TLWSDKManager.h"
 #import <AgriPestClient/AGPostResponseDto.h>
 #import <Masonry/Masonry.h>
+#import "TLWLoadingIndicator.h"
 
 static NSString * const kFavoriteCellID = @"TLWFavoriteCell";
 static NSInteger  const kPageSize       = 20;
@@ -59,6 +60,7 @@ static NSInteger  const kPageSize       = 20;
 
     // 下拉刷新
     UIRefreshControl *rc = [UIRefreshControl new];
+    rc.tintColor = [UIColor clearColor]; // 隐藏系统菊花
     [rc addTarget:self action:@selector(onRefresh) forControlEvents:UIControlEventValueChanged];
     self.favoriteView.collectionView.refreshControl = rc;
 
@@ -97,6 +99,7 @@ static NSInteger  const kPageSize       = 20;
     _hasMore     = YES;
     [_favorites removeAllObjects];
     [self.favoriteView.collectionView reloadData];
+    [TLWLoadingIndicator showPullToRefreshInScrollView:self.favoriteView.collectionView size:40];
     [self fetchPage:0];
 }
 
@@ -113,6 +116,7 @@ static NSInteger  const kPageSize       = 20;
             if (!self) return;
             self.isLoading = NO;
             [self.favoriteView.collectionView.refreshControl endRefreshing];
+            [TLWLoadingIndicator hideInView:self.favoriteView.collectionView];
 
             if (error || output.code.integerValue != 200) {
                 if (output.code.integerValue == 401) {

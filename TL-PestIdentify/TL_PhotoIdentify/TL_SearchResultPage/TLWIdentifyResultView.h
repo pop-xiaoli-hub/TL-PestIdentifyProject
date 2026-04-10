@@ -24,6 +24,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)applyLayoutStyleFlag:(NSInteger)styleFlag;
 - (void)selectTabAtIndex:(NSInteger)index animated:(BOOL)animated;
 - (void)configureWithImage:(nullable UIImage *)image results:(NSArray<NSDictionary *> *)results;
+- (NSString *)currentPestName;
+- (NSString *)currentConfidenceText;
+- (NSString *)currentAdviceText;
 
 @end
 

@@ -152,7 +152,7 @@
     }];
 
     // 结束图标（红色X）
-    UIImageView *stopIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconStop"]];
+    UIImageView *stopIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Xicon"]];
     stopIcon.contentMode = UIViewContentModeScaleAspectFit;
     [_hangUpButton addSubview:stopIcon];
     [stopIcon mas_makeConstraints:^(MASConstraintMaker *make) {
