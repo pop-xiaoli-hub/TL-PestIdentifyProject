@@ -67,6 +67,20 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
   }
 }
 
+- (void)prepareForRetakeCapture {
+  self.capturedImage = nil;
+  self.capturedImageView.image = nil;
+  self.capturedImageView.hidden = YES;
+  self.previewLayer.hidden = NO;
+  [self tl_stopLoadingIndicator];
+
+  if (self.session && !self.session.isRunning) {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      [self.session startRunning];
+    });
+  }
+}
+
 - (void)tl_openPhotoAlbum {
   TLWPhotoPickerController *pickerVC = [[TLWPhotoPickerController alloc] init];
   pickerVC.maxCount = 1;

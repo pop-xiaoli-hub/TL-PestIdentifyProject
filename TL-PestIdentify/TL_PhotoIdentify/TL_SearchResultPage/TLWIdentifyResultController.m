@@ -7,7 +7,8 @@
 
 #import "TLWIdentifyResultController.h"
 #import "TLWIdentifyResultView.h"
-#import "TLWSDKManager.h"
+#import "TLWIdentifyPageController.h"
+#import "TLWAIAssistantController.h"
 #import <Masonry/Masonry.h>
 
 @interface TLWIdentifyResultController ()
@@ -21,18 +22,9 @@
 
 - (instancetype)init {
   self = [super init];
-  
   if (self) {
-    _layoutStyleFlag = 1;//默认没有开启适老化
-    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
-    NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
-    BOOL elderModeEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:elderModeKey];
-    if (!elderModeEnabled) {
-      elderModeEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"TLW_elder_mode"];
-    }
-    if (elderModeEnabled) {//如果开启了适老化，则传0
-      _layoutStyleFlag = 0;
-    }
+    // 拍照识图结果页固定按设计稿展示，不复用“识别记录”样式。
+    _layoutStyleFlag = 1;
   }
   return self;
 }
@@ -87,11 +79,42 @@
 }
 
 - (void)tl_retakeTapped {
-  NSLog(@"[IdentifyResult] 重新拍摄点击");
+  for (UIViewController *controller in [self.navigationController.viewControllers reverseObjectEnumerator]) {
+    if (![controller isKindOfClass:[TLWIdentifyPageController class]]) {
+      continue;
+    }
+
+    TLWIdentifyPageController *identifyController = (TLWIdentifyPageController *)controller;
+    [identifyController prepareForRetakeCapture];
+    [self.navigationController popToViewController:identifyController animated:YES];
+    return;
+  }
+
+  [self tl_backTapped];
 }
 
 - (void)tl_aiTapped {
-  NSLog(@"[IdentifyResult] AI 助手点击");
+  NSString *pestName = [self.myView currentPestName];
+  NSString *confidence = [self.myView currentConfidenceText];
+  NSString *advice = [self.myView currentAdviceText];
+  NSString *question = nil;
+
+  if (pestName.length > 0) {
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    [parts addObject:[NSString stringWithFormat:@"请围绕“%@”给我一份更详细的病虫害分析和处理建议。", pestName]];
+    if (confidence.length > 0) {
+      [parts addObject:[NSString stringWithFormat:@"当前识别置信度：%@。", confidence]];
+    }
+    if (advice.length > 0) {
+      [parts addObject:[NSString stringWithFormat:@"当前识图页给出的建议是：%@。", advice]];
+    }
+    [parts addObject:@"请按“可能原因、继续观察点、推荐处理步骤、用药/护理注意事项”展开说明。"];
+    question = [parts componentsJoinedByString:@""];
+  }
+
+  TLWAIAssistantController *assistantController = [[TLWAIAssistantController alloc] initWithInitialQuestion:question];
+  assistantController.hidesBottomBarWhenPushed = YES;
+  [self.navigationController pushViewController:assistantController animated:YES];
 }
 
 - (void)tl_tabTapped:(UIButton *)sender {
