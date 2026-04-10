@@ -22,17 +22,38 @@
 
 @implementation TLWPlantDetailViewModel
 
+- (NSCalendar *)tl_calendar {
+  NSCalendar *calendar = [NSCalendar currentCalendar];
+  calendar.timeZone = [NSTimeZone localTimeZone];
+  return calendar;
+}
+
+- (NSDateFormatter *)tl_dayFormatter {
+  NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+  formatter.dateFormat = @"yyyy-MM-dd";
+  formatter.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+  formatter.timeZone = [NSTimeZone localTimeZone];
+  return formatter;
+}
+
+- (NSDate *)tl_normalizedDate:(NSDate *)date {
+  if (!date) {
+    return nil;
+  }
+  return [[self tl_calendar] startOfDayForDate:date];
+}
+
 - (instancetype)initWithPlantModel:(TLWPlantModel *)plantModel {
   self = [super init];
   if (self) {
     _plantModel = plantModel;
     _selectedTabType = TLWPlantDetailTabTypeWater;
 
-    NSCalendar *calendar = [NSCalendar currentCalendar];
+    NSCalendar *calendar = [self tl_calendar];
     NSDateComponents *components = [calendar components:NSCalendarUnitYear | NSCalendarUnitMonth fromDate:[NSDate date]];
     components.day = 1;
     _displayMonthDate = [calendar dateFromComponents:components] ?: [NSDate date];
-    _selectedDate = [NSDate date];
+    _selectedDate = [self tl_normalizedDate:[NSDate date]];
     _markedStatusMap = [NSMutableDictionary dictionary];
   }
   return self;
@@ -71,7 +92,7 @@
 }
 
 - (NSArray<TLWPlantCalendarDayItem *> *)calendarItems {
-  NSCalendar *calendar = [NSCalendar currentCalendar];
+  NSCalendar *calendar = [self tl_calendar];
   NSDateComponents *monthComponents = [calendar components:NSCalendarUnitYear | NSCalendarUnitMonth fromDate:self.displayMonthDate];
   monthComponents.day = 1;
   NSDate *firstDayOfMonth = [calendar dateFromComponents:monthComponents] ?: self.displayMonthDate;
@@ -94,7 +115,7 @@
     item.dayText = [NSString stringWithFormat:@"%02ld", (long)dateComponents.day];
     item.inCurrentMonth = (dateComponents.month == monthComponents.month && dateComponents.year == monthComponents.year);
     item.isToday = [calendar isDateInToday:date];
-    item.date = date;
+    item.date = [self tl_normalizedDate:date];
     item.status = TLWPlantCalendarDayStatusNone;
     item.isSelected = item.inCurrentMonth && [calendar isDate:date equalToDate:self.selectedDate toUnitGranularity:NSCalendarUnitDay];
 
@@ -112,8 +133,8 @@
 - (CGFloat)preferredContentHeightForSelectedTab {
   switch (self.selectedTabType) {
     case TLWPlantDetailTabTypeWater:
-      return 620.0;
     case TLWPlantDetailTabTypeFertilizer:
+      return 620.0;
     case TLWPlantDetailTabTypeMedicine:
     case TLWPlantDetailTabTypeNote:
       return 176.0;
@@ -142,10 +163,7 @@
 
   NSArray *wateringRecords = (NSArray *)wateringRecordsObj;
   NSMutableDictionary<NSString *, NSNumber *> *serverStatusMap = [NSMutableDictionary dictionary];
-  NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-  formatter.dateFormat = @"yyyy-MM-dd";
-  formatter.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
-  formatter.timeZone = [NSTimeZone timeZoneWithName:@"Asia/Shanghai"];
+  NSDateFormatter *formatter = [self tl_dayFormatter];
 
   for (id recordObj in wateringRecords) {
     if (![recordObj isKindOfClass:[NSDictionary class]]) {
@@ -168,7 +186,7 @@
           content,
           tagType);
 
-    NSDate *recordDate = [formatter dateFromString:recordDateString];
+    NSDate *recordDate = [self tl_normalizedDate:[formatter dateFromString:recordDateString]];
     if (recordDate == nil) {
       continue;
     }
@@ -178,6 +196,7 @@
     serverStatusMap[dateKey] = @(status);
   }
 
+  [self.markedStatusMap removeAllObjects];
   [self.markedStatusMap addEntriesFromDictionary:serverStatusMap];
 }
 
@@ -185,7 +204,7 @@
   if (!date) {
     return;
   }
-  self.selectedDate = date;
+  self.selectedDate = [self tl_normalizedDate:date];
 }
 
 - (void)markSelectedDateAsWatered {
@@ -199,21 +218,23 @@
 - (void)moveToPreviousMonth {
   NSDateComponents *components = [[NSDateComponents alloc] init];
   components.month = -1;
-  self.displayMonthDate = [[NSCalendar currentCalendar] dateByAddingComponents:components toDate:self.displayMonthDate options:0] ?: self.displayMonthDate;
+  self.displayMonthDate = [[self tl_calendar] dateByAddingComponents:components toDate:self.displayMonthDate options:0] ?: self.displayMonthDate;
   [self tl_resetSelectedDateIntoDisplayMonthIfNeeded];
 }
 
 - (void)moveToNextMonth {
   NSDateComponents *components = [[NSDateComponents alloc] init];
   components.month = 1;
-  self.displayMonthDate = [[NSCalendar currentCalendar] dateByAddingComponents:components toDate:self.displayMonthDate options:0] ?: self.displayMonthDate;
+  self.displayMonthDate = [[self tl_calendar] dateByAddingComponents:components toDate:self.displayMonthDate options:0] ?: self.displayMonthDate;
   [self tl_resetSelectedDateIntoDisplayMonthIfNeeded];
 }
 
 - (NSString *)tl_keyForDate:(NSDate *)date {
-  NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-  formatter.dateFormat = @"yyyy-MM-dd";
-  return [formatter stringFromDate:date];
+  NSDate *normalizedDate = [self tl_normalizedDate:date];
+  if (!normalizedDate) {
+    return nil;
+  }
+  return [[self tl_dayFormatter] stringFromDate:normalizedDate];
 }
 
 - (void)tl_storeStatus:(TLWPlantCalendarDayStatus)status forDate:(NSDate *)date {
@@ -224,14 +245,14 @@
 }
 
 - (void)tl_resetSelectedDateIntoDisplayMonthIfNeeded {
-  NSCalendar *calendar = [NSCalendar currentCalendar];
+  NSCalendar *calendar = [self tl_calendar];
   if ([calendar isDate:self.selectedDate equalToDate:self.displayMonthDate toUnitGranularity:NSCalendarUnitMonth]) {
     return;
   }
 
   NSDateComponents *components = [calendar components:NSCalendarUnitYear | NSCalendarUnitMonth fromDate:self.displayMonthDate];
   components.day = 1;
-  self.selectedDate = [calendar dateFromComponents:components] ?: self.displayMonthDate;
+  self.selectedDate = [self tl_normalizedDate:[calendar dateFromComponents:components] ?: self.displayMonthDate];
 }
 
 @end

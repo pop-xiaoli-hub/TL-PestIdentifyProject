@@ -11,6 +11,7 @@
 #import "Views/TLWPlantDetailSegmentTabView.h"
 #import "Views/TLWPlantDetailWateringView.h"
 #import <SDWebImage/SDWebImage.h>
+#import "TLWSDKManager.h"
 
 @interface TLWPlantDetailController ()
 
@@ -25,20 +26,20 @@
 - (instancetype)initWithPlantModel:(TLWPlantModel *)plantModel {
   self = [super init];
   if (self) {
-    _viewModel = [[TLWPlantDetailViewModel alloc] initWithPlantModel:plantModel];
+    _viewModel = [[TLWPlantDetailViewModel alloc] initWithPlantModel:plantModel];//初始化viewMdel
   }
   return self;
 }
 
 - (void)loadView {
-  self.detailView = [[TLWPlantDetailView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+  self.detailView = [[TLWPlantDetailView alloc] initWithFrame:[UIScreen mainScreen].bounds];//加载主视图
   self.view = self.detailView;
 }
 
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.navigationController.navigationBarHidden = YES;
-  [self tl_bindActions];
+  [self tl_bindActions];//绑定控件的回调行为
   [self tl_render];
   [self tl_fetchCropDetailAndRefreshCalendar];
 }
@@ -104,8 +105,7 @@
   if (self.viewModel.plantModel.localImage) {
     self.detailView.topImageView.image = self.viewModel.plantModel.localImage;
   } else if ([self.viewModel imageURLString].length > 0) {
-    [self.detailView.topImageView sd_setImageWithURL:[NSURL URLWithString:[self.viewModel imageURLString]]
-                                    placeholderImage:[UIImage imageNamed:@"hp_eg1.jpg"]];
+    [self.detailView.topImageView sd_setImageWithURL:[NSURL URLWithString:[self.viewModel imageURLString]] placeholderImage:[UIImage imageNamed:@"hp_eg1.jpg"]];
   } else {
     self.detailView.topImageView.image = [UIImage imageNamed:@"hp_eg1.jpg"];
   }
@@ -134,8 +134,15 @@
     return;
   }
 
+  NSDate *selectedDate = [self.viewModel currentSelectedDate];
+  NSCalendar *calendar = [NSCalendar currentCalendar];
+  NSDateComponents *components = [calendar components:NSCalendarUnitYear | NSCalendarUnitMonth | NSCalendarUnitDay fromDate:selectedDate];
+  components.hour = 12;
+  components.minute = 0;
+  components.second = 0;
+
   AGTagOperationRequest *request = [[AGTagOperationRequest alloc] init];
-  request.recordDate = [self.viewModel currentSelectedDate];
+  request.recordDate = [calendar dateFromComponents:components] ?: selectedDate;
   request.tagType = @"WATERING";
   request.content = content;
   request.status = status;
@@ -157,7 +164,7 @@
       }
 
       if (output.code.integerValue == 401) {
-        [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+        [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
           [strongSelf tl_submitWateringTagWithStatus:status content:content];
         }];
         return;
@@ -168,12 +175,6 @@
         return;
       }
       NSLog(@"浇水服务端信息同步成功");
-      if (status.integerValue == 1) {
-        [strongSelf.viewModel markSelectedDateAsWatered];
-      } else {
-        [strongSelf.viewModel markSelectedDateAsPending];
-      }
-      [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];
       [strongSelf tl_fetchCropDetailAndRefreshCalendar];
     });
   }];
@@ -199,7 +200,7 @@
       }
 
       if (output.code.integerValue == 401) {
-        [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+        [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
           [strongSelf tl_fetchCropDetailAndRefreshCalendar];
         }];
         return;
