@@ -3,13 +3,13 @@
 //  TL-PestIdentify
 //
 
-#import <UIKit/UIKit.h>
+#import "TLWBaseViewController.h"
 
 @class TLWCommunityPost;
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TLWPostDetailController : UIViewController
+@interface TLWPostDetailController : TLWBaseViewController
 @property (nonatomic, copy)void(^reloadPosts)(NSNumber*);
 
 /// 外部传入帖子数据
