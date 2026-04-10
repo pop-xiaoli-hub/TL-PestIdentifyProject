@@ -61,10 +61,9 @@ static NSInteger const kMessagePageSize = 20;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    // TabBar 初始化时会一次性 addSubview 所有子页面，hidden 的页面也会收到 viewWillAppear，
-    // 但真正被隐藏的是 UINavigationController 的 view，不是当前 controller 的 view。
-    // 如果这里判断 self.view.hidden，会误把隐藏 tab 当成可见页，触发“幽灵请求”。
-    if ([self tl_isActuallyVisible] && [TLWSDKManager shared].isLoggedIn) {
+    // 自定义 tab 容器会手动转发生命周期，可见性要以 navigationController.view
+    // 是否真正显示为准，不能只看当前 controller 的 self.view.hidden。
+    if ([TLWSDKManager shared].sessionManager.isLoggedIn) {
         [self tl_refreshMessages];
     }
 }
@@ -102,7 +101,7 @@ static NSInteger const kMessagePageSize = 20;
 - (void)fetchMessagesPage:(NSInteger)page reset:(BOOL)reset {
     if (self.isLoadingMessages) return;
     if (!reset && !self.hasMoreMessages) return;
-    if (![TLWSDKManager shared].isLoggedIn) {
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
         [self.myView.tableView.refreshControl endRefreshing];
         self.myView.tableView.tableFooterView = nil;
         [self.footerSpinner stopAnimating];
@@ -125,7 +124,7 @@ static NSInteger const kMessagePageSize = 20;
 
             if (error || output.code.integerValue != 200) {
                 if (!error && output.code.integerValue == 401) {
-                    [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self fetchMessagesPage:page reset:reset]; }];
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self fetchMessagesPage:page reset:reset]; }];
                     return;
                 }
                 if ([self tl_isActuallyVisible]) {
@@ -302,7 +301,7 @@ static NSInteger const kMessagePageSize = 20;
             [self tl_reloadMessageRowForMessageId:messageId preferredIndexPath:indexPath];
 
             if (!error && output.code.integerValue == 401) {
-                [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{ [self tl_markMessageAsReadForItem:item preferredIndexPath:indexPath]; }];
+                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self tl_markMessageAsReadForItem:item preferredIndexPath:indexPath]; }];
             }
         });
     }];

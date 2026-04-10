@@ -208,12 +208,16 @@ static CGFloat const kDefaultTabBarHeight = 96.0;
     UIViewController *fromVC = _childVCs[_selectedIndex];
     UIViewController *toVC   = _childVCs[idx];
 
+    // 先取消目标 tab 的 hidden，再触发 viewWillAppear。
+    // 部分页面会在 viewWillAppear 里判断 navigationController.view.hidden
+    // 来决定是否真正可见；如果这里顺序反了，首次切入懒加载 tab 可能跳过首刷。
+    toVC.view.hidden = NO;
+
     // 正确触发 viewWillDisappear / viewWillAppear 等生命周期
     [fromVC beginAppearanceTransition:NO animated:NO];
     [toVC   beginAppearanceTransition:YES animated:NO];
 
     fromVC.view.hidden = YES;
-    toVC.view.hidden   = NO;
 
     [fromVC endAppearanceTransition];
     [toVC   endAppearanceTransition];
