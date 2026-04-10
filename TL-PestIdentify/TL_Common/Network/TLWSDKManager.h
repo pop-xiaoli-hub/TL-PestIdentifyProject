@@ -31,6 +31,7 @@
 #import <AgriPestClient/AGCommentRequest.h>
 #import <AgriPestClient/AGResultCommentResponseDto.h>
 #import <AgriPestClient/AGMyCropCreateRequest.h>
+#import <AgriPestClient/AGTagOperationRequest.h>
 #import <AgriPestClient/AGResultMyCropResponseDto.h>
 #import <AgriPestClient/AGResultListMyCropResponseDto.h>
 
@@ -153,6 +154,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// 获取我的作物列表
 - (NSURLSessionTask *)getMyCropsWithCompletionHandler:(void (^)(AGResultListMyCropResponseDto * output, NSError * error))handler;
+
+/// 获取作物详情
+- (NSURLSessionTask *)getCropDetailWithId:(NSNumber *)cropId
+                        completionHandler:(void (^)(AGResultMyCropResponseDto * output, NSError * error))handler;
+
+/// 添加种植标签（浇水、施肥、用药、笔记）
+- (NSURLSessionTask *)addTagWithCropId:(NSNumber *)cropId
+                   tagOperationRequest:(AGTagOperationRequest *)request
+                     completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
 @end
 
 NS_ASSUME_NONNULL_END

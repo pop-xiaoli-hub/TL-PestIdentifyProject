@@ -569,4 +569,14 @@ static NSString * const kGenPwdKey  = @"TLW_generated_password";
   return [self.api getMyCropsWithCompletionHandler:handler];
 }
 
+- (NSURLSessionTask *)getCropDetailWithId:(NSNumber *)cropId
+                        completionHandler:(void (^)(AGResultMyCropResponseDto * output, NSError * error))handler {
+  return [self.api getCropDetailWithId:cropId completionHandler:handler];
+}
+
+- (NSURLSessionTask *)addTagWithCropId:(NSNumber *)cropId
+                   tagOperationRequest:(AGTagOperationRequest *)request
+                     completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
+  return [self.api addTagWithId:cropId tagOperationRequest:request completionHandler:handler];
+}
 @end
