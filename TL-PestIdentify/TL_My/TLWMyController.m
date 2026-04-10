@@ -50,6 +50,9 @@ extern NSString * const TLWProfileDidUpdateNotification;
         vc.hidesBottomBarWhenPushed = YES;
         [weakSelf.navigationController pushViewController:vc animated:YES];
     };
+    self.myView.onRefreshPosts = ^{
+        [weakSelf tl_fetchMyPostsForRefresh];
+    };
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -165,6 +168,32 @@ extern NSString * const TLWProfileDidUpdateNotification;
         });
     }];
 }
+- (void)tl_fetchMyPostsForRefresh {
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
+        [self.myView endRefreshingPosts];
+        return;
+    }
+    __weak typeof(self) weakSelf = self;
+    [[TLWSDKManager shared] getMyPostsWithPage:@(0) size:@(20) completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [strongSelf.myView endRefreshingPosts];
+            if (error || !output || output.code.integerValue != 200) {
+                if (output.code.integerValue == 401) {
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
+                        [strongSelf tl_fetchMyPostsForRefresh];
+                    }];
+                }
+                return;
+            }
+            NSArray<AGPostResponseDto *> *posts = output.data.list ?: @[];
+            strongSelf.hasLoadedMyPostsOnce = YES;
+            [strongSelf.myView reloadPosts:posts];
+        });
+    }];
+}
+
 - (void)onFavorite {
     TLWMyFavoriteController *vc = [[TLWMyFavoriteController alloc] init];
     [self.navigationController pushViewController:vc animated:YES];
