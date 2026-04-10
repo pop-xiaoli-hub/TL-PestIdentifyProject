@@ -5,6 +5,7 @@
 
 #import "TLWPlantDetailController.h"
 #import "../Models/TLWPlantModel.h"
+#import "../../TL_Common/Network/TLWSDKManager.h"
 #import "TLWPlantDetailView.h"
 #import "ViewModels/TLWPlantDetailViewModel.h"
 #import "Views/TLWPlantDetailSegmentTabView.h"
@@ -15,6 +16,7 @@
 
 @property (nonatomic, strong) TLWPlantDetailView *detailView;
 @property (nonatomic, strong) TLWPlantDetailViewModel *viewModel;
+@property (nonatomic, assign) BOOL tagRequestInFlight;
 
 @end
 
@@ -38,6 +40,7 @@
   self.navigationController.navigationBarHidden = YES;
   [self tl_bindActions];
   [self tl_render];
+  [self tl_fetchCropDetailAndRefreshCalendar];
 }
 
 - (void)tl_bindActions {
@@ -52,6 +55,7 @@
     strongSelf.viewModel.selectedTabType = index;
     [strongSelf.detailView updateSelectedTab:index contentHeight:[strongSelf.viewModel preferredContentHeightForSelectedTab]];
   };
+
   self.detailView.wateringView.previousMonthBlock = ^{
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf) {
@@ -60,6 +64,7 @@
     [strongSelf.viewModel moveToPreviousMonth];
     [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];
   };
+
   self.detailView.wateringView.nextMonthBlock = ^{
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf) {
@@ -68,13 +73,30 @@
     [strongSelf.viewModel moveToNextMonth];
     [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];
   };
+
+  self.detailView.wateringView.dateSelectionBlock = ^(NSDate *date) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf.viewModel selectDate:date];
+    [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];
+  };
+
   self.detailView.wateringView.tagActionBlock = ^{
     __strong typeof(weakSelf) strongSelf = weakSelf;
-    [strongSelf tl_showMessage:@"已预留“打上标签”业务接口"];
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf tl_submitWateringTagWithStatus:@1 content:@"已浇水"];
   };
+
   self.detailView.wateringView.cancelTagActionBlock = ^{
     __strong typeof(weakSelf) strongSelf = weakSelf;
-    [strongSelf tl_showMessage:@"已预留“取消标签”业务接口"];
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf tl_submitWateringTagWithStatus:@0 content:@"待浇水"];
   };
 }
 
@@ -99,6 +121,103 @@
   UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:message preferredStyle:UIAlertControllerStyleAlert];
   [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
   [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)tl_submitWateringTagWithStatus:(NSNumber *)status content:(NSString *)content {
+  if (self.tagRequestInFlight) {//节流，如果上一条打标签请求还没回来，再次点击不发送请求
+    return;
+  }
+
+  NSNumber *cropId = self.viewModel.plantModel.plantId;
+  if (cropId == nil || cropId.integerValue <= 0) {
+    [self tl_showMessage:@"当前作物还没有可用的服务端 ID"];
+    return;
+  }
+
+  AGTagOperationRequest *request = [[AGTagOperationRequest alloc] init];
+  request.recordDate = [self.viewModel currentSelectedDate];
+  request.tagType = @"WATERING";
+  request.content = content;
+  request.status = status;
+
+  self.tagRequestInFlight = YES;
+  __weak typeof(self) weakSelf = self;
+  NSLog(@"开始进行服务端浇水信息同步");
+  [[TLWSDKManager shared] addTagWithCropId:cropId tagOperationRequest:request completionHandler:^(AGResultVoid * output, NSError * error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+
+      strongSelf.tagRequestInFlight = NO;
+      if (error) {
+        [strongSelf tl_showMessage:error.localizedDescription ?: @"浇水标签同步失败"];
+        return;
+      }
+
+      if (output.code.integerValue == 401) {
+        [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [strongSelf tl_submitWateringTagWithStatus:status content:content];
+        }];
+        return;
+      }
+
+      if (output.code.integerValue != 200) {
+        [strongSelf tl_showMessage:output.message ?: @"浇水标签同步失败"];
+        return;
+      }
+      NSLog(@"浇水服务端信息同步成功");
+      if (status.integerValue == 1) {
+        [strongSelf.viewModel markSelectedDateAsWatered];
+      } else {
+        [strongSelf.viewModel markSelectedDateAsPending];
+      }
+      [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];
+      [strongSelf tl_fetchCropDetailAndRefreshCalendar];
+    });
+  }];
+}
+
+- (void)tl_fetchCropDetailAndRefreshCalendar {
+  NSNumber *cropId = self.viewModel.plantModel.plantId;
+  if (cropId == nil || cropId.integerValue <= 0) {
+    return;
+  }
+
+  __weak typeof(self) weakSelf = self;
+  [[TLWSDKManager shared] getCropDetailWithId:cropId completionHandler:^(AGResultMyCropResponseDto * output, NSError * error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+
+      if (error) {
+        NSLog(@"[PlantDetail] getCropDetail error: %@", error);
+        return;
+      }
+
+      if (output.code.integerValue == 401) {
+        [[TLWSDKManager shared] handleUnauthorizedWithRetry:^{
+          [strongSelf tl_fetchCropDetailAndRefreshCalendar];
+        }];
+        return;
+      }
+
+      if (output.code.integerValue != 200 || ![output.data isKindOfClass:[AGMyCropResponseDto class]]) {
+        NSLog(@"[PlantDetail] getCropDetail invalid response, code=%@ message=%@", output.code, output.message);
+        return;
+      }
+      NSLog(@"[PlantDetail] crop detail success, cropId=%@", cropId);
+      NSLog(@"[PlantDetail] crop detail records=%@", output.data.records);
+      NSLog(@"[PlantDetail] crop detail watering records=%@", output.data.records[@"WATERING"]);
+
+      NSLog(@"1");
+      [strongSelf.viewModel applyCropDetailResponse:output.data];//将服务端状态合入本地的markedStatusMap
+      [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];//刷新数据
+    });
+  }];
 }
 
 @end

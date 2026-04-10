@@ -7,7 +7,7 @@
 #import "TLWPlantDetailViewModel.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWPlantDetailCalendarDayCellView : UIView
+@interface TLWPlantDetailCalendarDayCellView : UIControl
 
 - (void)configureWithItem:(TLWPlantCalendarDayItem *)item;
 
@@ -17,6 +17,7 @@
 
 @property (nonatomic, strong) UIView *circleView;
 @property (nonatomic, strong) UILabel *dayLabel;
+@property (nonatomic, strong) TLWPlantCalendarDayItem *item;
 
 @end
 
@@ -49,6 +50,7 @@
 }
 
 - (void)configureWithItem:(TLWPlantCalendarDayItem *)item {
+  self.item = item;
   self.dayLabel.text = item.dayText;
   self.dayLabel.textColor = item.inCurrentMonth ? [UIColor colorWithWhite:0.32 alpha:1.0] : [UIColor colorWithWhite:0.78 alpha:1.0];
   self.circleView.backgroundColor = [UIColor clearColor];
@@ -64,14 +66,25 @@
       self.circleView.backgroundColor = [UIColor colorWithRed:0.98 green:0.70 blue:0.34 alpha:1.0];
       self.dayLabel.textColor = [UIColor whiteColor];
       break;
+    case TLWPlantCalendarDayStatusNone:
+      break;
     case TLWPlantCalendarDayStatusSelected:
+      break;
+  }
+
+  if (item.isSelected) {
+    if (item.status == TLWPlantCalendarDayStatusWatered) {
+      self.circleView.layer.borderWidth = 2.0;
+      self.circleView.layer.borderColor = [UIColor whiteColor].CGColor;
+    } else if (item.status == TLWPlantCalendarDayStatusPending) {
+      self.circleView.layer.borderWidth = 2.0;
+      self.circleView.layer.borderColor = [UIColor whiteColor].CGColor;
+    } else {
       self.circleView.backgroundColor = [UIColor whiteColor];
       self.circleView.layer.borderWidth = 2.0;
       self.circleView.layer.borderColor = [UIColor colorWithRed:0.48 green:0.78 blue:0.74 alpha:1.0].CGColor;
       self.dayLabel.textColor = [UIColor colorWithWhite:0.32 alpha:1.0];
-      break;
-    case TLWPlantCalendarDayStatusNone:
-      break;
+    }
   }
 }
 
@@ -82,6 +95,7 @@
 @property (nonatomic, strong) UILabel *monthTitleLabel;
 @property (nonatomic, strong) NSMutableArray<UILabel *> *weekdayLabels;
 @property (nonatomic, strong) NSMutableArray<TLWPlantDetailCalendarDayCellView *> *dayCellViews;
+@property (nonatomic, strong) UITapGestureRecognizer *gridTapGesture;
 
 @end
 
@@ -92,6 +106,11 @@
   if (self) {
     self.backgroundColor = [UIColor whiteColor];
     self.layer.cornerRadius = 18.0;
+
+    UITapGestureRecognizer *gridTapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_handleCalendarTap:)];
+    gridTapGesture.cancelsTouchesInView = NO;
+    [self addGestureRecognizer:gridTapGesture];
+    self.gridTapGesture = gridTapGesture;
 
     UIButton *previousButton = [UIButton buttonWithType:UIButtonTypeCustom];
     [previousButton setTitle:@"‹" forState:UIControlStateNormal];
@@ -165,6 +184,8 @@
       TLWPlantDetailCalendarDayCellView *cellView = [[TLWPlantDetailCalendarDayCellView alloc] init];
       [self addSubview:cellView];
       [self.dayCellViews addObject:cellView];
+      [cellView addTarget:self action:@selector(tl_dayCellTapped:) forControlEvents:UIControlEventTouchDown];
+
 
       NSInteger row = index / 7;
       NSInteger column = index % 7;
@@ -175,11 +196,22 @@
       [cellView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(anchorLabel);
         make.top.equalTo(topAnchor.mas_bottom).offset(topOffset);
-        make.width.height.mas_equalTo(38.0);
+        make.width.equalTo(anchorLabel);
+        make.height.mas_equalTo(44.0);
       }];
     }
   }
   return self;
+}
+
+- (void)tl_dayCellTapped:(TLWPlantDetailCalendarDayCellView *)sender {
+  NSLog(@"111");
+  if (!sender.item.inCurrentMonth || !sender.item.date) {
+    return;
+  }
+  if (self.dateSelectionBlock) {
+    self.dateSelectionBlock(sender.item.date);
+  }
 }
 
 - (void)configureWithMonthTitle:(NSString *)monthTitle dayItems:(NSArray<TLWPlantCalendarDayItem *> *)dayItems {
@@ -187,6 +219,17 @@
   NSInteger maxCount = MIN(dayItems.count, self.dayCellViews.count);
   for (NSInteger index = 0; index < maxCount; index++) {
     [self.dayCellViews[index] configureWithItem:dayItems[index]];
+  }
+}
+
+- (void)tl_handleCalendarTap:(UITapGestureRecognizer *)gesture {
+  CGPoint point = [gesture locationInView:self];
+  for (TLWPlantDetailCalendarDayCellView *cellView in self.dayCellViews) {
+    if (!CGRectContainsPoint(cellView.frame, point)) {
+      continue;
+    }
+    [self tl_dayCellTapped:cellView];
+    break;
   }
 }
 

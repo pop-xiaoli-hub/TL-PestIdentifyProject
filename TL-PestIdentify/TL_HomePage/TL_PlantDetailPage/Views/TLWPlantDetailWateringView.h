@@ -13,6 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, copy, nullable) void(^previousMonthBlock)(void);
 @property (nonatomic, copy, nullable) void(^nextMonthBlock)(void);
+@property (nonatomic, copy, nullable) void(^dateSelectionBlock)(NSDate *date);
 @property (nonatomic, copy, nullable) void(^tagActionBlock)(void);
 @property (nonatomic, copy, nullable) void(^cancelTagActionBlock)(void);
 

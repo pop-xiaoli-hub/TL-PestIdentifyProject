@@ -6,6 +6,7 @@
 #import <Foundation/Foundation.h>
 
 @class TLWPlantModel;
+@class AGMyCropResponseDto;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -29,6 +30,8 @@ typedef NS_ENUM(NSInteger, TLWPlantCalendarDayStatus) {
 @property (nonatomic, assign) BOOL inCurrentMonth;
 @property (nonatomic, assign) BOOL isToday;
 @property (nonatomic, assign) TLWPlantCalendarDayStatus status;
+@property (nonatomic, assign) BOOL isSelected;
+@property (nonatomic, strong) NSDate *date;
 
 @end
 
@@ -48,6 +51,11 @@ typedef NS_ENUM(NSInteger, TLWPlantCalendarDayStatus) {
 - (NSString *)currentMonthTitle;
 - (NSArray<TLWPlantCalendarDayItem *> *)calendarItems;
 - (CGFloat)preferredContentHeightForSelectedTab;
+- (NSDate *)currentSelectedDate;
+- (void)applyCropDetailResponse:(AGMyCropResponseDto *)cropDetail;
+- (void)selectDate:(NSDate *)date;
+- (void)markSelectedDateAsWatered;
+- (void)markSelectedDateAsPending;
 
 - (void)moveToPreviousMonth;
 - (void)moveToNextMonth;

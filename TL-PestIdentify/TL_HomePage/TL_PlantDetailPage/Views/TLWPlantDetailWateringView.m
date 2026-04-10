@@ -145,6 +145,12 @@
         strongSelf.nextMonthBlock();
       }
     };
+    calendarView.dateSelectionBlock = ^(NSDate *date) {
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (strongSelf.dateSelectionBlock) {
+        strongSelf.dateSelectionBlock(date);
+      }
+    };
   }
   return self;
 }
