@@ -271,7 +271,7 @@
   [self.headerContainer addSubview:imageView];
   [imageView mas_makeConstraints:^(MASConstraintMaker *make) {
       make.left.equalTo(self.temperatureSuffixLabel.mas_right).offset(-60);
-      make.top.equalTo(self.headerContainer).offset(95);
+      make.top.equalTo(self.headerContainer).offset(55);
     make.height.mas_equalTo(80);
     make.width.mas_equalTo(100);
   }];
