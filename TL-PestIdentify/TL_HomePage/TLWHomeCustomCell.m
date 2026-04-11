@@ -65,7 +65,7 @@
 }
 
 - (void)tl_applyLocationName:(nullable NSString *)locationName {
-  self.locationLabel.text = locationName.length > 0 ? locationName : @"杭州";
+  self.locationLabel.text = locationName.length > 0 ? locationName : @"未定位";
 }
 
 - (void)tl_setupSubviews {

@@ -147,7 +147,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
             });
             return;
         }
-        if (output.code.integerValue == 401) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
             [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                 [strongSelf fetchMyPosts];
             }];
@@ -180,7 +180,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         dispatch_async(dispatch_get_main_queue(), ^{
             [strongSelf.myView endRefreshingPosts];
             if (error || !output || output.code.integerValue != 200) {
-                if (output.code.integerValue == 401) {
+                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [strongSelf tl_fetchMyPostsForRefresh];
                     }];

@@ -223,7 +223,7 @@
         return;
       }
 
-      if (output.code.integerValue == 401) {
+      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
         [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
           [strongSelf tl_submitCultivationTagWithStatus:status content:content tagType:tagType];
         }];
@@ -259,7 +259,7 @@
         return;
       }
 
-      if (output.code.integerValue == 401) {
+      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
         [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
           [strongSelf tl_fetchCropDetailAndRefreshCalendar];
         }];

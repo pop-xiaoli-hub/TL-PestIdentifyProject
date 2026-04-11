@@ -32,7 +32,7 @@
 - 多轮对话式 AI 助手（已接入 AgriPestClient chatProfile SDK）
 - 支持图片 + 文字混合输入（图片压缩后 Base64 编码传输）
 - AI 占位消息"正在思考中..."+ 实时回显
-- 401 token 过期自动续期重试
+- 401/403 鉴权失效自动续期重试
 
 ### 我的
 - 编辑资料页（Figma 1:1 还原，独立毛玻璃卡片设计）
@@ -46,7 +46,7 @@
 ### 登录安全
 - 双 Token 机制（accessToken + refreshToken）
 - accessToken 过期自动续期，续期失败强制跳回登录页
-- 全部 API 接口接入 401 自动重试
+- 全部 API 接口接入 401/403 自动重试
 - SMS 验证码登录自动注册提示
 
 ### 通用组件
@@ -189,7 +189,7 @@ gh api 'repos/lukecc00/AgroAiServer/commits?sha=master&per_page=20' \
 - [ ] **记录详情 → AI 助手** — 跳转 AI 助手并预填当前病害名称作为问题
 - [x] **换绑手机号** — 短信验证码 + `changePhone` 接口
 - [x] **修改密码** — `updatePassword` 接口，6-20 位校验，支持显示原密码
-- [x] **双 Token 续期** — 401 自动 refresh，全接口覆盖
+- [x] **双 Token 续期** — 401/403 自动 refresh，全接口覆盖
 - [x] **统一 Toast** — TLWToast 组件，居中 + 遮罩
 - [x] **按钮防抖** — 登录/改昵称/收藏/头像上传
 - [x] **我的收藏** — 收藏列表分页 + 从个人主页跳转

@@ -73,7 +73,7 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
                                     completionHandler:^(AGResultMessageGroupResponseDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (error || output.code.integerValue != 200) {
-                if (!error && output.code.integerValue == 401) {
+                if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self fetchMessages]; }];
                     return;
                 }
@@ -186,7 +186,7 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
                                                      withRowAnimation:UITableViewRowAnimationNone];
                     return;
                 }
-                if (output.code.integerValue == 401) {
+                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [[TLWSDKManager shared].api markAsReadWithId:msgId
                                                    completionHandler:^(AGResultVoid *o, NSError *e) {

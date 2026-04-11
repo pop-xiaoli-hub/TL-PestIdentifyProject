@@ -58,7 +58,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         dispatch_async(dispatch_get_main_queue(), ^{
             self->_myView.confirmButton.enabled = YES;
             if (error || output.code.integerValue != 200) {
-                if (!error && output.code.integerValue == 401) {
+                if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
                     return;
                 }

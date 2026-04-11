@@ -35,6 +35,9 @@
 #import <AgriPestClient/AGTagOperationRequest.h>
 #import <AgriPestClient/AGResultMyCropResponseDto.h>
 #import <AgriPestClient/AGResultListMyCropResponseDto.h>
+#import <AgriPestClient/AGResultPageResultMessageResponseDto.h>
+#import <AgriPestClient/AGPageResultMessageResponseDto.h>
+#import <AgriPestClient/AGMessageResponseDto.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -133,6 +136,16 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSURLSessionTask *)addTagWithCropId:(NSNumber *)cropId
                    tagOperationRequest:(AGTagOperationRequest *)request
                      completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
+
+/// 获取首页预警消息列表（仅未读 ALERT 类型）
+- (NSURLSessionTask *)getAlertMessagesWithPage:(NSNumber *)page
+                                          size:(NSNumber *)size
+                             completionHandler:(void (^)(AGResultPageResultMessageResponseDto * output, NSError * error))handler;
+/// 获取首页实时天气（和风天气）
+- (nullable NSURLSessionTask *)getCurrentWeatherWithLatitude:(double)latitude
+                                           longitude:(double)longitude
+                                          completion:(void (^)(NSDictionary * _Nullable weatherInfo, NSError * _Nullable error))completion;
+
 @end
 
 NS_ASSUME_NONNULL_END

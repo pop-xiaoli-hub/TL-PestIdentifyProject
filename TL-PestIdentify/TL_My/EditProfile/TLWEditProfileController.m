@@ -131,7 +131,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
     [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:^(AGResultString *output, NSError *error) {
         if (error || output.code.integerValue != 200) {
-            if (!error && output.code.integerValue == 401) {
+            if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:nil];
@@ -149,7 +149,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *res, NSError *err) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (err || res.code.integerValue != 200) {
-                    if (!err && res.code.integerValue == 401) {
+                    if (!err && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:res.code]) {
                         [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                             [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:nil];
                         }];

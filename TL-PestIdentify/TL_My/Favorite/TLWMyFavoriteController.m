@@ -119,7 +119,7 @@ static NSInteger  const kPageSize       = 20;
             [TLWLoadingIndicator hideInView:self.favoriteView.collectionView];
 
             if (error || output.code.integerValue != 200) {
-                if (output.code.integerValue == 401) {
+                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [self fetchPage:page];
                     }];

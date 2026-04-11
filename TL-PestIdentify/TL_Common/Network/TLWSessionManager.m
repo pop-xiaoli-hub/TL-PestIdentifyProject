@@ -17,16 +17,9 @@ static NSString * const kLegacyRefreshKey = @"TLW_refresh_token";
 static NSString * const kUserIdKey = @"TLW_user_id";
 static NSString * const kUsernameKey = @"TLW_username";
 static NSString * const kGeneratedPasswordKey = @"TLW_generated_password";
+static NSTimeInterval const kTLWAuthToastThrottleInterval = 2.0;
 
 NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotification";
-
-static inline void TLWAuthDebugToast(NSString *message) {
-#if DEBUG
-    [TLWToast show:message];
-#else
-    (void)message;
-#endif
-}
 
 @interface TLWSessionManager ()
 
@@ -34,9 +27,17 @@ static inline void TLWAuthDebugToast(NSString *message) {
 @property (nonatomic, strong, readwrite) AGUserProfileDto *cachedProfile;
 @property (nonatomic, strong) NSMutableArray<dispatch_block_t> *pendingRetryBlocks;
 @property (nonatomic, assign) BOOL isRefreshing;
+@property (nonatomic, assign) BOOL isHandlingSessionInvalidation;
+@property (nonatomic, assign) NSTimeInterval lastAuthToastTimestamp;
+@property (nonatomic, copy, nullable) NSString *lastAuthToastMessage;
 
 //  这是一个会话版本号，用于避免旧回调污染新会话
 @property (nonatomic, assign) NSUInteger authStateVersion;
+
+- (void)tl_fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion
+                         didRetryAuth:(BOOL)didRetryAuth;
+- (void)tl_showAuthToastIfNeeded:(NSString *)message;
+- (void)tl_forceLogoutAndNotifyWithMessage:(nullable NSString *)message;
 
 @end
 
@@ -160,6 +161,7 @@ static inline void TLWAuthDebugToast(NSString *message) {
 
     self.userId = auth.userId.integerValue;
     self.username = auth.username.length > 0 ? auth.username : nil;
+    self.isHandlingSessionInvalidation = NO;
 
     //  重新打开数据库
     [[TLWDBManager shared] reopenForCurrentUser];
@@ -167,6 +169,11 @@ static inline void TLWAuthDebugToast(NSString *message) {
 }
 
 - (void)fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion {
+    [self tl_fetchProfileWithCompletion:completion didRetryAuth:NO];
+}
+
+- (void)tl_fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion
+                         didRetryAuth:(BOOL)didRetryAuth {
     __weak typeof(self) weakSelf = self;
     [self.api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -184,16 +191,13 @@ static inline void TLWAuthDebugToast(NSString *message) {
                 return;
             }
 
-            if (!error && output.code.integerValue == 401) {
-                NSLog(@"[Profile] fetch got 401, attempting refresh: userId=%ld message=%@",
-                      (long)self.userId,
-                      output.message ?: @"<empty>");
-                TLWAuthDebugToast(@"登录状态失效，正在刷新登录");
-                [self handleUnauthorizedWithRetry:^{
+            if (!didRetryAuth
+                && [self handleAuthFailureForCode:output.code
+                                          message:output.message
+                                       retryBlock:^{
                     NSLog(@"[Profile] retry fetch after refresh");
-                    TLWAuthDebugToast(@"登录状态已刷新，正在重试拉取资料");
-                    [self fetchProfileWithCompletion:completion];
-                }];
+                    [self tl_fetchProfileWithCompletion:completion didRetryAuth:YES];
+                }]) {
                 return;
             }
 
@@ -202,7 +206,10 @@ static inline void TLWAuthDebugToast(NSString *message) {
                   output.message ?: @"<empty>",
                   error.localizedDescription ?: @"<nil>",
                   output.data ? @"present" : @"nil");
-            TLWAuthDebugToast(@"资料拉取失败，请稍后重试");
+            [TLWToast show:[self userFacingMessageForError:error
+                                                     code:output.code
+                                            serverMessage:output.message
+                                           defaultMessage:@"资料拉取失败，请稍后重试"]];
             if (completion) completion(nil);
         });
     }];
@@ -228,11 +235,52 @@ static inline void TLWAuthDebugToast(NSString *message) {
     return [[NSUserDefaults standardUserDefaults] stringForKey:kGeneratedPasswordKey];
 }
 
+- (BOOL)shouldAttemptTokenRefreshForCode:(NSNumber *)code {
+    NSInteger statusCode = code.integerValue;
+    return statusCode == 401 || statusCode == 403;
+}
+
+- (BOOL)handleAuthFailureForCode:(NSNumber *)code
+                         message:(NSString *)message
+                      retryBlock:(nullable void(^)(void))retryBlock {
+    if (![self shouldAttemptTokenRefreshForCode:code]) {
+        return NO;
+    }
+
+    NSLog(@"[Auth] response considered expired: code=%@ userId=%ld message=%@",
+          code ?: @"<nil>",
+          (long)self.userId,
+          message ?: @"<empty>");
+    [self tl_showAuthToastIfNeeded:@"登录状态已失效，正在尝试恢复"];
+    [self handleUnauthorizedWithRetry:retryBlock];
+    return YES;
+}
+
+- (NSString *)userFacingMessageForError:(NSError *)error
+                                   code:(NSNumber *)code
+                          serverMessage:(NSString *)serverMessage
+                         defaultMessage:(NSString *)defaultMessage {
+    if (error.localizedDescription.length > 0) {
+        return error.localizedDescription;
+    }
+    if ([self shouldAttemptTokenRefreshForCode:code]) {
+        return @"登录状态异常，请重新登录";
+    }
+    if (code.integerValue == 4003) {
+        return serverMessage.length > 0 ? serverMessage : @"当前账号没有权限访问该内容";
+    }
+    if (serverMessage.length > 0) {
+        return serverMessage;
+    }
+    return defaultMessage;
+}
+
 - (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock {
     NSString *refreshToken = nil;
     NSUInteger requestVersion = 0;
     BOOL shouldStartRefresh = NO;
     BOOL shouldForceLogout = NO;
+    NSString *logoutMessage = nil;
 
     @synchronized (self) {
         if (retryBlock) {
@@ -241,15 +289,14 @@ static inline void TLWAuthDebugToast(NSString *message) {
         if (self.isRefreshing) {
             NSLog(@"[Token] refresh already in progress, queued retry block count=%lu",
                   (unsigned long)self.pendingRetryBlocks.count);
-            TLWAuthDebugToast(@"登录刷新进行中，请稍候");
             return;
         }
 
         refreshToken = [self refreshToken];
         if (!refreshToken.length) {
             NSLog(@"[Token] no refreshToken available, force logout");
-            TLWAuthDebugToast(@"登录信息缺失，请重新登录");
             shouldForceLogout = YES;
+            logoutMessage = @"登录信息已失效，请重新登录";
             [self.pendingRetryBlocks removeAllObjects];
         } else {
             self.isRefreshing = YES;
@@ -259,7 +306,7 @@ static inline void TLWAuthDebugToast(NSString *message) {
     }
 
     if (shouldForceLogout) {
-        [self tl_forceLogoutAndNotify];
+        [self tl_forceLogoutAndNotifyWithMessage:logoutMessage];
         return;
     }
     if (!shouldStartRefresh) return;
@@ -267,7 +314,6 @@ static inline void TLWAuthDebugToast(NSString *message) {
     NSLog(@"[Token] start refresh: userId=%ld queuedRetryCount=%lu",
           (long)self.userId,
           (unsigned long)self.pendingRetryBlocks.count);
-    TLWAuthDebugToast(@"检测到登录已过期，正在自动续期");
 
     AGRefreshTokenRequest *req = [[AGRefreshTokenRequest alloc] init];
     req.refreshToken = refreshToken;
@@ -301,7 +347,6 @@ static inline void TLWAuthDebugToast(NSString *message) {
                           output.code,
                           output.data.userId ?: @"<nil>",
                           (unsigned long)blocks.count);
-                    TLWAuthDebugToast(@"登录已续期成功");
                     for (dispatch_block_t block in blocks) {
                         block();
                     }
@@ -312,11 +357,10 @@ static inline void TLWAuthDebugToast(NSString *message) {
                       output.data.token.length > 0 ? @"present" : @"nil",
                       output.data.refreshToken.length > 0 ? @"present" : @"nil",
                       output.data.userId ?: @"<nil>");
-                TLWAuthDebugToast(@"登录续期异常，请重新登录");
                 @synchronized (self) {
                     [self.pendingRetryBlocks removeAllObjects];
                 }
-                [self tl_forceLogoutAndNotify];
+                [self tl_forceLogoutAndNotifyWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
                 return;
             }
 
@@ -324,11 +368,10 @@ static inline void TLWAuthDebugToast(NSString *message) {
                   output.code ?: @"<nil>",
                   output.message ?: @"<empty>",
                   error.localizedDescription ?: @"<nil>");
-            TLWAuthDebugToast(@"登录已失效，请重新登录");
             @synchronized (self) {
                 [self.pendingRetryBlocks removeAllObjects];
             }
-            [self tl_forceLogoutAndNotify];
+            [self tl_forceLogoutAndNotifyWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
         });
     }];
 }
@@ -382,8 +425,38 @@ static inline void TLWAuthDebugToast(NSString *message) {
     [ud removeObjectForKey:kGeneratedPasswordKey];
 }
 
-- (void)tl_forceLogoutAndNotify {
+- (void)tl_showAuthToastIfNeeded:(NSString *)message {
+    if (message.length == 0) return;
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+        BOOL sameMessage = [self.lastAuthToastMessage isEqualToString:message];
+        if (sameMessage && (now - self.lastAuthToastTimestamp) < kTLWAuthToastThrottleInterval) {
+            return;
+        }
+
+        self.lastAuthToastMessage = [message copy];
+        self.lastAuthToastTimestamp = now;
+        [TLWToast show:message];
+    });
+}
+
+- (void)tl_forceLogoutAndNotifyWithMessage:(nullable NSString *)message {
+    BOOL shouldNotify = NO;
+    @synchronized (self) {
+        if (!self.isHandlingSessionInvalidation) {
+            self.isHandlingSessionInvalidation = YES;
+            shouldNotify = YES;
+        }
+    }
+
     [self logout];
+    [self tl_showAuthToastIfNeeded:(message.length > 0 ? message : @"登录状态已失效，请重新登录")];
+
+    if (!shouldNotify) {
+        return;
+    }
+
     dispatch_block_t handler = self.sessionInvalidationHandler;
     if (handler) {
         dispatch_async(dispatch_get_main_queue(), handler);

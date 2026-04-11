@@ -13,6 +13,7 @@
 #import "TLWCustomInputCell.h"
 #import "TLWAddCropCell.h"
 #import "TLWCropSectionHeaderView.h"
+#import "TLWToast.h"
 #import <Masonry/Masonry.h>
 
 static NSString * const kCropCellID   = @"CropCell";
@@ -258,19 +259,46 @@ referenceSizeForHeaderInSection:(NSInteger)section {
 
 - (void)handleConfirm {
     NSLog(@"用户选择的农作物: %@", _selectedPlantNames);
-    // 上传偏好到后端
     AGProfileUpdateRequest *req = [[AGProfileUpdateRequest alloc] init];
     req.followedCrops = [_selectedPlantNames allObjects];
+    TLWSDKManager *manager = [TLWSDKManager shared];
+    __weak typeof(self) weakSelf = self;
 
-    [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *output, NSError *error) {
-        if (error) {
-            NSLog(@"偏好保存失败: %@", error.localizedDescription);
-        }
-        // 刷新缓存后进主页
-        [[TLWSDKManager shared].sessionManager fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
-            [self navigateToMain];
+    __block void (^savePreferenceBlock)(BOOL);
+    savePreferenceBlock = ^(BOOL didRetryAuth) {
+        [manager.api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *output, NSError *error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (!strongSelf) return;
+
+                if (!didRetryAuth
+                    && [manager.sessionManager handleAuthFailureForCode:output.code
+                                                               message:output.message
+                                                            retryBlock:^{
+                    savePreferenceBlock(YES);
+                }]) {
+                    return;
+                }
+
+                if (error || output.code.integerValue != 200) {
+                    NSLog(@"偏好保存失败: %@", error.localizedDescription ?: output.message);
+                    NSString *message = [manager.sessionManager userFacingMessageForError:error
+                                                                                     code:output.code
+                                                                            serverMessage:output.message
+                                                                           defaultMessage:@"偏好同步失败，已进入首页"];
+                    [TLWToast show:message];
+                    [strongSelf navigateToMain];
+                    return;
+                }
+
+                [manager.sessionManager fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
+                    [strongSelf navigateToMain];
+                }];
+            });
         }];
-    }];
+    };
+
+    savePreferenceBlock(NO);
 }
 
 - (void)navigateToMain {
