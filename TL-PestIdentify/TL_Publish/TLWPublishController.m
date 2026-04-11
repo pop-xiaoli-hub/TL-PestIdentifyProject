@@ -11,7 +11,11 @@
 #import <AgriPestClient/AgriPestClient.h>
 #import "TLWCommunityPost.h"
 #import "TLWSDKManager.h"
-@interface TLWPublishController ()<UIGestureRecognizerDelegate, UICollectionViewDataSource, UICollectionViewDelegate>
+#import "TLWToast.h"
+
+static NSString * const kTLWPublishContentPlaceholder = @"点击输入您要发布的内容";
+
+@interface TLWPublishController ()<UIGestureRecognizerDelegate, UICollectionViewDataSource, UICollectionViewDelegate, UITextViewDelegate>
 
 @property (nonatomic, strong) TLWPublishView *myView;
 @property (nonatomic, strong, nullable) id draftObject;
@@ -49,6 +53,7 @@
   self.myView.cropsCollectionView.dataSource = self;
   self.myView.cropsCollectionView.delegate = self;
   [self.myView.cropsCollectionView registerClass:[UICollectionViewCell class] forCellWithReuseIdentifier:@"PublishCropTagCell"];
+  self.myView.contentTextView.delegate = self;
 
   self.selectedImages = [NSMutableArray array];
   self.selectedCrops = [NSMutableArray array];
@@ -82,6 +87,31 @@
 
 - (void)hideKeyboard {
   [self.myView endEditing:YES];
+}
+
+#pragma mark - UITextViewDelegate
+
+- (void)textViewDidBeginEditing:(UITextView *)textView {
+  if (textView != self.myView.contentTextView) {
+    return;
+  }
+
+  if ([textView.text isEqualToString:kTLWPublishContentPlaceholder]) {
+    textView.text = @"";
+    textView.textColor = [UIColor darkTextColor];
+  }
+}
+
+- (void)textViewDidEndEditing:(UITextView *)textView {
+  if (textView != self.myView.contentTextView) {
+    return;
+  }
+
+  NSString *content = [textView.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  if (content.length == 0) {
+    textView.text = kTLWPublishContentPlaceholder;
+    textView.textColor = [UIColor lightGrayColor];
+  }
 }
 
 #pragma mark - UICollectionViewDataSource
@@ -255,10 +285,25 @@
 - (void)tl_confirmPublishTapped {
   NSString *title = [self.myView.titleTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
   NSString* content = [self.myView.contentTextView.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-  if (!title.length || (!content.length && !self.selectedImages.count)) {
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"提示" message:@"请输入完整信息" preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
+  BOOL hasValidContent = content.length > 0 && ![content isEqualToString:kTLWPublishContentPlaceholder];
+
+  if (self.selectedImages.count == 0) {
+    [TLWToast show:@"请至少上传一张图片"];
+    return;
+  }
+
+  if (self.selectedCrops.count == 0) {
+    [TLWToast show:@"请选择要发布的作物"];
+    return;
+  }
+
+  if (!title.length) {
+    [TLWToast show:@"请输入帖子标题"];
+    return;
+  }
+
+  if (!hasValidContent) {
+    [TLWToast show:@"请输入帖子内容"];
     return;
   }
 

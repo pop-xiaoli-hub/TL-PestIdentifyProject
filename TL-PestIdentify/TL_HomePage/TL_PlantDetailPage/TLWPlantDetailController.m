@@ -16,15 +16,20 @@
 #import <SDWebImage/SDWebImage.h>
 #import "TLWSDKManager.h"
 
-@interface TLWPlantDetailController ()
+@interface TLWPlantDetailController () <UIGestureRecognizerDelegate>
 
 @property (nonatomic, strong) TLWPlantDetailView *detailView;
 @property (nonatomic, strong) TLWPlantDetailViewModel *viewModel;
 @property (nonatomic, assign) BOOL tagRequestInFlight;
+@property (nonatomic, strong) UITapGestureRecognizer *dismissKeyboardTapGesture;
 
 @end
 
 @implementation TLWPlantDetailController
+
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
 
 - (instancetype)initWithPlantModel:(TLWPlantModel *)plantModel {
   self = [super init];
@@ -43,6 +48,8 @@
   [super viewDidLoad];
   self.navigationController.navigationBarHidden = YES;
   [self tl_bindActions];//绑定控件的回调行为
+  [self tl_setupDismissKeyboardGesture];
+  [self tl_registerKeyboardNotifications];
   [self tl_render];
   [self tl_fetchCropDetailAndRefreshCalendar];
 }
@@ -155,6 +162,68 @@
     }
     [strongSelf tl_submitCultivationTagWithStatus:@0 content:@"" tagType:@"NOTE"];
   };
+}
+
+- (void)tl_setupDismissKeyboardGesture {
+  UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_handleBackgroundTap)];
+  tapGesture.cancelsTouchesInView = NO;
+  tapGesture.delegate = self;
+  [self.detailView addGestureRecognizer:tapGesture];
+  self.dismissKeyboardTapGesture = tapGesture;
+}
+
+- (void)tl_handleBackgroundTap {
+  [self.detailView endEditing:YES];
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+  if (gestureRecognizer != self.dismissKeyboardTapGesture) {
+    return YES;
+  }
+
+  UIView *touchedView = touch.view;
+  while (touchedView != nil) {
+    if ([touchedView isKindOfClass:[UIControl class]] || [touchedView isKindOfClass:[UITextView class]]) {
+      return NO;
+    }
+    touchedView = touchedView.superview;
+  }
+
+  return YES;
+}
+
+- (void)tl_registerKeyboardNotifications {
+  NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
+  [notificationCenter addObserver:self selector:@selector(tl_keyboardWillShow:) name:UIKeyboardWillShowNotification object:nil];
+  [notificationCenter addObserver:self selector:@selector(tl_keyboardWillHide:) name:UIKeyboardWillHideNotification object:nil];
+}
+
+- (void)tl_keyboardWillShow:(NSNotification *)notification {
+  NSDictionary *userInfo = notification.userInfo;
+  CGRect keyboardFrame = [userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
+  NSTimeInterval animationDuration = [userInfo[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+  UIViewAnimationOptions animationOptions = ([userInfo[UIKeyboardAnimationCurveUserInfoKey] integerValue] << 16);
+
+  CGRect keyboardFrameInView = [self.view convertRect:keyboardFrame fromView:nil];
+  CGFloat keyboardOverlap = MAX(0.0, CGRectGetMaxY(self.view.bounds) - CGRectGetMinY(keyboardFrameInView));
+  CGFloat bottomInset = MAX(0.0, keyboardOverlap - self.view.safeAreaInsets.bottom);
+
+  [UIView animateWithDuration:animationDuration delay:0 options:animationOptions animations:^{
+    [self.detailView setScrollViewBottomInset:bottomInset];
+    if (self.viewModel.selectedTabType == TLWPlantDetailTabTypeNote && [self.detailView.noteView isEditingNoteText]) {
+      [self.detailView scrollToBottomAnimated:NO];
+    }
+  } completion:nil];
+}
+
+- (void)tl_keyboardWillHide:(NSNotification *)notification {
+  NSDictionary *userInfo = notification.userInfo;
+  NSTimeInterval animationDuration = [userInfo[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+  UIViewAnimationOptions animationOptions = ([userInfo[UIKeyboardAnimationCurveUserInfoKey] integerValue] << 16);
+
+  [UIView animateWithDuration:animationDuration delay:0 options:animationOptions animations:^{
+    [self.detailView setScrollViewBottomInset:0.0];
+  } completion:nil];
 }
 
 - (void)tl_render {

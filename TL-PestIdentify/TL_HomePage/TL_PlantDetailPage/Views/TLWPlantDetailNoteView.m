@@ -102,6 +102,7 @@
 @interface TLWPlantDetailNoteView () <UITextViewDelegate>
 
 @property (nonatomic, strong) TLWPlantDetailCalendarView *calendarView;
+@property (nonatomic, strong) UIView *textContainerView;
 @property (nonatomic, strong) UITextView *textView;
 @property (nonatomic, strong) UILabel *placeholderLabel;
 
@@ -134,6 +135,7 @@
     textContainerView.layer.shadowOffset = CGSizeMake(0, 4.0);
     textContainerView.layer.shadowRadius = 10.0;
     [self addSubview:textContainerView];
+    self.textContainerView = textContainerView;
 
     UITextView *textView = [[UITextView alloc] init];
     textView.backgroundColor = [UIColor clearColor];
@@ -289,6 +291,14 @@
 
 - (NSString *)currentNoteText {
   return self.textView.text ?: @"";
+}
+
+- (BOOL)isEditingNoteText {
+  return self.textView.isFirstResponder;
+}
+
+- (CGRect)noteEditorRectInView:(UIView *)view {
+  return [self.textContainerView convertRect:self.textContainerView.bounds toView:view];
 }
 
 - (void)textViewDidChange:(UITextView *)textView {
