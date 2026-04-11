@@ -14,6 +14,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)configureWithViewModel:(TLWPlantDetailViewModel *)viewModel;
 - (NSString *)currentNoteText;
+- (BOOL)isEditingNoteText;
+- (CGRect)noteEditorRectInView:(UIView *)view;
 
 @end
 

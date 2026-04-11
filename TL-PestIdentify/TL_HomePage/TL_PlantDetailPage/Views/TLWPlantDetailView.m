@@ -79,12 +79,10 @@
   self.topImageView = topImageView;
 
   UIButton *backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [backButton setTitle:@"‹" forState:UIControlStateNormal];
-  [backButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-  backButton.titleLabel.font = [UIFont systemFontOfSize:22.0 weight:UIFontWeightSemibold];
+  [backButton setImage:[UIImage imageNamed:@"iconBack"] forState:UIControlStateNormal];
   backButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.28];
   backButton.layer.cornerRadius = 20.0;
-  [contentView addSubview:backButton];
+  [self addSubview:backButton];
   self.backButton = backButton;
 
   UIButton *imageTagButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -163,8 +161,8 @@
   }];
 
   [backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(contentView).offset(16.0);
-    make.top.equalTo(contentView.mas_safeAreaLayoutGuideTop).offset(14.0);
+    make.left.equalTo(self).offset(16.0);
+    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(14.0);
     make.width.height.mas_equalTo(40.0);
   }];
 
@@ -311,6 +309,25 @@
   }];
   [self setNeedsLayout];
   [self layoutIfNeeded];
+}
+
+- (void)setScrollViewBottomInset:(CGFloat)bottomInset {
+  UIEdgeInsets contentInset = self.scrollView.contentInset;
+  contentInset.bottom = bottomInset;
+  self.scrollView.contentInset = contentInset;
+  self.scrollView.scrollIndicatorInsets = contentInset;
+}
+
+- (void)scrollContentRectToVisible:(CGRect)rect animated:(BOOL)animated {
+  [self.scrollView scrollRectToVisible:rect animated:animated];
+}
+
+- (void)scrollToBottomAnimated:(BOOL)animated {
+  CGFloat maxOffsetY = self.scrollView.contentSize.height - CGRectGetHeight(self.scrollView.bounds) + self.scrollView.contentInset.bottom;
+  if (maxOffsetY < -self.scrollView.adjustedContentInset.top) {
+    maxOffsetY = -self.scrollView.adjustedContentInset.top;
+  }
+  [self.scrollView setContentOffset:CGPointMake(0.0, maxOffsetY) animated:animated];
 }
 
 @end

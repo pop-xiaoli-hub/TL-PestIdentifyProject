@@ -41,6 +41,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 @property (nonatomic, copy) NSString *activeSearchQuery;
 @property (nonatomic, strong) NSArray<TLWCommunityPost *> *searchRecommendations;
 @property (nonatomic, strong) NSArray<NSString *> *searchKeywordSuggestions;
+@property (nonatomic, strong) NSMutableArray<NSString *> *searchHistoryItems;
 @property (nonatomic, assign) BOOL isSearchingPosts;
 @end
 
@@ -84,6 +85,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   self.refreshControl = refreshControl;
   self.posts = [NSMutableArray array];
   self.searchSuggestions = [NSMutableArray array];
+  self.searchHistoryItems = [NSMutableArray array];
   self.pendingSuggestionQuery = @"";
   self.activeSearchQuery = @"";
   self.searchRecommendations = @[];
@@ -92,6 +94,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   self.currentFeedPage = -1;
   self.hasMoreFeed = YES;
   self.feedRequestToken = 0;
+  [self.myView tl_setSearchHistoryItems:self.searchHistoryItems];
   [self tl_applyCommunityLayoutStyle];
   [self tl_fetchCommunityFeed];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
@@ -388,6 +391,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
   self.isSearchingPosts = YES;//进入请求态
   self.activeSearchQuery = trimmedQuery;
+  [self tl_addSearchHistoryKeyword:trimmedQuery];
   [self.suggestionTask cancel];
   self.suggestionTask = nil;
   [self tl_clearSuggestionList];
@@ -439,6 +443,22 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       [strongSelf presentViewController:nav animated:YES completion:nil];
     });
   }];
+}
+
+- (void)tl_addSearchHistoryKeyword:(NSString *)keyword {
+  if (keyword.length == 0) {
+    return;
+  }
+
+  [self.searchHistoryItems removeObject:keyword];
+  [self.searchHistoryItems insertObject:keyword atIndex:0];
+
+  NSInteger const maxHistoryCount = 12;
+  if (self.searchHistoryItems.count > maxHistoryCount) {
+    [self.searchHistoryItems removeObjectsInRange:NSMakeRange(maxHistoryCount, self.searchHistoryItems.count - maxHistoryCount)];
+  }
+
+  [self.myView tl_setSearchHistoryItems:self.searchHistoryItems];
 }
 
 #pragma mark - UICollectionViewDataSource

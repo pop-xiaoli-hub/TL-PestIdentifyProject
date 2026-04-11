@@ -31,6 +31,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)configureWithViewModel:(TLWPlantDetailViewModel *)viewModel;
 - (void)updateSelectedTab:(NSInteger)selectedIndex contentHeight:(CGFloat)contentHeight;
+- (void)setScrollViewBottomInset:(CGFloat)bottomInset;
+- (void)scrollContentRectToVisible:(CGRect)rect animated:(BOOL)animated;
+- (void)scrollToBottomAnimated:(BOOL)animated;
 
 @end
 

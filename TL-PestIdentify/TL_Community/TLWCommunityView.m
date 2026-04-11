@@ -428,8 +428,8 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
     make.bottom.equalTo(defaultSearchContentView).offset(-16);
   }];
 
-  // 默认展示数据，外部可通过接口覆盖
-  [self tl_setSearchHistoryItems:@[ @"水稻", @"杨梅树", @"白菜", @"地瓜", @"水稻", @"小麦", @"白菜", @"地瓜", @"水稻", @"小麦", @"白菜", @"地瓜" ]];
+  // 默认历史记录为空，待用户实际搜索后再填充
+  [self tl_setSearchHistoryItems:@[]];
   [self tl_setGuessYouWantToSearchItems:@[ @"水稻", @"小麦", @"白菜" ]];
 }
 
