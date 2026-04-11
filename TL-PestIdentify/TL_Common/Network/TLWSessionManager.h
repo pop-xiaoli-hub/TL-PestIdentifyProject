@@ -59,8 +59,23 @@ extern NSString * const TLWProfileDidUpdateNotification;
 /// 获取本地保存的 refreshToken
 - (nullable NSString *)refreshToken;
 
-/// Token 续期入口：检测到 401 时调用，自动用 refreshToken 换新 accessToken 后执行 retryBlock。
-/// 若 refreshToken 也已过期则强制跳回登录页。多个并发 401 只发一次刷新请求，其余排队等结果。
+/// 判断响应码是否应视为鉴权失效并触发 token 续期。
+- (BOOL)shouldAttemptTokenRefreshForCode:(nullable NSNumber *)code;
+
+/// 统一处理鉴权失败：识别 401/403、展示节流提示，并在 refresh 成功后执行 retryBlock。
+/// 返回 YES 表示当前响应已被会话层接管，调用方应直接 return。
+- (BOOL)handleAuthFailureForCode:(nullable NSNumber *)code
+                         message:(nullable NSString *)message
+                      retryBlock:(nullable void(^)(void))retryBlock;
+
+/// 生成更接近真实原因的失败文案，优先使用网络错误，其次回退服务端 message / 默认文案。
+- (NSString *)userFacingMessageForError:(nullable NSError *)error
+                                   code:(nullable NSNumber *)code
+                          serverMessage:(nullable NSString *)serverMessage
+                         defaultMessage:(NSString *)defaultMessage;
+
+/// Token 续期入口：检测到鉴权失效时调用，自动用 refreshToken 换新 accessToken 后执行 retryBlock。
+/// 若 refreshToken 也已过期则强制跳回登录页。多个并发鉴权失败只发一次刷新请求，其余排队等结果。
 - (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock;
 
 @end

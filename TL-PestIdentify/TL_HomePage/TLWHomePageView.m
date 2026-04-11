@@ -23,9 +23,40 @@
 @property (nonatomic, strong) UIImageView* bottomOfUserNameImageView;
 @property (nonatomic, strong) UIImageView* bambooImageView;
 @property (nonatomic, strong) UIView* headerContainer;
+
+// 定位行
+@property (nonatomic, strong) UIImageView *locationIconView;
+@property (nonatomic, strong) UILabel *locationNameLabel;
+@property (nonatomic, strong) UILabel *locationArrowLabel;
+
+// 底部定位 Banner
+@property (nonatomic, strong) UIView *locationBannerView;
+
 @end
 
 @implementation TLWHomePageView
+
+- (NSString *)tl_currentLunarDateText {
+  NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierChinese];
+  NSDateComponents *components = [calendar components:(NSCalendarUnitMonth | NSCalendarUnitDay) fromDate:[NSDate date]];
+
+  NSArray<NSString *> *monthTexts = @[@"正月", @"二月", @"三月", @"四月", @"五月", @"六月",
+                                      @"七月", @"八月", @"九月", @"十月", @"冬月", @"腊月"];
+  NSArray<NSString *> *dayTexts = @[@"初一", @"初二", @"初三", @"初四", @"初五", @"初六", @"初七", @"初八", @"初九", @"初十",
+                                    @"十一", @"十二", @"十三", @"十四", @"十五", @"十六", @"十七", @"十八", @"十九", @"二十",
+                                    @"廿一", @"廿二", @"廿三", @"廿四", @"廿五", @"廿六", @"廿七", @"廿八", @"廿九", @"三十"];
+
+  NSInteger monthIndex = MAX(1, MIN(components.month, monthTexts.count)) - 1;
+  NSInteger dayIndex = MAX(1, MIN(components.day, dayTexts.count)) - 1;
+  NSString *monthText = monthTexts[monthIndex];
+  NSString *dayText = dayTexts[dayIndex];
+
+  if (components.isLeapMonth) {
+    monthText = [@"闰" stringByAppendingString:monthText];
+  }
+
+  return [NSString stringWithFormat:@"农历%@%@", monthText, dayText];
+}
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
@@ -38,12 +69,14 @@
 - (void)setupSubviews {
   [self tl_setMainTableView];
   [self tl_setSubViewsOfHeaderContainer];
+  [self tl_setupLocationBanner];
 }
 
 - (void)tl_setSubViewsOfHeaderContainer {
   [self tl_setHelloLabel];
   [self tl_setUserNameLabel];
   [self tl_setBottomNameImageView];
+  [self tl_setLocationRow];
   [self tl_setUserVersionImageView];
   [self tl_setUserAvatorImageView];
   [self tl_setTemperatureLabels];
@@ -51,6 +84,149 @@
   [self tl_setCalendarLabel];
   [self tl_setBambooImageView];
 }
+
+#pragma mark - 定位行
+
+- (void)tl_setLocationRow {
+  UIImageView *iconView = self.locationIconView;
+  iconView.image = [[UIImage imageNamed:@"iconLocation"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  [self.headerContainer addSubview:iconView];
+
+  UILabel *nameLabel = self.locationNameLabel;
+  nameLabel.text = @"未定位";
+  [self.headerContainer addSubview:nameLabel];
+
+  UILabel *arrowLabel = self.locationArrowLabel;
+  arrowLabel.text = @"▼";
+  [self.headerContainer addSubview:arrowLabel];
+
+  [iconView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.headerContainer).offset(30);
+    make.top.equalTo(self.helloLabel.mas_bottom).offset(5);
+    make.width.height.mas_equalTo(16);
+  }];
+
+  [nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(iconView.mas_right).offset(4);
+    make.centerY.equalTo(iconView);
+  }];
+
+  [arrowLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(nameLabel.mas_right).offset(3);
+    make.centerY.equalTo(iconView);
+  }];
+}
+
+- (void)configureWithLocationName:(nullable NSString *)locationName {
+  self.locationNameLabel.text = locationName.length > 0 ? locationName : @"未定位";
+}
+
+#pragma mark - 底部定位 Banner
+
+- (void)tl_setupLocationBanner {
+  UIView *banner = [[UIView alloc] init];
+  banner.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.67];
+  banner.layer.cornerRadius = 20.0;
+  banner.layer.masksToBounds = YES;
+  banner.hidden = YES;
+  [self addSubview:banner];
+  self.locationBannerView = banner;
+
+  [banner mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self).offset(16);
+    make.right.equalTo(self).offset(-16);
+    make.bottom.equalTo(self).offset(-100);
+    make.height.mas_equalTo(80);
+  }];
+
+  // 标题
+  UILabel *titleLabel = [[UILabel alloc] init];
+  titleLabel.text = @"开启定位服务";
+  titleLabel.textColor = [UIColor whiteColor];
+  titleLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightHeavy];
+  [banner addSubview:titleLabel];
+
+  // 副标题
+  UILabel *subtitleLabel = [[UILabel alloc] init];
+  subtitleLabel.text = @"开启后，将为您精准提供病害预警信息";
+  subtitleLabel.textColor = [UIColor whiteColor];
+  subtitleLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightMedium];
+  [banner addSubview:subtitleLabel];
+
+  // 开启定位按钮
+  UIButton *openButton = [UIButton buttonWithType:UIButtonTypeCustom];
+  openButton.backgroundColor = [UIColor colorWithRed:1.0 green:0.71 blue:0.14 alpha:1.0]; // #FFB524
+  openButton.layer.cornerRadius = 13.0;
+  openButton.layer.masksToBounds = YES;
+  openButton.titleLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightBold];
+  [openButton setTitle:@"开启定位" forState:UIControlStateNormal];
+  [openButton setTitleColor:[UIColor colorWithRed:0.29 green:0.16 blue:0.0 alpha:1.0] forState:UIControlStateNormal]; // #4B2800
+  [openButton addTarget:self action:@selector(tl_didTapOpenLocation) forControlEvents:UIControlEventTouchUpInside];
+  [banner addSubview:openButton];
+
+  // 关闭按钮
+  UIButton *closeButton = [UIButton buttonWithType:UIButtonTypeCustom];
+  if (@available(iOS 13.0, *)) {
+    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:18.0 weight:UIImageSymbolWeightMedium];
+    UIImage *xImage = [[UIImage systemImageNamed:@"xmark.circle.fill" withConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    [closeButton setImage:xImage forState:UIControlStateNormal];
+    closeButton.tintColor = [UIColor colorWithWhite:0.6 alpha:1.0];
+  } else {
+    [closeButton setTitle:@"✕" forState:UIControlStateNormal];
+    closeButton.titleLabel.font = [UIFont systemFontOfSize:18.0];
+    [closeButton setTitleColor:[UIColor colorWithWhite:0.6 alpha:1.0] forState:UIControlStateNormal];
+  }
+  [closeButton addTarget:self action:@selector(tl_didTapCloseBanner) forControlEvents:UIControlEventTouchUpInside];
+  [banner addSubview:closeButton];
+
+  // 布局
+  [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(banner).offset(20);
+    make.top.equalTo(banner).offset(14);
+  }];
+
+  [subtitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(titleLabel);
+    make.top.equalTo(titleLabel.mas_bottom).offset(6);
+    make.right.lessThanOrEqualTo(openButton.mas_left).offset(-8);
+  }];
+
+  [closeButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(banner).offset(-12);
+    make.top.equalTo(banner).offset(12);
+    make.width.height.mas_equalTo(28);
+  }];
+
+  [openButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(closeButton.mas_left).offset(-8);
+    make.centerY.equalTo(banner);
+    make.width.mas_equalTo(72);
+    make.height.mas_equalTo(33);
+  }];
+}
+
+- (void)showLocationBanner {
+  self.locationBannerView.hidden = NO;
+}
+
+- (void)hideLocationBanner {
+  self.locationBannerView.hidden = YES;
+}
+
+- (void)tl_didTapOpenLocation {
+  if (self.onOpenLocationTapped) {
+    self.onOpenLocationTapped();
+  }
+}
+
+- (void)tl_didTapCloseBanner {
+  [self hideLocationBanner];
+  if (self.onCloseLocationBanner) {
+    self.onCloseLocationBanner();
+  }
+}
+
+#pragma mark - 原有 Header 组件
 
 - (void)tl_setBambooImageView {
   UIImageView* imageView = self.bambooImageView;
@@ -64,7 +240,7 @@
 
 - (void)tl_setCalendarLabel {
   UILabel* label = self.calendarLabel;
-  label.text = @"农历冬月十二";
+  label.text = [self tl_currentLunarDateText];
   [self.headerContainer addSubview:label];
   [label mas_makeConstraints:^(MASConstraintMaker *make) {
       make.left.equalTo(self.temperatureDigitalLabel.mas_left).offset(5);
@@ -81,7 +257,7 @@
   textLabel.text = @"℃/晴";
   [numberLabel mas_makeConstraints:^(MASConstraintMaker *make) {
       make.left.equalTo(self.headerContainer).offset(30);
-      make.top.equalTo(self.helloLabel.mas_bottom).offset(60);
+      make.top.equalTo(self.locationIconView.mas_bottom).offset(20);
   }];
   [textLabel mas_makeConstraints:^(MASConstraintMaker *make) {
       make.left.equalTo(numberLabel.mas_right);
@@ -164,6 +340,28 @@
   self.userVersionButton.selected = enabled;
 }
 
+- (NSString *)tl_weatherImageNameForIconCode:(NSString *)iconCode {
+  NSInteger code = iconCode.integerValue;
+  if ((code >= 100 && code <= 104) || code == 150 || code == 151 || code == 152 || code == 153) {
+    return @"hp_cloud.png";
+  }
+  if ((code >= 300 && code <= 313) || (code >= 399 && code <= 404)) {
+    return @"hp_cloud.png";
+  }
+  return @"hp_cloud.png";
+}
+
+- (void)configureWithTemperature:(nullable NSString *)temperature
+                     weatherText:(nullable NSString *)weatherText
+                        iconCode:(nullable NSString *)iconCode {
+  NSString *safeTemperature = temperature.length > 0 ? temperature : @"--";
+  NSString *safeWeatherText = weatherText.length > 0 ? weatherText : @"未知";
+  self.temperatureDigitalLabel.text = safeTemperature;
+  self.temperatureSuffixLabel.text = [NSString stringWithFormat:@"℃/%@", safeWeatherText];
+  NSString *imageName = [self tl_weatherImageNameForIconCode:iconCode ?: @""];
+  self.weatherCardImageView.image = [[UIImage imageNamed:imageName] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+}
+
 - (void)tl_setHelloLabel {
   UILabel* label = self.helloLabel;
   label.text = @"你好，";
@@ -212,14 +410,40 @@
 
 #pragma mark - 懒加载实现
 
+- (UIImageView *)locationIconView {
+  if (!_locationIconView) {
+    _locationIconView = [[UIImageView alloc] init];
+    _locationIconView.contentMode = UIViewContentModeScaleAspectFit;
+  }
+  return _locationIconView;
+}
 
+- (UILabel *)locationNameLabel {
+  if (!_locationNameLabel) {
+    _locationNameLabel = [[UILabel alloc] init];
+    _locationNameLabel.backgroundColor = [UIColor clearColor];
+    _locationNameLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.85];
+    _locationNameLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+  }
+  return _locationNameLabel;
+}
+
+- (UILabel *)locationArrowLabel {
+  if (!_locationArrowLabel) {
+    _locationArrowLabel = [[UILabel alloc] init];
+    _locationArrowLabel.backgroundColor = [UIColor clearColor];
+    _locationArrowLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.7];
+    _locationArrowLabel.font = [UIFont systemFontOfSize:10];
+  }
+  return _locationArrowLabel;
+}
 
 - (UITableView *)locationTableView {
   if (!_locationTableView) {
     _locationTableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
     _locationTableView.backgroundColor = [UIColor clearColor];
     _locationTableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    _locationTableView.scrollEnabled = NO; // 通常嵌套在 Header 里的 TableView 不需要滚动
+    _locationTableView.scrollEnabled = NO;
   }
   return _locationTableView;
 }

@@ -12,6 +12,7 @@
 #import "TLWRecordModel.h"
 #import "TLWRecordDetailController.h"
 #import "TLWSDKManager.h"
+#import "TLWLoadingIndicator.h"
 #import "TLWToast.h"
 #import <AgriPestClient/AGAgentChatHistory.h>
 #import <AgriPestClient/AGResultListAgentChatHistory.h>
@@ -23,6 +24,7 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 @interface TLWRecordController () <UICollectionViewDataSource, UICollectionViewDelegate>
 @property (nonatomic, strong) TLWRecordView *myView;
 @property (nonatomic, strong) NSArray<TLWRecordSection *> *sections;
+@property (nonatomic, assign) BOOL isLoading;
 @end
 
 @implementation TLWRecordController
@@ -65,6 +67,7 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 #pragma mark - Data
 
 - (void)tl_fetchRecords {
+    [self tl_setLoading:YES];
     __weak typeof(self) weakSelf = self;
     [[TLWSDKManager shared].api getHistoryWithCompletionHandler:^(AGResultListAgentChatHistory *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -72,18 +75,20 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
             if (!self) return;
 
             if (error) {
+                [self tl_setLoading:NO];
                 [TLWToast show:@"加载识别记录失败"];
                 self.sections = @[];
                 [self tl_reloadData];
                 return;
             }
-            if (output.code.integerValue == 401) {
+            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                 [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                     [self tl_fetchRecords];
                 }];
                 return;
             }
             if (output.code.integerValue != 200) {
+                [self tl_setLoading:NO];
                 [TLWToast show:output.message ?: @"加载识别记录失败"];
                 self.sections = @[];
                 [self tl_reloadData];
@@ -91,6 +96,7 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
             }
 
             NSArray<AGAgentChatHistory> *historyList = output.data ?: @[];
+            [self tl_setLoading:NO];
             self.sections = [self tl_buildSectionsFromHistory:historyList];
             [self tl_reloadData];
         });
@@ -162,14 +168,29 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 /// 统一刷新入口，同时控制空态 UI 的显隐
 - (void)tl_reloadData {
     BOOL isEmpty = self.sections.count == 0;
-    self.myView.emptyLabel.hidden  = !isEmpty;
-    self.myView.collectionView.hidden = isEmpty;
+    self.myView.emptyLabel.hidden = self.isLoading || !isEmpty;
+    self.myView.collectionView.hidden = NO;
     [self.myView.collectionView reloadData];
+}
+
+- (void)tl_setLoading:(BOOL)isLoading {
+    self.isLoading = isLoading;
+    self.myView.emptyLabel.hidden = YES;
+    self.myView.collectionView.hidden = NO;
+
+    if (isLoading) {
+        [TLWLoadingIndicator showInView:self.myView.collectionView];
+    } else {
+        [TLWLoadingIndicator hideInView:self.myView.collectionView];
+    }
 }
 
 #pragma mark - UICollectionViewDataSource
 
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView {
+    if (self.isLoading) {
+        return 0;
+    }
     return self.sections.count;
 }
 

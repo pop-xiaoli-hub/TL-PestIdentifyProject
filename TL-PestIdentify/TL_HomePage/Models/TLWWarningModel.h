@@ -10,6 +10,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWWarningModel : NSObject
+@property (nonatomic, copy)NSString* title;  //预警标题，如"【橙色霜冻预警警报】"
 @property (nonatomic, copy)NSString* string;
 @property (nonatomic, assign)BOOL shouldExpand;//判断是否需要折叠
 @end

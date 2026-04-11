@@ -321,56 +321,70 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
 
   TLWSDKManager *manager = [TLWSDKManager shared];
   NSLog(@"AI识别：开始识别，payload=%lu bytes", (unsigned long)imageData.length);
-  [manager.api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *chatOutput, NSError *chatError) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-      __strong typeof(weakSelf) strongSelf = weakSelf;
-      if (!strongSelf) {
-        return;
-      }
+  __block void (^performCloudIdentify)(BOOL);
+  performCloudIdentify = ^(BOOL didRetryAuth) {
+    [manager.api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *chatOutput, NSError *chatError) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) {
+          return;
+        }
 
-      if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.answer.length == 0) {
-        NSLog(@"========== [云端] AI识别失败 ==========");
-        NSLog(@"[云端] chatError: %@", chatError.localizedDescription);
-        NSLog(@"[云端] code: %@, message: %@", chatOutput.code, chatOutput.message);
+        if (!didRetryAuth
+            && [manager.sessionManager handleAuthFailureForCode:chatOutput.code
+                                                       message:chatOutput.message
+                                                    retryBlock:^{
+          performCloudIdentify(YES);
+        }]) {
+          return;
+        }
+
+        if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.answer.length == 0) {
+          NSLog(@"========== [云端] AI识别失败 ==========");
+          NSLog(@"[云端] chatError: %@", chatError.localizedDescription);
+          NSLog(@"[云端] code: %@, message: %@", chatOutput.code, chatOutput.message);
+          NSLog(@"============================================");
+          waitingForLocalFallback = YES;
+          presentLocalFallbackIfNeeded();
+          return;
+        }
+
+        NSLog(@"========== [云端] AI识别成功 ==========");
+        NSLog(@"[云端] 原始返回: %@", chatOutput.data.answer);
+        if (chatOutput.data.profile) {
+          NSLog(@"[云端] profile: singleModel=%@, imageType=%@, imageLength=%@, totalMs=%@",
+                chatOutput.data.profile.singleModel,
+                chatOutput.data.profile.imageUrlType,
+                chatOutput.data.profile.imageUrlLength,
+                chatOutput.data.profile.totalMs);
+        }
+
+        NSArray<NSDictionary *> *parsedResults = [strongSelf tl_normalizedIdentifyResultsForDisplay:
+                                                  [strongSelf tl_parseIdentifyResultsFromJSONString:chatOutput.data.answer]];
+        if (parsedResults.count == 0) {
+          NSLog(@"[云端] 结构化结果解析失败，回退本地识别");
+          waitingForLocalFallback = YES;
+          presentLocalFallbackIfNeeded();
+          return;
+        }
+
+        for (NSInteger i = 0; i < parsedResults.count; i++) {
+          NSDictionary *r = parsedResults[i];
+          NSLog(@"[云端] Top%ld: %@ | 置信度: %@ | 依据: %@", (long)(i + 1), r[@"name"], r[@"confidence"], r[@"reason"]);
+        }
         NSLog(@"============================================");
-        waitingForLocalFallback = YES;
-        presentLocalFallbackIfNeeded();
-        return;
-      }
 
-      NSLog(@"========== [云端] AI识别成功 ==========");
-      NSLog(@"[云端] 原始返回: %@", chatOutput.data.answer);
-      if (chatOutput.data.profile) {
-        NSLog(@"[云端] profile: singleModel=%@, imageType=%@, imageLength=%@, totalMs=%@",
-              chatOutput.data.profile.singleModel,
-              chatOutput.data.profile.imageUrlType,
-              chatOutput.data.profile.imageUrlLength,
-              chatOutput.data.profile.totalMs);
-      }
+        [strongSelf tl_stopLoadingIndicator];
+        TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
+        vc.image = strongSelf.capturedImage;
+        vc.identifyResults = parsedResults;
+        vc.hidesBottomBarWhenPushed = YES;
+        [strongSelf.navigationController pushViewController:vc animated:YES];
+      });
+    }];
+  };
 
-      NSArray<NSDictionary *> *parsedResults = [strongSelf tl_normalizedIdentifyResultsForDisplay:
-                                                [strongSelf tl_parseIdentifyResultsFromJSONString:chatOutput.data.answer]];
-      if (parsedResults.count == 0) {
-        NSLog(@"[云端] 结构化结果解析失败，回退本地识别");
-        waitingForLocalFallback = YES;
-        presentLocalFallbackIfNeeded();
-        return;
-      }
-
-      for (NSInteger i = 0; i < parsedResults.count; i++) {
-        NSDictionary *r = parsedResults[i];
-        NSLog(@"[云端] Top%ld: %@ | 置信度: %@ | 依据: %@", (long)(i + 1), r[@"name"], r[@"confidence"], r[@"reason"]);
-      }
-      NSLog(@"============================================");
-
-      [strongSelf tl_stopLoadingIndicator];
-      TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
-      vc.image = strongSelf.capturedImage;
-      vc.identifyResults = parsedResults;
-      vc.hidesBottomBarWhenPushed = YES;
-      [strongSelf.navigationController pushViewController:vc animated:YES];
-    });
-  }];
+  performCloudIdentify(NO);
 }
 
 #pragma mark - 本地识别兜底

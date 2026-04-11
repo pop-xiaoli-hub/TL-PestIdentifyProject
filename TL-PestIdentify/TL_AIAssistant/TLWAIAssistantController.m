@@ -382,8 +382,8 @@
                 return;
             }
 
-            // 401 token 过期，自动续期后重试
-            if (output.code && output.code.integerValue == 401) {
+            // 鉴权失效（401/403），自动续期后重试
+            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                 [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                     [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *retryOutput, NSError *retryError) {
                         dispatch_async(dispatch_get_main_queue(), ^{

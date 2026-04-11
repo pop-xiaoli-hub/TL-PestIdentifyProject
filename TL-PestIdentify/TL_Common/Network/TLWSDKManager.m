@@ -6,6 +6,35 @@
 
 #import "TLWSDKManager.h"
 #import <UIKit/UIKit.h>
+#import <float.h>
+
+static NSString * _Nullable TLWQWeatherPlistValue(NSString *key) {
+    id value = [[NSBundle mainBundle] objectForInfoDictionaryKey:key];
+    return [value isKindOfClass:[NSString class]] ? value : nil;
+}
+
+static NSString * _Nullable TLWQWeatherNormalizedHost(void) {
+    NSString *rawHost = TLWQWeatherPlistValue(@"QWeatherHost");
+    NSString *trimmedHost = [[rawHost stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+    if (trimmedHost.length == 0) {
+        return nil;
+    }
+    if ([trimmedHost containsString:@"://"]) {
+        return trimmedHost;
+    }
+    return [@"https://" stringByAppendingString:trimmedHost];
+}
+
+static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
+    NSURL *url = [NSURL URLWithString:host];
+    NSString *lowercasedHost = url.host.lowercaseString ?: host.lowercaseString;
+    NSSet<NSString *> *deprecatedHosts = [NSSet setWithArray:@[
+        @"api.qweather.com",
+        @"devapi.qweather.com",
+        @"geoapi.qweather.com",
+    ]];
+    return [deprecatedHosts containsObject:lowercasedHost];
+}
 
 @interface TLWSDKManager ()
 @property (nonatomic, strong, readwrite) AGApiService *api;
@@ -225,6 +254,12 @@
       if (!s) return;
 
       if (error || !output || output.code.integerValue != 200) {
+        if (!error && [s.sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+          [s.sessionManager handleUnauthorizedWithRetry:^{
+            fetchPageBlock(pageIndex);
+          }];
+          return;
+        }
         NSError *finalError = error;
         if (!finalError) {
           NSString *msg = output.message ?: @"拉取收藏帖子失败";
@@ -283,12 +318,19 @@
 - (void)_navigateToLogin {
     Class loginClass = NSClassFromString(@"TLWPasswordLoginController");
     if (!loginClass) return;
+    UIWindow *window = [TLWSDKManager tl_activeWindow];
+    if (!window) return;
+    UIViewController *rootVC = window.rootViewController;
+    if ([rootVC isKindOfClass:[UINavigationController class]]) {
+        UINavigationController *rootNav = (UINavigationController *)rootVC;
+        if ([rootNav.viewControllers.firstObject isKindOfClass:loginClass]) {
+            return;
+        }
+    }
+
     UIViewController *loginVC = [[loginClass alloc] init];
     UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:loginVC];
     nav.navigationBarHidden = YES;
-
-    UIWindow *window = [TLWSDKManager tl_activeWindow];
-    if (!window) return;
 
     [UIView transitionWithView:window
                       duration:0.35
@@ -322,5 +364,141 @@
                    tagOperationRequest:(AGTagOperationRequest *)request
                      completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
   return [self.api addTagWithId:cropId tagOperationRequest:request completionHandler:handler];
+}
+
+- (NSURLSessionTask *)getAlertMessagesWithPage:(NSNumber *)page
+                                          size:(NSNumber *)size
+                             completionHandler:(void (^)(AGResultPageResultMessageResponseDto * output, NSError * error))handler {
+  return [self.api getAlertMessagesWithPage:page size:size completionHandler:handler];
+}
+
+- (nullable NSURLSessionTask *)getCurrentWeatherWithLatitude:(double)latitude
+                                           longitude:(double)longitude
+                                          completion:(void (^)(NSDictionary * _Nullable weatherInfo, NSError * _Nullable error))completion {
+  NSString *apiKey = TLWQWeatherPlistValue(@"QWeatherApiKey");
+  NSString *host = TLWQWeatherNormalizedHost();
+  if (apiKey.length == 0 || host.length == 0) {
+    NSError *configError = [NSError errorWithDomain:@"TLWSDKManager.weather"
+                                               code:-1000
+                                           userInfo:@{NSLocalizedDescriptionKey: @"和风天气配置缺失，请补充 QWeatherApiKey 和专属 QWeatherHost"}];
+    if (completion) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        completion(nil, configError);
+      });
+    }
+    NSLog(@"[HomeWeather] missing config apiKey=%@ host=%@", apiKey.length > 0 ? @"YES" : @"NO", host.length > 0 ? @"YES" : @"NO");
+    return nil;
+  }
+
+  if (TLWQWeatherHostRequiresDedicatedHost(host)) {
+    NSError *hostError = [NSError errorWithDomain:@"TLWSDKManager.weather"
+                                             code:-1004
+                                         userInfo:@{NSLocalizedDescriptionKey: @"当前 QWeatherHost 仍是公共地址，请在和风控制台中改成你的专属 API Host"}];
+    if (completion) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        completion(nil, hostError);
+      });
+    }
+    NSLog(@"[HomeWeather] invalid public host=%@", host);
+    return nil;
+  }
+
+  NSString *locationValue = [NSString stringWithFormat:@"%.2f,%.2f", longitude, latitude];
+  NSURLComponents *components = [NSURLComponents componentsWithString:[host stringByAppendingString:@"/v7/weather/now"]];
+  components.queryItems = @[
+    [NSURLQueryItem queryItemWithName:@"location" value:locationValue],
+    [NSURLQueryItem queryItemWithName:@"lang" value:@"zh"]
+  ];
+
+  NSURL *url = components.URL;
+  if (!url) {
+    NSError *urlError = [NSError errorWithDomain:@"TLWSDKManager.weather"
+                                            code:-1001
+                                        userInfo:@{NSLocalizedDescriptionKey: @"天气请求地址无效"}];
+    if (completion) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        completion(nil, urlError);
+      });
+    }
+    return nil;
+  }
+
+  NSLog(@"[HomeWeather] request start lat=%.6f lon=%.6f", latitude, longitude);
+  NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+  request.HTTPMethod = @"GET";
+  [request setValue:apiKey forHTTPHeaderField:@"X-QW-Api-Key"];
+  [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+
+  NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
+    if (error) {
+      NSLog(@"[HomeWeather] request failed error=%@", error.localizedDescription);
+      if (completion) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          completion(nil, error);
+        });
+      }
+      return;
+    }
+
+    NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+    if (![httpResponse isKindOfClass:[NSHTTPURLResponse class]] || httpResponse.statusCode != 200) {
+      NSString *statusMessage = httpResponse.statusCode == 403 ? @"和风天气拒绝了当前 Host，请改成控制台里的专属 API Host" : @"天气服务返回异常";
+      NSError *statusError = [NSError errorWithDomain:@"TLWSDKManager.weather"
+                                                 code:httpResponse.statusCode
+                                             userInfo:@{NSLocalizedDescriptionKey: statusMessage}];
+      NSLog(@"[HomeWeather] request failed status=%ld", (long)httpResponse.statusCode);
+      if (completion) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          completion(nil, statusError);
+        });
+      }
+      return;
+    }
+
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    if (![json isKindOfClass:[NSDictionary class]]) {
+      NSError *jsonError = [NSError errorWithDomain:@"TLWSDKManager.weather"
+                                               code:-1003
+                                           userInfo:@{NSLocalizedDescriptionKey: @"天气数据格式异常"}];
+      if (completion) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          completion(nil, jsonError);
+        });
+      }
+      return;
+    }
+    NSDictionary *now = [json[@"now"] isKindOfClass:[NSDictionary class]] ? json[@"now"] : nil;
+    NSString *code = [json[@"code"] description];
+    if (![now isKindOfClass:[NSDictionary class]] || ![code isEqualToString:@"200"]) {
+      NSString *message = [json[@"message"] isKindOfClass:[NSString class]] ? json[@"message"] : @"天气数据解析失败";
+      NSError *parseError = [NSError errorWithDomain:@"TLWSDKManager.weather"
+                                                code:code.integerValue ?: -1002
+                                            userInfo:@{NSLocalizedDescriptionKey: message}];
+      NSLog(@"[HomeWeather] request failed code=%@ message=%@", code ?: @"nil", message);
+      if (completion) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          completion(nil, parseError);
+        });
+      }
+      return;
+    }
+
+    NSString *temperature = [[now[@"temp"] description] copy] ?: @"--";
+    NSString *weatherText = [now[@"text"] isKindOfClass:[NSString class]] ? now[@"text"] : @"未知";
+    NSString *iconCode = [now[@"icon"] isKindOfClass:[NSString class]] ? now[@"icon"] : @"999";
+    NSDictionary *weatherInfo = @{
+      @"temperature": temperature,
+      @"weatherText": weatherText,
+      @"iconCode": iconCode
+    };
+    NSLog(@"[HomeWeather] request success temp=%@ text=%@ icon=%@", temperature, weatherText, iconCode);
+    if (completion) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        completion(weatherInfo, nil);
+      });
+    }
+  }];
+  [task resume];
+  return task;
 }
 @end

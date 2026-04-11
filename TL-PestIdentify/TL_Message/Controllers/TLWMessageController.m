@@ -30,6 +30,7 @@ static NSInteger const kMessagePageSize = 20;
 @property (nonatomic, assign) BOOL isLoadingMessages;
 @property (nonatomic, assign) BOOL hasMoreMessages;
 @property (nonatomic, copy) NSString *latestAlertTitle;
+@property (nonatomic, copy) NSString *latestAlertSubtitle;
 @property (nonatomic, strong) NSNumber *alertUnreadCount;
 @property (nonatomic, strong) NSNumber *systemUnreadCount;
 @property (nonatomic, strong) UIView *footerLoadingView;
@@ -136,7 +137,7 @@ static NSInteger const kMessagePageSize = 20;
             self.myView.tableView.tableFooterView = nil;
 
             if (error || output.code.integerValue != 200) {
-                if (!error && output.code.integerValue == 401) {
+                if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self fetchMessagesPage:page reset:reset]; }];
                     return;
                 }
@@ -150,10 +151,23 @@ static NSInteger const kMessagePageSize = 20;
 
             AGMessageGroupResponseDto *data = output.data;
             AGMessageResponseDto *latestAlert = data.alertMessages.list.firstObject;
+            AGMessageResponseDto *latestSystem = data.systemMessages.list.firstObject;
             if (reset) {
                 self.alertUnreadCount = data.alertUnreadCount ?: @0;
                 self.systemUnreadCount = data.systemUnreadCount ?: @0;
                 self.latestAlertTitle = latestAlert.title;
+                // 取 alert 和 system 里时间最新的那条作为通知行副标题
+                AGMessageResponseDto *latestNotif = latestAlert;
+                if (latestSystem) {
+                    if (!latestAlert) {
+                        latestNotif = latestSystem;
+                    } else if (latestAlert.createdAt && latestSystem.createdAt &&
+                               [latestSystem.createdAt compare:latestAlert.createdAt] == NSOrderedDescending) {
+                        latestNotif = latestSystem;
+                    }
+                }
+                NSString *notifText = latestNotif.title.length > 0 ? latestNotif.title : latestNotif.content;
+                self.latestAlertSubtitle = notifText;
                 [self.commentItems removeAllObjects];
             }
 
@@ -286,7 +300,7 @@ static NSInteger const kMessagePageSize = 20;
     alertItem.title           = @"通知";
     alertItem.hasUnread       = self.alertUnreadCount.integerValue > 0;
     alertItem.unreadCount     = self.alertUnreadCount;
-    alertItem.subtitle = self.latestAlertTitle.length > 0 ? self.latestAlertTitle :
+    alertItem.subtitle = self.latestAlertSubtitle.length > 0 ? self.latestAlertSubtitle :
                          (self.alertUnreadCount.integerValue > 0 ? @"有新通知" : @"暂无通知");
     [newItems addObject:alertItem];
 
@@ -315,7 +329,7 @@ static NSInteger const kMessagePageSize = 20;
             item.hasUnread = YES;
             [self tl_reloadMessageRowForMessageId:messageId preferredIndexPath:indexPath];
 
-            if (!error && output.code.integerValue == 401) {
+            if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                 [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self tl_markMessageAsReadForItem:item preferredIndexPath:indexPath]; }];
             }
         });
@@ -356,10 +370,18 @@ static NSInteger const kMessagePageSize = 20;
 
     // 等所有请求完成后一次性刷新，避免多次 reloadData 导致闪烁
     dispatch_group_t group = dispatch_group_create();
+    TLWSDKManager *manager = [TLWSDKManager shared];
     for (NSNumber *postId in postIdToItems) {
         dispatch_group_enter(group);
-        [[TLWSDKManager shared].api getPostDetailWithId:postId completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+        [manager.api getPostDetailWithId:postId completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
+                if ([manager.sessionManager handleAuthFailureForCode:output.code
+                                                             message:output.message
+                                                          retryBlock:nil]) {
+                    dispatch_group_leave(group);
+                    return;
+                }
+
                 if (!error && output.code.integerValue == 200) {
                     NSString *imageUrl = output.data.images.firstObject;
                     if (imageUrl.length > 0) {

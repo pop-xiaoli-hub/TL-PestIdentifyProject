@@ -18,6 +18,7 @@
 @property (nonatomic, strong) UIImageView *leadingIconView;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *detailLabel;
+@property (nonatomic, strong) UILabel *recordSubLabel;
 @property (nonatomic, strong) CAGradientLayer *shineGradientLayer;
 @property (nonatomic, strong) CAGradientLayer *topShineGradientLayer;
 @property (nonatomic, assign) BOOL warningExpanded;
@@ -38,13 +39,49 @@
   return self;
 }
 
-- (void)tl_configureWithWarning:(TLWWarningModel* )model {
-  self.bodyLabel.text = [model.string copy];
-  if (model.shouldExpand) {
-    self.detailLabel.hidden = NO;
-  } else {
-    self.detailLabel.hidden = YES;
+- (void)prepareForReuse {
+  [super prepareForReuse];
+
+  self.clickPhotoIdentification = nil;
+  self.clickRecordCard = nil;
+  self.clickAIAssistant = nil;
+  self.clickWarningDetail = nil;
+
+  if (self.bodyLabel) {
+    self.bodyLabel.attributedText = nil;
+    self.bodyLabel.text = nil;
+    self.bodyLabel.textAlignment = NSTextAlignmentLeft;
+    self.bodyLabel.textColor = [UIColor colorWithWhite:0.15 alpha:0.9];
+    self.bodyLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightRegular];
+    self.bodyLabel.numberOfLines = 3;
+    self.bodyLabel.lineBreakMode = NSLineBreakByTruncatingTail;
   }
+}
+
+- (void)tl_configureWithWarning:(TLWWarningModel* )model {
+  self.leadingIconView.hidden = NO;
+  self.titleLabel.hidden = NO;
+  self.titleLabel.textColor = [UIColor colorWithWhite:0.1 alpha:1.0];
+  self.titleLabel.font = [UIFont systemFontOfSize:20.0 weight:UIFontWeightHeavy];
+  self.bodyLabel.textAlignment = NSTextAlignmentLeft;
+  self.bodyLabel.textColor = [UIColor colorWithWhite:0.15 alpha:0.9];
+  self.bodyLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightRegular];
+  self.bodyLabel.numberOfLines = 3;
+  self.bodyLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+  self.detailLabel.textColor = [UIColor colorWithWhite:0.25 alpha:1.0];
+  self.detailLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightMedium];
+  self.titleLabel.text = model.title.length > 0 ? model.title : @"【预警通知】";
+  self.bodyLabel.text = [model.string copy];
+
+  // 恢复正常布局约束
+  [self.bodyLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.cardContainerView).offset(16.0);
+    make.right.equalTo(self.cardContainerView).offset(-10);
+    make.top.equalTo(self.leadingIconView.mas_bottom).offset(10.0);
+    make.bottom.equalTo(self.detailLabel.mas_top).offset(-10);
+  }];
+
+  self.detailLabel.hidden = !model.shouldExpand;
 }
 
 - (void)tl_configureWarningExpanded:(BOOL)expanded {
@@ -52,6 +89,26 @@
   self.bodyLabel.numberOfLines = expanded ? 0 : 3;
   self.bodyLabel.lineBreakMode = NSLineBreakByTruncatingTail;
   self.detailLabel.text = expanded ? @"点击收起" : @"查看详细>";
+}
+
+- (void)tl_configureAsNoLocationWarning {
+  self.leadingIconView.hidden = YES;
+  self.titleLabel.hidden = YES;
+  self.detailLabel.hidden = YES;
+  self.bodyLabel.text = @"暂无预警信息，请开启定位功能";
+  self.bodyLabel.textAlignment = NSTextAlignmentCenter;
+  self.bodyLabel.numberOfLines = 1;
+  self.bodyLabel.font = [UIFont systemFontOfSize:18.0 weight:UIFontWeightMedium];
+  self.bodyLabel.textColor = [UIColor colorWithWhite:0.13 alpha:1.0];
+
+  // 居中布局
+  [self.bodyLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.cardContainerView).offset(16.0);
+    make.right.equalTo(self.cardContainerView).offset(-16.0);
+    make.centerY.equalTo(self.cardContainerView);
+    make.top.greaterThanOrEqualTo(self.cardContainerView).offset(16);
+    make.bottom.lessThanOrEqualTo(self.cardContainerView).offset(-16);
+  }];
 }
 
 - (void)tl_setupWarningCardSubviews {
@@ -272,9 +329,10 @@
   recordTitle.font = [UIFont systemFontOfSize:18.0 weight:UIFontWeightSemibold];
 
   UILabel *recordSub = [[UILabel alloc] init];
-  recordSub.text = @"共5次识别记录";
   recordSub.textColor = [UIColor colorWithWhite:0.45 alpha:1.0];
   recordSub.font = [UIFont systemFontOfSize:13.0];
+  self.recordSubLabel = recordSub;
+  [self tl_configureRecordCount:0];
 
   [recordCard addSubview:recordOuterIcon];
   [recordCard addSubview:recordTitle];
@@ -296,6 +354,13 @@
   }];
 
   return recordCard;
+}
+
+- (void)tl_configureRecordCount:(NSInteger)recordCount {
+  if (!self.recordSubLabel) {
+    return;
+  }
+  self.recordSubLabel.text = [NSString stringWithFormat:@"共%ld次识别记录", (long)MAX(recordCount, 0)];
 }
 
 - (UIView *)tl_createFeatureAssistantCardBelowRecordCardInStack:(UIView *)leftStack recordCard:(UIView *)recordCard {
@@ -485,4 +550,3 @@
 }
 
 @end
-

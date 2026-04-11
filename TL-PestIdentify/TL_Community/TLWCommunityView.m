@@ -28,6 +28,8 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
 @property (nonatomic, strong, readwrite) UITableView *suggestionTableView;
 @property (nonatomic, strong, readwrite) UIButton *voiceButton;
 @property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UIImageView *titleIconView;
+@property (nonatomic, strong) UIView *titleContainerView;
 @property (nonatomic, strong) UIView *searchContainer;
 @property (nonatomic, strong) UIView *searchFieldBackground;
 /// 搜索时的毛玻璃覆盖层（含历史记录、猜你想搜）
@@ -75,7 +77,19 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
   titleLabel.text = @"社区";
   titleLabel.textColor = [UIColor whiteColor];
   titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
-  [self addSubview:titleLabel];
+  self.titleLabel = titleLabel;
+
+  UIImageView *titleIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconCommunity"]];
+  titleIconView.contentMode = UIViewContentModeScaleAspectFit;
+  self.titleIconView = titleIconView;
+
+  UIView *titleContainerView = [[UIView alloc] init];
+  titleContainerView.backgroundColor = [UIColor clearColor];
+  [self addSubview:titleContainerView];
+  self.titleContainerView = titleContainerView;
+
+  [titleContainerView addSubview:titleLabel];
+  [titleContainerView addSubview:titleIconView];
   self.titleLabel = titleLabel;
 
   UIView *searchFieldBackground = [[UIView alloc] init];
@@ -122,9 +136,20 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
     make.height.mas_equalTo(kSearchBarHeight);
   }];
 
-  [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+  [titleContainerView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self);
     make.bottom.equalTo(container.mas_top).offset(5);
+  }];
+
+  [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.top.bottom.equalTo(titleContainerView);
+  }];
+
+  [titleIconView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(titleLabel.mas_right).offset(6.0);
+    make.centerY.equalTo(titleLabel);
+    make.right.equalTo(titleContainerView);
+    make.width.height.mas_equalTo(20.0);
   }];
 
   [searchFieldBackground mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -157,6 +182,9 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
 - (void)applyElderModeEnabled:(BOOL)enabled {
   self.collectionView.backgroundColor = [UIColor whiteColor];
   self.titleLabel.font = [UIFont systemFontOfSize:(enabled ? 22.0 : 20.0) weight:UIFontWeightSemibold];
+  [self.titleIconView mas_updateConstraints:^(MASConstraintMaker *make) {
+    make.width.height.mas_equalTo(enabled ? 22.0 : 20.0);
+  }];
   self.searchTextField.font = [UIFont systemFontOfSize:(enabled ? 17.0 : 14.0) weight:UIFontWeightMedium];
   self.searchTextField.textColor = enabled ? [UIColor colorWithWhite:0.30 alpha:1.0] : [UIColor darkTextColor];
   self.searchTextField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入关键词" attributes:@{
