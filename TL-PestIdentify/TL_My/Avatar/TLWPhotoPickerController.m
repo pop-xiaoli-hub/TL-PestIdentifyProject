@@ -352,7 +352,7 @@ didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
         [self loadFullImageForAsset:asset completion:^(UIImage *image) {
             if (self.onSelectImage) {
                 self.onSelectImage(image);
-                [self.navigationController popViewControllerAnimated:YES];
+                [self tl_closeIfStillTopMost];
             } else {
                 TLWAvatarCropController *cropVC = [[TLWAvatarCropController alloc] initWithImage:image];
                 cropVC.delegate = self.cropDelegate;
@@ -439,13 +439,22 @@ didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
         if (self.onSelectImages) {
             self.onSelectImages([images copy]);
         }
-        if (self.navigationController.viewControllers.firstObject == self &&
-            self.navigationController.presentingViewController) {
-            [self.navigationController dismissViewControllerAnimated:YES completion:nil];
-        } else {
-            [self.navigationController popViewControllerAnimated:YES];
-        }
+        [self tl_closeIfStillTopMost];
     });
+}
+
+- (void)tl_closeIfStillTopMost {
+    UINavigationController *navigationController = self.navigationController;
+    if (!navigationController || navigationController.topViewController != self) {
+        return;
+    }
+
+    if (navigationController.viewControllers.firstObject == self &&
+        navigationController.presentingViewController) {
+        [navigationController dismissViewControllerAnimated:YES completion:nil];
+    } else {
+        [navigationController popViewControllerAnimated:YES];
+    }
 }
 
 @end
