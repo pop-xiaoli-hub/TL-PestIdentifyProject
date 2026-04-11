@@ -1,20 +1,20 @@
 //
-//  TLWPlantDetailFertilizerView.m
+//  TLWPlantDetailMedicineView.m
 //  TL-PestIdentify
 //
 
-#import "TLWPlantDetailFertilizerView.h"
+#import "TLWPlantDetailMedicineView.h"
 #import "TLWPlantDetailCalendarView.h"
 #import "TLWPlantDetailViewModel.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWPlantFertilizerLegendItemView : UIView
+@interface TLWPlantMedicineLegendItemView : UIView
 
 - (void)configureWithColor:(UIColor *)color title:(NSString *)title;
 
 @end
 
-@interface TLWPlantFertilizerLegendItemView ()
+@interface TLWPlantMedicineLegendItemView ()
 
 @property (nonatomic, strong) UIView *surfaceView;
 @property (nonatomic, strong) UIView *highlightView;
@@ -23,7 +23,7 @@
 
 @end
 
-@implementation TLWPlantFertilizerLegendItemView
+@implementation TLWPlantMedicineLegendItemView
 
 - (instancetype)initWithFrame:(CGRect)frame {
   self = [super initWithFrame:frame];
@@ -99,13 +99,13 @@
 
 @end
 
-@interface TLWPlantDetailFertilizerView ()
+@interface TLWPlantDetailMedicineView ()
 
 @property (nonatomic, strong) TLWPlantDetailCalendarView *calendarView;
 
 @end
 
-@implementation TLWPlantDetailFertilizerView
+@implementation TLWPlantDetailMedicineView
 
 - (instancetype)initWithFrame:(CGRect)frame {
   self = [super initWithFrame:frame];
@@ -120,12 +120,12 @@
     legendTitleLabel.textColor = [UIColor colorWithWhite:0.18 alpha:1.0];
     [self addSubview:legendTitleLabel];
 
-    TLWPlantFertilizerLegendItemView *doneLegendView = [[TLWPlantFertilizerLegendItemView alloc] init];
-    [doneLegendView configureWithColor:[UIColor colorWithRed:0.47 green:0.86 blue:0.79 alpha:1.0] title:@"已施肥"];
+    TLWPlantMedicineLegendItemView *doneLegendView = [[TLWPlantMedicineLegendItemView alloc] init];
+    [doneLegendView configureWithColor:[UIColor colorWithRed:0.47 green:0.86 blue:0.79 alpha:1.0] title:@"已用药"];
     [self addSubview:doneLegendView];
 
-    TLWPlantFertilizerLegendItemView *pendingLegendView = [[TLWPlantFertilizerLegendItemView alloc] init];
-    [pendingLegendView configureWithColor:[UIColor colorWithRed:0.98 green:0.70 blue:0.34 alpha:1.0] title:@"待施肥"];
+    TLWPlantMedicineLegendItemView *pendingLegendView = [[TLWPlantMedicineLegendItemView alloc] init];
+    [pendingLegendView configureWithColor:[UIColor colorWithRed:0.98 green:0.70 blue:0.34 alpha:1.0] title:@"待用药"];
     [self addSubview:pendingLegendView];
 
     UIButton *tagButton = [self tl_actionButtonWithTitle:@"打上标签"];
@@ -248,7 +248,7 @@
 }
 
 - (void)configureWithViewModel:(TLWPlantDetailViewModel *)viewModel {
-  [self.calendarView configureWithMonthTitle:[viewModel currentMonthTitle] dayItems:[viewModel calendarItemsForTabType:TLWPlantDetailTabTypeFertilizer]];
+  [self.calendarView configureWithMonthTitle:[viewModel currentMonthTitle] dayItems:[viewModel calendarItemsForTabType:TLWPlantDetailTabTypeMedicine]];
 }
 
 - (void)tl_tagButtonTapped {

@@ -4,7 +4,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface TLWPlantDetailFertilizerView : UIView
+@interface TLWPlantDetailNoteView : UIView
 
 @property (nonatomic, copy, nullable) void(^previousMonthBlock)(void);
 @property (nonatomic, copy, nullable) void(^nextMonthBlock)(void);
@@ -13,6 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) void(^cancelTagActionBlock)(void);
 
 - (void)configureWithViewModel:(TLWPlantDetailViewModel *)viewModel;
+- (NSString *)currentNoteText;
 
 @end
 

@@ -142,7 +142,7 @@
     }];
 
     [legendTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.top.equalTo(calendarView.mas_bottom).offset(18.0);
+      make.top.equalTo(calendarView.mas_bottom).offset(48.0);
       make.left.equalTo(self).offset(2.0);
     }];
 
@@ -247,7 +247,7 @@
 }
 
 - (void)configureWithViewModel:(TLWPlantDetailViewModel *)viewModel {
-  [self.calendarView configureWithMonthTitle:[viewModel currentMonthTitle] dayItems:[viewModel calendarItems]];
+  [self.calendarView configureWithMonthTitle:[viewModel currentMonthTitle] dayItems:[viewModel calendarItemsForTabType:TLWPlantDetailTabTypeWater]];
 }
 
 - (void)tl_tagButtonTapped {

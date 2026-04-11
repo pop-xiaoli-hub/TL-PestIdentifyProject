@@ -1,20 +1,20 @@
 //
-//  TLWPlantDetailFertilizerView.m
+//  TLWPlantDetailNoteView.m
 //  TL-PestIdentify
 //
 
-#import "TLWPlantDetailFertilizerView.h"
+#import "TLWPlantDetailNoteView.h"
 #import "TLWPlantDetailCalendarView.h"
 #import "TLWPlantDetailViewModel.h"
 #import <Masonry/Masonry.h>
 
-@interface TLWPlantFertilizerLegendItemView : UIView
+@interface TLWPlantNoteLegendItemView : UIView
 
 - (void)configureWithColor:(UIColor *)color title:(NSString *)title;
 
 @end
 
-@interface TLWPlantFertilizerLegendItemView ()
+@interface TLWPlantNoteLegendItemView ()
 
 @property (nonatomic, strong) UIView *surfaceView;
 @property (nonatomic, strong) UIView *highlightView;
@@ -23,7 +23,7 @@
 
 @end
 
-@implementation TLWPlantFertilizerLegendItemView
+@implementation TLWPlantNoteLegendItemView
 
 - (instancetype)initWithFrame:(CGRect)frame {
   self = [super initWithFrame:frame];
@@ -99,13 +99,15 @@
 
 @end
 
-@interface TLWPlantDetailFertilizerView ()
+@interface TLWPlantDetailNoteView () <UITextViewDelegate>
 
 @property (nonatomic, strong) TLWPlantDetailCalendarView *calendarView;
+@property (nonatomic, strong) UITextView *textView;
+@property (nonatomic, strong) UILabel *placeholderLabel;
 
 @end
 
-@implementation TLWPlantDetailFertilizerView
+@implementation TLWPlantDetailNoteView
 
 - (instancetype)initWithFrame:(CGRect)frame {
   self = [super initWithFrame:frame];
@@ -120,13 +122,34 @@
     legendTitleLabel.textColor = [UIColor colorWithWhite:0.18 alpha:1.0];
     [self addSubview:legendTitleLabel];
 
-    TLWPlantFertilizerLegendItemView *doneLegendView = [[TLWPlantFertilizerLegendItemView alloc] init];
-    [doneLegendView configureWithColor:[UIColor colorWithRed:0.47 green:0.86 blue:0.79 alpha:1.0] title:@"已施肥"];
-    [self addSubview:doneLegendView];
+    TLWPlantNoteLegendItemView *noteLegendView = [[TLWPlantNoteLegendItemView alloc] init];
+    [noteLegendView configureWithColor:[UIColor colorWithRed:0.47 green:0.86 blue:0.79 alpha:1.0] title:@"有笔记"];
+    [self addSubview:noteLegendView];
 
-    TLWPlantFertilizerLegendItemView *pendingLegendView = [[TLWPlantFertilizerLegendItemView alloc] init];
-    [pendingLegendView configureWithColor:[UIColor colorWithRed:0.98 green:0.70 blue:0.34 alpha:1.0] title:@"待施肥"];
-    [self addSubview:pendingLegendView];
+    UIView *textContainerView = [[UIView alloc] init];
+    textContainerView.backgroundColor = [UIColor whiteColor];
+    textContainerView.layer.cornerRadius = 12.0;
+    textContainerView.layer.shadowColor = [UIColor colorWithRed:0.63 green:0.63 blue:0.63 alpha:0.18].CGColor;
+    textContainerView.layer.shadowOpacity = 1.0;
+    textContainerView.layer.shadowOffset = CGSizeMake(0, 4.0);
+    textContainerView.layer.shadowRadius = 10.0;
+    [self addSubview:textContainerView];
+
+    UITextView *textView = [[UITextView alloc] init];
+    textView.backgroundColor = [UIColor clearColor];
+    textView.font = [UIFont systemFontOfSize:18.0 weight:UIFontWeightMedium];
+    textView.textColor = [UIColor colorWithWhite:0.28 alpha:1.0];
+    textView.delegate = self;
+    textView.textContainerInset = UIEdgeInsetsMake(14.0, 12.0, 14.0, 12.0);
+    [textContainerView addSubview:textView];
+    self.textView = textView;
+
+    UILabel *placeholderLabel = [[UILabel alloc] init];
+    placeholderLabel.text = @"点击输入笔记内容";
+    placeholderLabel.font = [UIFont systemFontOfSize:18.0 weight:UIFontWeightMedium];
+    placeholderLabel.textColor = [UIColor colorWithWhite:0.72 alpha:1.0];
+    [textContainerView addSubview:placeholderLabel];
+    self.placeholderLabel = placeholderLabel;
 
     UIButton *tagButton = [self tl_actionButtonWithTitle:@"打上标签"];
     [tagButton addTarget:self action:@selector(tl_tagButtonTapped) forControlEvents:UIControlEventTouchUpInside];
@@ -146,25 +169,36 @@
       make.left.equalTo(self).offset(2.0);
     }];
 
-    [doneLegendView mas_makeConstraints:^(MASConstraintMaker *make) {
+    [noteLegendView mas_makeConstraints:^(MASConstraintMaker *make) {
       make.top.equalTo(legendTitleLabel.mas_bottom).offset(12.0);
       make.left.right.equalTo(self);
       make.height.mas_equalTo(42.0);
     }];
 
-    [pendingLegendView mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.top.equalTo(doneLegendView.mas_bottom).offset(10.0);
-      make.left.right.height.equalTo(doneLegendView);
+    [textContainerView mas_makeConstraints:^(MASConstraintMaker *make) {
+      make.top.equalTo(noteLegendView.mas_bottom).offset(12.0);
+      make.left.right.equalTo(self);
+      make.height.mas_equalTo(88.0);
+    }];
+
+    [textView mas_makeConstraints:^(MASConstraintMaker *make) {
+      make.edges.equalTo(textContainerView);
+    }];
+
+    [placeholderLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+      make.top.equalTo(textContainerView).offset(14.0);
+      make.left.equalTo(textContainerView).offset(16.0);
+      make.right.lessThanOrEqualTo(textContainerView).offset(-16.0);
     }];
 
     [tagButton mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.top.equalTo(pendingLegendView.mas_bottom).offset(18.0);
+      make.top.equalTo(textContainerView.mas_bottom).offset(22.0);
       make.left.right.equalTo(self);
       make.height.mas_equalTo(44.0);
     }];
 
     [cancelTagButton mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.top.equalTo(tagButton.mas_bottom).offset(10.0);
+      make.top.equalTo(tagButton.mas_bottom).offset(12.0);
       make.left.right.height.equalTo(tagButton);
       make.bottom.equalTo(self);
     }];
@@ -248,7 +282,21 @@
 }
 
 - (void)configureWithViewModel:(TLWPlantDetailViewModel *)viewModel {
-  [self.calendarView configureWithMonthTitle:[viewModel currentMonthTitle] dayItems:[viewModel calendarItemsForTabType:TLWPlantDetailTabTypeFertilizer]];
+  [self.calendarView configureWithMonthTitle:[viewModel currentMonthTitle] dayItems:[viewModel calendarItemsForTabType:TLWPlantDetailTabTypeNote]];
+  self.textView.text = [viewModel noteContentForSelectedDate];
+  [self tl_updatePlaceholderVisibility];
+}
+
+- (NSString *)currentNoteText {
+  return self.textView.text ?: @"";
+}
+
+- (void)textViewDidChange:(UITextView *)textView {
+  [self tl_updatePlaceholderVisibility];
+}
+
+- (void)tl_updatePlaceholderVisibility {
+  self.placeholderLabel.hidden = self.textView.text.length > 0;
 }
 
 - (void)tl_tagButtonTapped {
