@@ -18,7 +18,7 @@
 
 static NSString *const kCommentCellID = @"TLWCommentCell";
 
-@interface TLWPostDetailController () <UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate>
+@interface TLWPostDetailController () <UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate, UIGestureRecognizerDelegate>
 
 @property (nonatomic, strong) UITableView *tableView;
 @property (nonatomic, strong) TLWPostDetailHeaderView *headerView;
@@ -80,6 +80,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [self buildNavBar];
   [self buildTableView];
   [self buildInputBar];
+  [self buildDismissKeyboardGesture];
   [self fetchPostDetail];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillChange:) name:UIKeyboardWillChangeFrameNotification object:nil];
   [self.headerView.likeButton addTarget:self action:@selector(likeTapped:) forControlEvents:UIControlEventTouchUpInside];
@@ -266,6 +267,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   self.commentTextField = [[UITextField alloc] init];
   self.commentTextField.placeholder = @"说点什么…";
   self.commentTextField.font = [UIFont systemFontOfSize:14];
+  self.commentTextField.textColor = [UIColor blackColor];
   self.commentTextField.returnKeyType = UIReturnKeySend;
   self.commentTextField.delegate = self;
   [fieldBg addSubview:self.commentTextField];
@@ -296,6 +298,13 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
     make.centerY.equalTo(self.inputBar);
     make.height.mas_equalTo(36);
   }];
+}
+
+- (void)buildDismissKeyboardGesture {
+  UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(hideKeyboard)];
+  tapGesture.cancelsTouchesInView = NO;
+  tapGesture.delegate = self;
+  [self.view addGestureRecognizer:tapGesture];
 }
 
 - (void)loadComments {
@@ -461,6 +470,19 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   return YES;
 }
 
+#pragma mark - UIGestureRecognizerDelegate
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+  UIView *touchedView = touch.view;
+  if (touchedView == self.commentTextField || [touchedView isDescendantOfView:self.commentTextField]) {
+    return NO;
+  }
+  if (touchedView == self.inputBar || [touchedView isDescendantOfView:self.inputBar]) {
+    return NO;
+  }
+  return YES;
+}
+
 #pragma mark - Actions
 
 - (void)backTapped {
@@ -469,6 +491,10 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   } else {
     [self dismissViewControllerAnimated:YES completion:nil];
   }
+}
+
+- (void)hideKeyboard {
+  [self.view endEditing:YES];
 }
 
 
