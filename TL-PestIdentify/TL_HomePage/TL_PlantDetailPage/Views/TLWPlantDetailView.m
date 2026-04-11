@@ -7,6 +7,8 @@
 #import "TLWPlantDetailInfoCardView.h"
 #import "TLWPlantDetailSegmentTabView.h"
 #import "TLWPlantDetailFertilizerView.h"
+#import "TLWPlantDetailMedicineView.h"
+#import "TLWPlantDetailNoteView.h"
 #import "TLWPlantDetailWateringView.h"
 #import "TLWPlantDetailPlaceholderView.h"
 #import "../ViewModels/TLWPlantDetailViewModel.h"
@@ -30,8 +32,8 @@
 @property (nonatomic, strong, readwrite) TLWPlantDetailSegmentTabView *segmentTabView;
 @property (nonatomic, strong, readwrite) TLWPlantDetailWateringView *wateringView;
 @property (nonatomic, strong, readwrite) TLWPlantDetailFertilizerView *fertilizerView;
-@property (nonatomic, strong, readwrite) TLWPlantDetailPlaceholderView *medicineView;
-@property (nonatomic, strong, readwrite) TLWPlantDetailPlaceholderView *noteView;
+@property (nonatomic, strong, readwrite) TLWPlantDetailMedicineView *medicineView;
+@property (nonatomic, strong, readwrite) TLWPlantDetailNoteView *noteView;
 
 @end
 
@@ -147,13 +149,11 @@
   [contentContainerView addSubview:fertilizerView];
   self.fertilizerView = fertilizerView;
 
-  TLWPlantDetailPlaceholderView *medicineView = [[TLWPlantDetailPlaceholderView alloc] init];
-  [medicineView configureWithTitle:@"用药记录" message:@"可在这里补充用药方案、周期和病虫害处理记录。"];
+  TLWPlantDetailMedicineView *medicineView = [[TLWPlantDetailMedicineView alloc] init];
   [contentContainerView addSubview:medicineView];
   self.medicineView = medicineView;
 
-  TLWPlantDetailPlaceholderView *noteView = [[TLWPlantDetailPlaceholderView alloc] init];
-  [noteView configureWithTitle:@"种植笔记" message:@"可在这里接入文字记录、图片笔记和养护心得。"];
+  TLWPlantDetailNoteView *noteView = [[TLWPlantDetailNoteView alloc] init];
   [contentContainerView addSubview:noteView];
   self.noteView = noteView;
 
@@ -250,6 +250,42 @@
       strongSelf.wateringView.dateSelectionBlock(date);
     }
   };
+  medicineView.previousMonthBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (strongSelf.wateringView.previousMonthBlock) {
+      strongSelf.wateringView.previousMonthBlock();
+    }
+  };
+  medicineView.nextMonthBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (strongSelf.wateringView.nextMonthBlock) {
+      strongSelf.wateringView.nextMonthBlock();
+    }
+  };
+  medicineView.dateSelectionBlock = ^(NSDate *date) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (strongSelf.wateringView.dateSelectionBlock) {
+      strongSelf.wateringView.dateSelectionBlock(date);
+    }
+  };
+  noteView.previousMonthBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (strongSelf.wateringView.previousMonthBlock) {
+      strongSelf.wateringView.previousMonthBlock();
+    }
+  };
+  noteView.nextMonthBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (strongSelf.wateringView.nextMonthBlock) {
+      strongSelf.wateringView.nextMonthBlock();
+    }
+  };
+  noteView.dateSelectionBlock = ^(NSDate *date) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (strongSelf.wateringView.dateSelectionBlock) {
+      strongSelf.wateringView.dateSelectionBlock(date);
+    }
+  };
 }
 
 - (void)configureWithViewModel:(TLWPlantDetailViewModel *)viewModel {
@@ -259,6 +295,8 @@
   [self.segmentTabView configureWithTitles:[viewModel tabTitles]];
   [self.wateringView configureWithViewModel:viewModel];
   [self.fertilizerView configureWithViewModel:viewModel];
+  [self.medicineView configureWithViewModel:viewModel];
+  [self.noteView configureWithViewModel:viewModel];
   [self updateSelectedTab:viewModel.selectedTabType contentHeight:[viewModel preferredContentHeightForSelectedTab]];
 }
 

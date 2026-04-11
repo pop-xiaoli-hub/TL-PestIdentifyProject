@@ -14,6 +14,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSNumber *plantId;
 @property (nonatomic, copy) NSString *plantName;
 @property (nonatomic, copy) NSString *imageUrl;
+@property (nonatomic, copy) NSString *plantStatus;
+@property (nonatomic, strong, nullable) NSDate *plantingDate;
 @property (nonatomic, strong, nullable) UIImage *localImage;
 @property (nonatomic, assign) BOOL isUploading;
 

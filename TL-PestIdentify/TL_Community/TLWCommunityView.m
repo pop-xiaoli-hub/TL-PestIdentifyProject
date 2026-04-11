@@ -124,7 +124,7 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
 
   [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self);
-    make.bottom.equalTo(container.mas_top).offset(-8);
+    make.bottom.equalTo(container.mas_top).offset(5);
   }];
 
   [searchFieldBackground mas_makeConstraints:^(MASConstraintMaker *make) {

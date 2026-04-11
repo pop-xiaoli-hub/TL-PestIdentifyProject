@@ -9,6 +9,9 @@
 #import "TLWPlantDetailView.h"
 #import "ViewModels/TLWPlantDetailViewModel.h"
 #import "Views/TLWPlantDetailSegmentTabView.h"
+#import "Views/TLWPlantDetailFertilizerView.h"
+#import "Views/TLWPlantDetailMedicineView.h"
+#import "Views/TLWPlantDetailNoteView.h"
 #import "Views/TLWPlantDetailWateringView.h"
 #import <SDWebImage/SDWebImage.h>
 #import "TLWSDKManager.h"
@@ -63,7 +66,7 @@
       return;
     }
     [strongSelf.viewModel moveToPreviousMonth];
-    [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];
+    [strongSelf.detailView configureWithViewModel:strongSelf.viewModel];
   };
 
   self.detailView.wateringView.nextMonthBlock = ^{
@@ -72,7 +75,7 @@
       return;
     }
     [strongSelf.viewModel moveToNextMonth];
-    [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];
+    [strongSelf.detailView configureWithViewModel:strongSelf.viewModel];
   };
 
   self.detailView.wateringView.dateSelectionBlock = ^(NSDate *date) {
@@ -81,7 +84,7 @@
       return;
     }
     [strongSelf.viewModel selectDate:date];
-    [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];
+    [strongSelf.detailView configureWithViewModel:strongSelf.viewModel];
   };
 
   self.detailView.wateringView.tagActionBlock = ^{
@@ -97,7 +100,60 @@
     if (!strongSelf) {
       return;
     }
-    [strongSelf tl_submitWateringTagWithStatus:@0 content:@"待浇水"];
+    [strongSelf tl_submitCultivationTagWithStatus:@0 content:@"待浇水" tagType:@"WATERING"];
+  };
+
+  self.detailView.fertilizerView.tagActionBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf tl_submitCultivationTagWithStatus:@1 content:@"已施肥" tagType:@"FERTILIZING"];
+  };
+
+  self.detailView.fertilizerView.cancelTagActionBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf tl_submitCultivationTagWithStatus:@0 content:@"待施肥" tagType:@"FERTILIZING"];
+  };
+
+  self.detailView.medicineView.tagActionBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf tl_submitCultivationTagWithStatus:@1 content:@"已用药" tagType:@"MEDICATION"];
+  };
+
+  self.detailView.medicineView.cancelTagActionBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf tl_submitCultivationTagWithStatus:@0 content:@"待用药" tagType:@"MEDICATION"];
+  };
+
+  self.detailView.noteView.tagActionBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    NSString *noteText = [[strongSelf.detailView.noteView currentNoteText] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (noteText.length == 0) {
+      [strongSelf tl_showMessage:@"请输入笔记内容"];
+      return;
+    }
+    [strongSelf tl_submitCultivationTagWithStatus:@1 content:noteText tagType:@"NOTE"];
+  };
+
+  self.detailView.noteView.cancelTagActionBlock = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf tl_submitCultivationTagWithStatus:@0 content:@"" tagType:@"NOTE"];
   };
 }
 
@@ -124,6 +180,10 @@
 }
 
 - (void)tl_submitWateringTagWithStatus:(NSNumber *)status content:(NSString *)content {
+  [self tl_submitCultivationTagWithStatus:status content:content tagType:@"WATERING"];
+}
+
+- (void)tl_submitCultivationTagWithStatus:(NSNumber *)status content:(NSString *)content tagType:(NSString *)tagType {
   if (self.tagRequestInFlight) {//节流，如果上一条打标签请求还没回来，再次点击不发送请求
     return;
   }
@@ -143,13 +203,13 @@
 
   AGTagOperationRequest *request = [[AGTagOperationRequest alloc] init];
   request.recordDate = [calendar dateFromComponents:components] ?: selectedDate;
-  request.tagType = @"WATERING";
+  request.tagType = tagType;
   request.content = content;
   request.status = status;
 
   self.tagRequestInFlight = YES;
   __weak typeof(self) weakSelf = self;
-  NSLog(@"开始进行服务端浇水信息同步");
+  NSLog(@"开始进行服务端标签同步, tagType=%@", tagType);
   [[TLWSDKManager shared] addTagWithCropId:cropId tagOperationRequest:request completionHandler:^(AGResultVoid * output, NSError * error) {
     dispatch_async(dispatch_get_main_queue(), ^{
       __strong typeof(weakSelf) strongSelf = weakSelf;
@@ -159,22 +219,22 @@
 
       strongSelf.tagRequestInFlight = NO;
       if (error) {
-        [strongSelf tl_showMessage:error.localizedDescription ?: @"浇水标签同步失败"];
+        [strongSelf tl_showMessage:error.localizedDescription ?: @"标签同步失败"];
         return;
       }
 
       if (output.code.integerValue == 401) {
         [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-          [strongSelf tl_submitWateringTagWithStatus:status content:content];
+          [strongSelf tl_submitCultivationTagWithStatus:status content:content tagType:tagType];
         }];
         return;
       }
 
       if (output.code.integerValue != 200) {
-        [strongSelf tl_showMessage:output.message ?: @"浇水标签同步失败"];
+        [strongSelf tl_showMessage:output.message ?: @"标签同步失败"];
         return;
       }
-      NSLog(@"浇水服务端信息同步成功");
+      NSLog(@"服务端标签同步成功, tagType=%@", tagType);
       [strongSelf tl_fetchCropDetailAndRefreshCalendar];
     });
   }];
@@ -213,10 +273,25 @@
       NSLog(@"[PlantDetail] crop detail success, cropId=%@", cropId);
       NSLog(@"[PlantDetail] crop detail records=%@", output.data.records);
       NSLog(@"[PlantDetail] crop detail watering records=%@", output.data.records[@"WATERING"]);
+      NSLog(@"[PlantDetail] crop detail fertilizing records=%@", output.data.records[@"FERTILIZING"]);
+      NSLog(@"[PlantDetail] crop detail medication records=%@", output.data.records[@"MEDICATION"]);
+      NSLog(@"[PlantDetail] crop detail note records=%@", output.data.records[@"NOTE"]);
+      NSLog(@"[PlantDetail] crop detail plantName=%@ status=%@ plantingDate=%@",
+            output.data.plantName,
+            output.data.status,
+            output.data.plantingDate);
 
-      NSLog(@"1");
+      if ([output.data.plantName isKindOfClass:[NSString class]] && output.data.plantName.length > 0) {
+        strongSelf.viewModel.plantModel.plantName = output.data.plantName;
+      }
+      if ([output.data.imageUrl isKindOfClass:[NSString class]] && output.data.imageUrl.length > 0) {
+        strongSelf.viewModel.plantModel.imageUrl = output.data.imageUrl;
+      }
+      strongSelf.viewModel.plantModel.plantStatus = [output.data.status isKindOfClass:[NSString class]] ? output.data.status : @"";
+      strongSelf.viewModel.plantModel.plantingDate = output.data.plantingDate;
+
       [strongSelf.viewModel applyCropDetailResponse:output.data];//将服务端状态合入本地的markedStatusMap
-      [strongSelf.detailView.wateringView configureWithViewModel:strongSelf.viewModel];//刷新数据
+      [strongSelf.detailView configureWithViewModel:strongSelf.viewModel];//刷新数据
     });
   }];
 }

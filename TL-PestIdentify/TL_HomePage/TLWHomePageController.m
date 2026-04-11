@@ -318,6 +318,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
       request.plantName = plantModel.plantName;
       request.imageUrl = imageURL;
       request.status = @"正常";
+      request.plantingDate = [NSDate date];
       request.pestCount = @0;
 
       [[TLWSDKManager shared] createCropWithRequest:request completionHandler:^(AGResultMyCropResponseDto * output, NSError * error) {
@@ -338,6 +339,8 @@ extern NSString * const TLWProfileDidUpdateNotification;
           plantModel.plantId = output.data._id ?: plantModel.plantId;
           plantModel.plantName = output.data.plantName.length > 0 ? output.data.plantName : plantModel.plantName;
           plantModel.imageUrl = output.data.imageUrl.length > 0 ? output.data.imageUrl : imageURL;
+          plantModel.plantStatus = output.data.status.length > 0 ? output.data.status : request.status;
+          plantModel.plantingDate = output.data.plantingDate ?: request.plantingDate;
           plantModel.localImage = nil;
           [innerSelf.homePageView.tableView reloadData];
         });
