@@ -9,9 +9,19 @@
 
 /// 单个候选识别结果（一张图最多对应 3 个候选）
 @interface TLWRecordResult : NSObject
+@property (nonatomic, copy) NSString *title;      // 结果标题，如"结果一"
 @property (nonatomic, copy) NSString *pestName;   // 病害名称，如"炭疽病"
 @property (nonatomic, assign) float confidence;    // 置信度，0.0~1.0
+@property (nonatomic, assign) BOOL hasConfidence;  // 是否有可用置信度
+@property (nonatomic, copy) NSString *reason;      // 识别依据
 @property (nonatomic, copy) NSString *solution;    // 解决方案文本
+
+/// 从接口返回的 agentResponse 中解析候选结果，兼容 JSON / 转义 JSON / 纯文本兜底。
++ (NSArray<TLWRecordResult *> *)resultsFromAgentResponse:(NSString *)agentResponse
+                                             fallbackQuery:(NSString *)userQuery;
+
+/// 供 UI 展示的置信度文本，无数据时返回 "--"
+- (NSString *)displayConfidenceText;
 @end
 
 /// 单条识别记录

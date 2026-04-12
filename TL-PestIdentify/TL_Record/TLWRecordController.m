@@ -35,6 +35,9 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 - (void)viewDidLoad {
     [super viewDidLoad];
     [self.navBar setRightButtonTitle:@"筛选" iconName:@"筛选"];
+    self.navBar.rightButton.titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
+    self.navBar.rightButton.imageEdgeInsets = UIEdgeInsetsMake(0, 1, 0, -1);
+    self.navBar.rightButton.titleEdgeInsets = UIEdgeInsetsMake(0, -1, 0, 1);
 
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -125,13 +128,8 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
             item.recordTime = @"";
         }
 
-        // 从 agentResponse 中提取病害名和解决方案
-        TLWRecordResult *result = [TLWRecordResult new];
-        result.pestName = [self tl_extractPestNameFromResponse:history.agentResponse
-                                                    userQuery:history.userQuery];
-        result.confidence = 0;
-        result.solution = history.agentResponse ?: @"";
-        item.results = @[result];
+        item.results = [TLWRecordResult resultsFromAgentResponse:history.agentResponse
+                                                    fallbackQuery:history.userQuery];
 
         NSString *dateKey = history.createTime ? [dateFmt stringFromDate:history.createTime] : @"未知日期";
         if (!grouped[dateKey]) {
@@ -149,20 +147,6 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
         [sections addObject:sec];
     }
     return [sections copy];
-}
-
-/// 从 agentResponse 中提取病害名称，优先取第一行或冒号前的关键词
-- (NSString *)tl_extractPestNameFromResponse:(NSString *)response userQuery:(NSString *)userQuery {
-    if (!response.length) {
-        return userQuery.length ? userQuery : @"未知病害";
-    }
-    // 尝试从第一行提取（通常 Agent 回复开头会包含病害名）
-    NSString *firstLine = [[response componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]] firstObject];
-    // 如果第一行太长（超过20字），可能不是病害名，截取前20字
-    if (firstLine.length > 20) {
-        firstLine = [firstLine substringToIndex:20];
-    }
-    return firstLine.length ? firstLine : @"识别结果";
 }
 
 /// 统一刷新入口，同时控制空态 UI 的显隐
