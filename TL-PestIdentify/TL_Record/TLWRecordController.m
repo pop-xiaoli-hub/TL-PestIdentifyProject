@@ -24,7 +24,16 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 @interface TLWRecordController () <UICollectionViewDataSource, UICollectionViewDelegate>
 @property (nonatomic, strong) TLWRecordView *myView;
 @property (nonatomic, strong) NSArray<TLWRecordSection *> *sections;
+@property (nonatomic, strong) NSArray<AGAgentChatHistory> *allHistoryList;
 @property (nonatomic, assign) BOOL isLoading;
+@property (nonatomic, strong) UIView *filterMaskView;
+@property (nonatomic, strong) UIView *filterPanelView;
+@property (nonatomic, strong) UILabel *filterYearLabel;
+@property (nonatomic, strong) NSArray<UIButton *> *monthButtons;
+@property (nonatomic, assign) NSInteger selectedFilterYear;
+@property (nonatomic, assign) NSInteger selectedFilterMonth;
+@property (nonatomic, assign) NSInteger pendingFilterYear;
+@property (nonatomic, assign) NSInteger pendingFilterMonth;
 @end
 
 @implementation TLWRecordController
@@ -61,7 +70,9 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 #pragma mark - Actions
 
 - (void)tl_filter {
-    // TODO: 展示筛选面板（按日期/病虫害类型过滤）
+    [self tl_preparePendingFilter];
+    [self tl_updateFilterPanelSelection];
+    [self tl_showFilterPanel];
 }
 
 #pragma mark - Data
@@ -96,8 +107,10 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
             }
 
             NSArray<AGAgentChatHistory> *historyList = output.data ?: @[];
+            self.allHistoryList = historyList;
+            [self tl_prepareDefaultFilterIfNeededWithHistory:historyList];
             [self tl_setLoading:NO];
-            self.sections = [self tl_buildSectionsFromHistory:historyList];
+            self.sections = [self tl_buildSectionsFromHistory:[self tl_filteredHistoryListFromHistory:historyList]];
             [self tl_reloadData];
         });
     }];
@@ -151,6 +164,26 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
     return [sections copy];
 }
 
+- (NSArray<AGAgentChatHistory> *)tl_filteredHistoryListFromHistory:(NSArray<AGAgentChatHistory> *)historyList {
+    if (self.selectedFilterYear <= 0 || self.selectedFilterMonth <= 0) {
+        return historyList ?: @[];
+    }
+
+    NSCalendar *calendar = [NSCalendar currentCalendar];
+    NSMutableArray<AGAgentChatHistory> *filtered = [NSMutableArray array];
+    for (AGAgentChatHistory *history in historyList) {
+        NSDate *date = history.createTime;
+        if (!date) {
+            continue;
+        }
+        NSDateComponents *components = [calendar components:NSCalendarUnitYear | NSCalendarUnitMonth fromDate:date];
+        if (components.year == self.selectedFilterYear && components.month == self.selectedFilterMonth) {
+            [filtered addObject:history];
+        }
+    }
+    return [filtered copy];
+}
+
 /// 从 agentResponse 中提取病害名称，优先取第一行或冒号前的关键词
 - (NSString *)tl_extractPestNameFromResponse:(NSString *)response userQuery:(NSString *)userQuery {
     if (!response.length) {
@@ -183,6 +216,248 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
     } else {
         [TLWLoadingIndicator hideInView:self.myView.collectionView];
     }
+}
+
+#pragma mark - Filter Panel
+
+- (void)tl_prepareDefaultFilterIfNeededWithHistory:(NSArray<AGAgentChatHistory> *)historyList {
+    if (self.selectedFilterYear > 0 && self.selectedFilterMonth > 0) {
+        return;
+    }
+
+    NSDate *referenceDate = nil;
+    for (AGAgentChatHistory *history in historyList) {
+        if (history.createTime) {
+            referenceDate = history.createTime;
+            break;
+        }
+    }
+    if (!referenceDate) {
+        referenceDate = [NSDate date];
+    }
+
+    NSDateComponents *components = [[NSCalendar currentCalendar] components:NSCalendarUnitYear | NSCalendarUnitMonth fromDate:referenceDate];
+    self.selectedFilterYear = components.year;
+    self.selectedFilterMonth = components.month;
+}
+
+- (void)tl_preparePendingFilter {
+    if (self.selectedFilterYear <= 0 || self.selectedFilterMonth <= 0) {
+        [self tl_prepareDefaultFilterIfNeededWithHistory:self.allHistoryList];
+    }
+    self.pendingFilterYear = self.selectedFilterYear;
+    self.pendingFilterMonth = self.selectedFilterMonth;
+}
+
+- (void)tl_showFilterPanel {
+    if (!self.filterMaskView) {
+        [self tl_buildFilterPanelIfNeeded];
+    }
+    self.filterMaskView.hidden = NO;
+    self.filterMaskView.alpha = 0.0;
+    self.filterPanelView.transform = CGAffineTransformMakeScale(0.96, 0.96);
+    [UIView animateWithDuration:0.22 animations:^{
+        self.filterMaskView.alpha = 1.0;
+        self.filterPanelView.transform = CGAffineTransformIdentity;
+    }];
+}
+
+- (void)tl_hideFilterPanel {
+    if (!self.filterMaskView || self.filterMaskView.hidden) {
+        return;
+    }
+    [UIView animateWithDuration:0.2 animations:^{
+        self.filterMaskView.alpha = 0.0;
+        self.filterPanelView.transform = CGAffineTransformMakeScale(0.96, 0.96);
+    } completion:^(BOOL finished) {
+        self.filterMaskView.hidden = YES;
+        self.filterPanelView.transform = CGAffineTransformIdentity;
+    }];
+}
+
+- (void)tl_buildFilterPanelIfNeeded {
+    UIView *maskView = [[UIView alloc] init];
+    maskView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.16];
+    maskView.hidden = YES;
+    [self.view addSubview:maskView];
+    [maskView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.view);
+    }];
+    self.filterMaskView = maskView;
+
+    UIButton *dismissButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    dismissButton.backgroundColor = [UIColor clearColor];
+    [dismissButton addTarget:self action:@selector(tl_hideFilterPanel) forControlEvents:UIControlEventTouchUpInside];
+    [maskView addSubview:dismissButton];
+    [dismissButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(maskView);
+    }];
+
+    UIView *panel = [[UIView alloc] init];
+    panel.backgroundColor = [UIColor whiteColor];
+    panel.layer.cornerRadius = 20.0;
+    panel.layer.masksToBounds = YES;
+    [maskView addSubview:panel];
+    self.filterPanelView = panel;
+    [panel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(maskView).offset(28);
+        make.right.equalTo(maskView).offset(-28);
+        make.top.equalTo(maskView).offset(92);
+    }];
+
+    UIButton *prevButton = [self tl_filterArrowButtonWithTitle:@"←"];
+    prevButton.tag = -1;
+    [prevButton addTarget:self action:@selector(tl_changeFilterYear:) forControlEvents:UIControlEventTouchUpInside];
+    [panel addSubview:prevButton];
+
+    UIButton *nextButton = [self tl_filterArrowButtonWithTitle:@"→"];
+    nextButton.tag = 1;
+    [nextButton addTarget:self action:@selector(tl_changeFilterYear:) forControlEvents:UIControlEventTouchUpInside];
+    [panel addSubview:nextButton];
+
+    UILabel *yearLabel = [[UILabel alloc] init];
+    yearLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+    yearLabel.textColor = [UIColor colorWithWhite:0.25 alpha:1.0];
+    yearLabel.textAlignment = NSTextAlignmentCenter;
+    [panel addSubview:yearLabel];
+    self.filterYearLabel = yearLabel;
+
+    [prevButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(panel).offset(26);
+        make.top.equalTo(panel).offset(20);
+        make.width.height.mas_equalTo(40);
+    }];
+    [nextButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.right.equalTo(panel).offset(-26);
+        make.centerY.equalTo(prevButton);
+        make.width.height.mas_equalTo(40);
+    }];
+    [yearLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.centerY.equalTo(prevButton);
+        make.centerX.equalTo(panel);
+    }];
+
+    NSArray<NSString *> *months = @[@"一月", @"二月", @"三月", @"四月", @"五月",
+                                    @"六月", @"七月", @"八月", @"九月", @"十月",
+                                    @"十一月", @"十二月"];
+    NSMutableArray<UIButton *> *buttons = [NSMutableArray array];
+    NSInteger columnCount = 5;
+    CGFloat horizontalInset = 18.0;
+    CGFloat buttonWidth = (UIScreen.mainScreen.bounds.size.width - 56.0 - horizontalInset * 2) / 5.0;
+    CGFloat buttonHeight = 40.0;
+    CGFloat topStart = 88.0;
+    CGFloat rowSpacing = 22.0;
+
+    for (NSInteger index = 0; index < months.count; index++) {
+        UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+        [button setTitle:months[index] forState:UIControlStateNormal];
+        [button setTitleColor:[UIColor colorWithWhite:0.65 alpha:1.0] forState:UIControlStateNormal];
+        [button setTitleColor:[UIColor whiteColor] forState:UIControlStateSelected];
+        button.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+        button.layer.cornerRadius = 6.0;
+        button.tag = index + 1;
+        [button addTarget:self action:@selector(tl_monthButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
+        [panel addSubview:button];
+        [buttons addObject:button];
+
+        NSInteger row = index / columnCount;
+        NSInteger column = index % columnCount;
+        CGFloat left = horizontalInset + column * buttonWidth;
+        CGFloat top = topStart + row * (buttonHeight + rowSpacing);
+        [button mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.left.equalTo(panel).offset(left);
+            make.top.equalTo(panel).offset(top);
+            make.width.mas_equalTo(buttonWidth);
+            make.height.mas_equalTo(buttonHeight);
+        }];
+    }
+    self.monthButtons = [buttons copy];
+
+    UIView *line = [[UIView alloc] init];
+    line.backgroundColor = [UIColor colorWithWhite:0.93 alpha:1.0];
+    [panel addSubview:line];
+    [line mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.right.equalTo(panel);
+        make.top.equalTo(panel).offset(280);
+        make.height.mas_equalTo(1.0);
+    }];
+
+    UIButton *confirmButton = [self tl_filterActionButtonWithTitle:@"确认" filled:YES];
+    [confirmButton addTarget:self action:@selector(tl_confirmFilterSelection) forControlEvents:UIControlEventTouchUpInside];
+    [panel addSubview:confirmButton];
+
+    UIButton *cancelButton = [self tl_filterActionButtonWithTitle:@"取消" filled:NO];
+    [cancelButton addTarget:self action:@selector(tl_hideFilterPanel) forControlEvents:UIControlEventTouchUpInside];
+    [panel addSubview:cancelButton];
+
+    [confirmButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(line.mas_bottom).offset(12);
+        make.right.equalTo(panel.mas_centerX).offset(-10);
+        make.width.mas_equalTo(88);
+        make.height.mas_equalTo(38);
+        make.bottom.equalTo(panel).offset(-14);
+    }];
+    [cancelButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(confirmButton);
+        make.left.equalTo(panel.mas_centerX).offset(10);
+        make.width.height.equalTo(confirmButton);
+    }];
+}
+
+- (UIButton *)tl_filterArrowButtonWithTitle:(NSString *)title {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+    [button setTitle:title forState:UIControlStateNormal];
+    [button setTitleColor:[UIColor colorWithRed:1.0 green:0.69 blue:0.12 alpha:1.0] forState:UIControlStateNormal];
+    button.titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightSemibold];
+    button.layer.cornerRadius = 20.0;
+    button.layer.borderWidth = 1.0;
+    button.layer.borderColor = [UIColor colorWithWhite:0.9 alpha:1.0].CGColor;
+    button.backgroundColor = [UIColor whiteColor];
+    return button;
+}
+
+- (UIButton *)tl_filterActionButtonWithTitle:(NSString *)title filled:(BOOL)filled {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
+    [button setTitle:title forState:UIControlStateNormal];
+    button.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    button.layer.cornerRadius = 6.0;
+    button.layer.borderWidth = filled ? 0.0 : 1.0;
+    if (filled) {
+        [button setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        button.backgroundColor = [UIColor colorWithRed:1.0 green:0.69 blue:0.12 alpha:1.0];
+    } else {
+        [button setTitleColor:[UIColor colorWithRed:1.0 green:0.69 blue:0.12 alpha:1.0] forState:UIControlStateNormal];
+        button.backgroundColor = [UIColor whiteColor];
+        button.layer.borderColor = [UIColor colorWithRed:1.0 green:0.69 blue:0.12 alpha:1.0].CGColor;
+    }
+    return button;
+}
+
+- (void)tl_changeFilterYear:(UIButton *)sender {
+    self.pendingFilterYear += sender.tag;
+    [self tl_updateFilterPanelSelection];
+}
+
+- (void)tl_monthButtonTapped:(UIButton *)sender {
+    self.pendingFilterMonth = sender.tag;
+    [self tl_updateFilterPanelSelection];
+}
+
+- (void)tl_updateFilterPanelSelection {
+    self.filterYearLabel.text = [NSString stringWithFormat:@"%ld年", (long)self.pendingFilterYear];
+    for (UIButton *button in self.monthButtons) {
+        BOOL selected = (button.tag == self.pendingFilterMonth);
+        button.selected = selected;
+        button.backgroundColor = selected ? [UIColor colorWithRed:1.0 green:0.69 blue:0.12 alpha:1.0] : [UIColor clearColor];
+    }
+}
+
+- (void)tl_confirmFilterSelection {
+    self.selectedFilterYear = self.pendingFilterYear;
+    self.selectedFilterMonth = self.pendingFilterMonth;
+    self.sections = [self tl_buildSectionsFromHistory:[self tl_filteredHistoryListFromHistory:self.allHistoryList]];
+    [self tl_reloadData];
+    [self tl_hideFilterPanel];
 }
 
 #pragma mark - UICollectionViewDataSource
