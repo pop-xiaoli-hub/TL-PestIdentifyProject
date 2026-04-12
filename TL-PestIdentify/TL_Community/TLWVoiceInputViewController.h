@@ -11,6 +11,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, copy, nullable) NSString *initialSearchText;
 @property (nonatomic, copy, nullable) void (^onSearchTextChanged)(NSString *text);
+@property (nonatomic, strong) NSMutableArray *hasCollectedPosts;
 
 @end
 

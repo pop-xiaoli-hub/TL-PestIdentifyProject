@@ -556,6 +556,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 - (void)tl_voiceButtonTapped {
   TLWVoiceInputViewController *vc = [[TLWVoiceInputViewController alloc] init];
   vc.initialSearchText = self.myView.searchTextField.text;
+  vc.hasCollectedPosts = self.collectePosts;
   __weak typeof(self) weakSelf = self;
   vc.onSearchTextChanged = ^(NSString *text) {
     __strong typeof(weakSelf) strongSelf = weakSelf;
