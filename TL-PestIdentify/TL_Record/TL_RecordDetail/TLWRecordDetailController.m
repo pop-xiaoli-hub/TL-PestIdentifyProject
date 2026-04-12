@@ -68,7 +68,10 @@
     // 隐藏没有数据的 Tab 按钮（结果数量可能不足 3 个）
     NSArray<UIButton *> *tabs = self.myView.tabButtons;
     for (int i = 0; i < 3; i++) {
-        tabs[i].hidden = (i >= (NSInteger)_item.results.count);
+        BOOL hasResult = (i < (NSInteger)_item.results.count);
+        tabs[i].hidden = !hasResult;
+        NSString *title = hasResult ? _item.results[i].title : [NSString stringWithFormat:@"结果%u", i + 1];
+        [tabs[i] setTitle:(title.length > 0 ? title : @"结果") forState:UIControlStateNormal];
     }
 
     // 展示第一个结果
@@ -84,7 +87,7 @@
 
     [self.myView selectTabAtIndex:index animated:animated];
     self.myView.pestNameLabel.text   = result.pestName;
-    self.myView.confidenceLabel.text = [NSString stringWithFormat:@"%.0f%%", result.confidence * 100];
+    self.myView.confidenceLabel.text = [result displayConfidenceText];
     self.myView.solutionLabel.text   = result.solution;
 }
 
