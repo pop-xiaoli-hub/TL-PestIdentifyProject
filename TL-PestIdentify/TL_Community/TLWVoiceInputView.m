@@ -11,18 +11,25 @@ static CGFloat const kCenterCircleSize = 254.0;
 static CGFloat const kEqualizerBarWidth = 8.0;
 static CGFloat const kEqualizerBarSpacing = 12.0;
 static CGFloat const kEqualizerBarMaxHeight = 48.0;
+static CGFloat const kSearchButtonWidth = 72.0;
+static CGFloat const kSearchButtonRightInset = 16.0;
+static CGFloat const kSearchButtonSpacing = 8.0;
 
 @interface TLWVoiceInputView ()
 
 @property (nonatomic, strong, readwrite) UIButton *backButton;
 @property (nonatomic, strong, readwrite) UITextField *searchTextField;
+@property (nonatomic, strong, readwrite) UIButton *searchButton;
 @property (nonatomic, strong, readwrite) UIButton *longPressMicButton;
 @property (nonatomic, strong) CAShapeLayer *ringLayer;
 @property (nonatomic, assign) BOOL isRecording;
 @property (nonatomic, strong) UIView *headerGradientContainer;
+@property (nonatomic, strong) UIView *searchBackgroundView;
 @property (nonatomic, strong) UIView *centerCircleContainer;
 @property (nonatomic, strong) NSArray<UIView *> *equalizerBars;
 @property (nonatomic, strong) UILabel *inputtingLabel;
+@property (nonatomic, strong) MASConstraint *searchBackgroundRightConstraint;
+@property (nonatomic, strong) MASConstraint *searchButtonWidthConstraint;
 
 @end
 
@@ -96,6 +103,7 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
   searchBg.layer.cornerRadius = 20.0;
   searchBg.clipsToBounds = YES;
   [header addSubview:searchBg];
+  self.searchBackgroundView = searchBg;
 
   UIImageView *searchIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_search.png"]];
   searchIcon.contentMode = UIViewContentModeScaleAspectFit;
@@ -109,9 +117,16 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
   [searchBg addSubview:tf];
   self.searchTextField = tf;
 
-  UIImageView *micIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_voice.png"]];
-  micIcon.contentMode = UIViewContentModeScaleAspectFit;
-  [searchBg addSubview:micIcon];
+  UIButton *searchButton = [UIButton buttonWithType:UIButtonTypeCustom];
+  [searchButton setTitle:@"搜索" forState:UIControlStateNormal];
+  [searchButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+  searchButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+  searchButton.backgroundColor = [UIColor colorWithRed:0.19 green:0.76 blue:0.60 alpha:1.0];
+  searchButton.layer.cornerRadius = 20.0;
+  searchButton.alpha = 0.0;
+  searchButton.hidden = YES;
+  [header addSubview:searchButton];
+  self.searchButton = searchButton;
 
   [backBtn mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(header).offset(16);
@@ -120,23 +135,24 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
   }];
   [searchBg mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(backBtn.mas_right).offset(12);
-    make.right.equalTo(header).offset(-16);
+    self.searchBackgroundRightConstraint = make.right.equalTo(header).offset(-16);
     make.centerY.equalTo(backBtn);
     make.height.mas_equalTo(40);
+  }];
+  [searchButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(header).offset(-kSearchButtonRightInset);
+    make.centerY.equalTo(searchBg);
+    make.height.mas_equalTo(40);
+    self.searchButtonWidthConstraint = make.width.mas_equalTo(0);
   }];
   [searchIcon mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(searchBg).offset(12);
     make.centerY.equalTo(searchBg);
     make.width.height.mas_equalTo(18);
   }];
-  [micIcon mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.right.equalTo(searchBg).offset(-12);
-    make.centerY.equalTo(searchBg);
-    make.width.height.mas_equalTo(18);
-  }];
   [tf mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(searchIcon.mas_right).offset(8);
-    make.right.equalTo(micIcon.mas_left).offset(-8);
+    make.right.equalTo(searchBg).offset(-12);
     make.centerY.equalTo(searchBg);
     make.height.mas_equalTo(32);
   }];
@@ -363,6 +379,35 @@ static CGFloat const kEqualizerBarMaxHeight = 48.0;
     }
     default:
       break;
+  }
+}
+
+- (void)updateSearchActionVisible:(BOOL)visible animated:(BOOL)animated {
+  [self.searchBackgroundRightConstraint uninstall];
+  [self.searchBackgroundView mas_updateConstraints:^(MASConstraintMaker *make) {
+    self.searchBackgroundRightConstraint = visible
+    ? make.right.equalTo(self.headerGradientContainer).offset(-(kSearchButtonRightInset + kSearchButtonWidth + kSearchButtonSpacing))
+    : make.right.equalTo(self.headerGradientContainer).offset(-16);
+  }];
+  [self.searchButtonWidthConstraint uninstall];
+  [self.searchButton mas_updateConstraints:^(MASConstraintMaker *make) {
+    self.searchButtonWidthConstraint = make.width.mas_equalTo(visible ? kSearchButtonWidth : 0.0);
+  }];
+
+  void (^animations)(void) = ^{
+    self.searchButton.hidden = NO;
+    self.searchButton.alpha = visible ? 1.0 : 0.0;
+    [self layoutIfNeeded];
+  };
+  void (^completion)(BOOL) = ^(BOOL finished) {
+    self.searchButton.hidden = !visible;
+  };
+
+  if (animated) {
+    [UIView animateWithDuration:0.22 animations:animations completion:completion];
+  } else {
+    animations();
+    completion(YES);
   }
 }
 

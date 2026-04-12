@@ -11,10 +11,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, readonly) UIButton *backButton;
 @property (nonatomic, strong, readonly) UITextField *searchTextField;
+@property (nonatomic, strong, readonly) UIButton *searchButton;
 @property (nonatomic, strong, readonly) UIButton *longPressMicButton;
 
 @property (nonatomic, copy, nullable) void (^onRecordingStart)(void);
 @property (nonatomic, copy, nullable) void (^onRecordingEnd)(void);
+
+- (void)updateSearchActionVisible:(BOOL)visible animated:(BOOL)animated;
 
 @end
 
