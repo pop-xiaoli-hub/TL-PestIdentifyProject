@@ -1,3 +1,32 @@
+require 'fileutils'
+
+def ensure_speechsdk_present(installer)
+  speech_target = installer.pod_targets.find { |pod_target| pod_target.pod_name == 'SpeechEngineToB' }
+  speech_version = speech_target&.version&.to_s
+  return unless speech_version
+
+  speech_lib_dir = File.join(installer.sandbox.root.to_s, 'SpeechEngineToB', 'pod', 'libs')
+  speech_lib_path = File.join(speech_lib_dir, 'libspeechsdk.a')
+  return if File.exist?(speech_lib_path)
+
+  cached_lib = Dir.glob(
+    File.join(
+      File.expand_path('~/Library/Caches/CocoaPods'),
+      'Pods',
+      'Release',
+      'SpeechEngineToB',
+      "#{speech_version}-*",
+      'pod',
+      'libs',
+      'libspeechsdk.a'
+    )
+  ).first
+  return unless cached_lib && File.exist?(cached_lib)
+
+  FileUtils.mkdir_p(speech_lib_dir)
+  FileUtils.cp(cached_lib, speech_lib_path)
+end
+
 source 'https://cdn.cocoapods.org/'
 source 'https://github.com/volcengine/volcengine-specs.git'
 
@@ -40,4 +69,12 @@ post_install do |installer|
       end
     end
   end
+
+  # SpeechEngineToB 当前 podspec 会链接 libspeechsdk.a，但有时安装产物里缺少该库。
+  # 若检测到缺失，则从 CocoaPods 缓存中补回，避免链接阶段出现 undefined symbol。
+  ensure_speechsdk_present(installer)
+end
+
+post_integrate do |installer|
+  ensure_speechsdk_present(installer)
 end
