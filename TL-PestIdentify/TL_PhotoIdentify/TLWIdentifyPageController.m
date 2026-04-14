@@ -12,8 +12,7 @@
 #import "TLWIdentifyResultController.h"
 #import "TLWSDKManager.h"
 #import <AgriPestClient/AGChatRequest.h>
-#import <AgriPestClient/AGResultListDiagnosisItem.h>
-#import <AgriPestClient/AGDiagnosisItem.h>
+#import <AgriPestClient/AGResultChatProfileResponse.h>
 #import <AgriPestClient/AGDefaultConfiguration.h>
 #import "TLWPhotoPickerController.h"
 #import "TLWLocalIdentifyManager.h"
@@ -328,7 +327,7 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
         currentToken.length > 0 ? @"有" : @"无（未登录？）");
   __block void (^performCloudIdentify)(BOOL);
   performCloudIdentify = ^(BOOL didRetryAuth) {
-    [manager.api chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *chatOutput, NSError *chatError) {
+    [manager.api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *chatOutput, NSError *chatError) {
       dispatch_async(dispatch_get_main_queue(), ^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) {
@@ -344,7 +343,7 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
           return;
         }
 
-        if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.count == 0) {
+        if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.answer.length == 0) {
           NSLog(@"========== [云端] AI识别失败 ==========");
           if (chatError) {
             NSLog(@"[云端] NSError domain=%@ code=%ld msg=%@",
@@ -357,7 +356,7 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
             NSLog(@"[云端] chatOutput=nil（响应体解析失败或无响应）");
           } else {
             NSLog(@"[云端] code=%@, message=%@", chatOutput.code, chatOutput.message);
-            NSLog(@"[云端] data=%@ (count=%lu)", chatOutput.data, (unsigned long)chatOutput.data.count);
+            NSLog(@"[云端] answer=%@", chatOutput.data.answer);
           }
           NSLog(@"============================================");
           waitingForLocalFallback = YES;
@@ -366,24 +365,30 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
         }
 
         NSLog(@"========== [云端] AI识别成功 ==========");
-        NSMutableArray<NSDictionary *> *rawResults = [NSMutableArray array];
-        for (AGDiagnosisItem *item in chatOutput.data) {
-          NSString *name = item.diseaseName.length > 0 ? item.diseaseName : @"待确认";
-          NSString *confidence = item.confidence ? [NSString stringWithFormat:@"%@%%", item.confidence] : @"--";
-          NSString *advice = item.controlPlan.length > 0 ? item.controlPlan : @"建议补拍叶片近景、病斑局部、叶背或虫体细节后再次识别。";
-          NSLog(@"[云端] %@ | 置信度: %@ | 防治: %@", name, confidence, advice);
-          [rawResults addObject:@{
-            @"title": @"",
-            @"name": name,
-            @"names": @[name],
-            @"confidence": confidence,
-            @"reason": @"",
-            @"advice": advice
-          }];
+        NSLog(@"[云端] 原始返回: %@", chatOutput.data.answer);
+        if (chatOutput.data.profile) {
+          NSLog(@"[云端] profile: singleModel=%@, imageType=%@, imageLength=%@, totalMs=%@",
+                chatOutput.data.profile.singleModel,
+                chatOutput.data.profile.imageUrlType,
+                chatOutput.data.profile.imageUrlLength,
+                chatOutput.data.profile.totalMs);
+        }
+
+        NSArray<NSDictionary *> *parsedResults = [strongSelf tl_normalizedIdentifyResultsForDisplay:
+                                                  [strongSelf tl_parseIdentifyResultsFromJSONString:chatOutput.data.answer]];
+        if (parsedResults.count == 0) {
+          NSLog(@"[云端] 结构化结果解析失败，回退本地识别");
+          waitingForLocalFallback = YES;
+          presentLocalFallbackIfNeeded();
+          return;
+        }
+
+        for (NSInteger i = 0; i < parsedResults.count; i++) {
+          NSDictionary *r = parsedResults[i];
+          NSLog(@"[云端] Top%ld: %@ | 置信度: %@ | 依据: %@", (long)(i + 1), r[@"name"], r[@"confidence"], r[@"reason"]);
         }
         NSLog(@"============================================");
 
-        NSArray<NSDictionary *> *parsedResults = [strongSelf tl_normalizedIdentifyResultsForDisplay:rawResults];
         [strongSelf tl_stopLoadingIndicator];
         TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
         vc.image = strongSelf.capturedImage;
@@ -495,7 +500,92 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
 }
 
 - (NSString *)tl_identifyPrompt {
-  return @"请识别图片中农作物的病虫害情况，根据可见症状给出诊断结论。如果图像不清晰或证据不足，请如实说明，不要编造具体病名。";
+  return @"请只根据图片中可见的农作物症状进行判断，不要为了凑满结果而猜测。"
+         "结论可以是病害、虫害、健康，或待确认。"
+         "如果证据不足、图像不清晰、主体不明确，必须返回待确认，不要编造具体病名。"
+         "严格返回 JSON，不要输出任何额外文字。"
+         "格式为：{\"results\":[{\"title\":\"结果一\",\"name\":\"结论名称\",\"confidence\":\"百分比\",\"reason\":\"只写图像中可见依据\",\"advice\":\"给出简短处理建议\"}]}"
+         "。results 按置信度从高到低返回 1 到 3 项。";
+}
+
+- (NSArray<NSDictionary *> *)tl_parseIdentifyResultsFromJSONString:(NSString *)jsonString {
+  if (![jsonString isKindOfClass:[NSString class]] || jsonString.length == 0) {
+    return @[];
+  }
+
+  NSString *normalized = [jsonString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+  NSRange firstBraceRange = [normalized rangeOfString:@"{"];
+  NSRange lastBraceRange = [normalized rangeOfString:@"}" options:NSBackwardsSearch];
+  if (firstBraceRange.location != NSNotFound &&
+      lastBraceRange.location != NSNotFound &&
+      lastBraceRange.location > firstBraceRange.location) {
+    normalized = [normalized substringWithRange:NSMakeRange(firstBraceRange.location,
+                                                            lastBraceRange.location - firstBraceRange.location + 1)];
+  }
+
+  NSData *data = [normalized dataUsingEncoding:NSUTF8StringEncoding];
+  if (!data) {
+    return @[];
+  }
+
+  NSError *jsonError = nil;
+  id jsonObject = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+  if (jsonError || ![jsonObject isKindOfClass:[NSDictionary class]]) {
+    NSLog(@"AI识别：JSON解析失败 %@", jsonError.localizedDescription);
+    return @[];
+  }
+
+  id resultsObject = ((NSDictionary *)jsonObject)[@"results"];
+  if (![resultsObject isKindOfClass:[NSArray class]]) {
+    return @[];
+  }
+
+  NSMutableArray<NSDictionary *> *parsedResults = [NSMutableArray array];
+  NSArray *rawResults = (NSArray *)resultsObject;
+  for (NSUInteger idx = 0; idx < rawResults.count; idx++) {
+    id item = rawResults[idx];
+    if (![item isKindOfClass:[NSDictionary class]]) {
+      continue;
+    }
+
+    NSDictionary *result = (NSDictionary *)item;
+    NSString *title = [result[@"title"] isKindOfClass:[NSString class]] ? result[@"title"] : [NSString stringWithFormat:@"结果%lu", (unsigned long)(idx + 1)];
+
+    NSString *name = nil;
+    if ([result[@"name"] isKindOfClass:[NSString class]] && [result[@"name"] length] > 0) {
+      name = result[@"name"];
+    } else if ([result[@"names"] isKindOfClass:[NSArray class]]) {
+      for (id nameItem in result[@"names"]) {
+        if ([nameItem isKindOfClass:[NSString class]] && [((NSString *)nameItem) length] > 0) {
+          name = nameItem;
+          break;
+        }
+      }
+    }
+
+    NSString *confidence = nil;
+    if ([result[@"confidence"] isKindOfClass:[NSString class]]) {
+      confidence = result[@"confidence"];
+    } else if ([result[@"confidence"] isKindOfClass:[NSNumber class]]) {
+      confidence = [NSString stringWithFormat:@"%.1f%%", [result[@"confidence"] floatValue]];
+    }
+    NSString *advice = [result[@"advice"] isKindOfClass:[NSString class]] ? result[@"advice"] : @"";
+    NSString *reason = [result[@"reason"] isKindOfClass:[NSString class]] ? result[@"reason"] : @"";
+    if (advice.length == 0 && reason.length > 0) {
+      advice = reason;
+    }
+
+    [parsedResults addObject:@{
+      @"title": title ?: @"",
+      @"name": name ?: @"",
+      @"names": name.length > 0 ? @[name] : @[],
+      @"confidence": confidence ?: @"--",
+      @"reason": reason ?: @"",
+      @"advice": advice ?: @""
+    }];
+  }
+
+  return [parsedResults copy];
 }
 
 - (NSArray<NSDictionary *> *)tl_buildLocalFallbackResultsFromIdentifyResults:(NSArray<TLWLocalIdentifyResult *> *)results {
