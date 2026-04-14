@@ -14,6 +14,7 @@
 #import <AgriPestClient/AGChatRequest.h>
 #import <AgriPestClient/AGResultListDiagnosisItem.h>
 #import <AgriPestClient/AGDiagnosisItem.h>
+#import <AgriPestClient/AGDefaultConfiguration.h>
 #import "TLWPhotoPickerController.h"
 #import "TLWLocalIdentifyManager.h"
 #import "TLWToast.h"
@@ -321,7 +322,10 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
   request.useSingleModel = @(NO);
 
   TLWSDKManager *manager = [TLWSDKManager shared];
-  NSLog(@"AI识别：开始识别，payload=%lu bytes", (unsigned long)imageData.length);
+  NSString *currentToken = [AGDefaultConfiguration sharedConfig].accessToken;
+  NSLog(@"AI识别：开始识别，payload=%lu bytes，token=%@",
+        (unsigned long)imageData.length,
+        currentToken.length > 0 ? @"有" : @"无（未登录？）");
   __block void (^performCloudIdentify)(BOOL);
   performCloudIdentify = ^(BOOL didRetryAuth) {
     [manager.api chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *chatOutput, NSError *chatError) {
@@ -342,8 +346,19 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
 
         if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.count == 0) {
           NSLog(@"========== [云端] AI识别失败 ==========");
-          NSLog(@"[云端] chatError: %@", chatError.localizedDescription);
-          NSLog(@"[云端] code: %@, message: %@", chatOutput.code, chatOutput.message);
+          if (chatError) {
+            NSLog(@"[云端] NSError domain=%@ code=%ld msg=%@",
+                  chatError.domain, (long)chatError.code, chatError.localizedDescription);
+            NSLog(@"[云端] NSError userInfo=%@", chatError.userInfo);
+          } else {
+            NSLog(@"[云端] NSError=nil");
+          }
+          if (!chatOutput) {
+            NSLog(@"[云端] chatOutput=nil（响应体解析失败或无响应）");
+          } else {
+            NSLog(@"[云端] code=%@, message=%@", chatOutput.code, chatOutput.message);
+            NSLog(@"[云端] data=%@ (count=%lu)", chatOutput.data, (unsigned long)chatOutput.data.count);
+          }
           NSLog(@"============================================");
           waitingForLocalFallback = YES;
           presentLocalFallbackIfNeeded();
