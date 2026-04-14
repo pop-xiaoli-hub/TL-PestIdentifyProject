@@ -7,6 +7,7 @@
 #import "TLWSDKManager.h"
 #import <UIKit/UIKit.h>
 #import <float.h>
+#import <AgriPestClient/AGApiClient.h>
 
 static NSString * _Nullable TLWQWeatherPlistValue(NSString *key) {
     id value = [[NSBundle mainBundle] objectForInfoDictionaryKey:key];
@@ -95,6 +96,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
         config.host = @"http://115.191.67.35:8080";
         self.cachedFavoritedPosts = @[];
         self.api = [[AGApiService alloc] init];
+        [AGApiClient sharedClient].timeoutInterval = 120;
         self.sessionManager = [[TLWSessionManager alloc] initWithAPIService:self.api];
         __weak typeof(self) weakSelf = self;
         self.sessionManager.sessionInvalidationHandler = ^{
