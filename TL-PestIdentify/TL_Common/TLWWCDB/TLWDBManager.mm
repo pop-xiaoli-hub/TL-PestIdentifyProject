@@ -10,6 +10,8 @@
 #import "TLWDBCollectedModel+WCTTableCoding.h"
 #import "TLWDBIdentificationModel.h"
 #import "TLWDBIdentificationModel+WCTTableCoding.h"
+#import "TLWDBMyPublishedModel.h"
+#import "TLWDBMyPublishedModel+WCTTableCoding.h"
 #import "TLWSDKManager.h"
 #import <WCDB/WCDBObjc.h>
 #import <AgriPestClient/AGPostResponseDto.h>
@@ -18,10 +20,13 @@
 @property (nonatomic, strong) WCTDatabase *database;
 @property (nonatomic, strong) WCTTable<TLWDBCollectedModel *> *collectedTable;
 @property (nonatomic, strong) WCTTable<TLWDBIdentificationModel *> *identificationTable;
+@property (nonatomic, strong) WCTTable<TLWDBMyPublishedModel *> *myPublishedTable;
 @property (nonatomic, assign) NSInteger nextGeneratedLocalId;
 @property (nonatomic, assign) NSInteger nextGeneratedIdentificationLocalId;
+@property (nonatomic, assign) NSInteger nextGeneratedMyPublishedLocalId;
 @property (nonatomic, assign) BOOL didSetupCollectedTable;
 @property (nonatomic, assign) BOOL didSetupIdentificationTable;
+@property (nonatomic, assign) BOOL didSetupMyPublishedTable;
 
 @end
 
@@ -125,6 +130,15 @@
     }
 }
 
+- (NSString *)formattedCollectedPostsDescription {
+    NSArray<TLWDBCollectedModel *> *posts = [self fetchAllCollectedPosts];
+    return [self formattedDescriptionForCollectedPosts:posts];
+}
+
+- (void)printFormattedCollectedPosts {
+    NSLog(@"%@", [self formattedCollectedPostsDescription]);
+}
+
 - (nullable TLWDBCollectedModel *)fetchCollectedPostByPostId:(NSNumber *)postId {
     @synchronized (self) {
         return [self fetchCollectedPostByPostId_unlocked:postId];
@@ -160,6 +174,25 @@
     @synchronized (self) {
         [self setupCollectedTableIfNeeded];
         return [self.collectedTable deleteObjects];
+    }
+}
+
+- (BOOL)cleanCacheWithDeadDate {
+    @synchronized (self) {
+        [self setupCollectedTableIfNeeded];
+      //倒序遍历
+        NSArray<TLWDBCollectedModel *> *collectedPosts = [self.collectedTable getObjectsOrders:TLWDBCollectedModel.collectedAt.asOrder(WCTOrderedDescending)];
+        if (collectedPosts.count <= 20) {
+            return YES;
+        }
+
+        BOOL deleteOverflowSuccess = YES;
+        for (NSUInteger idx = 20; idx < collectedPosts.count; idx++) {
+            TLWDBCollectedModel *model = collectedPosts[idx];
+            BOOL success = [self.collectedTable deleteObjectsWhere:TLWDBCollectedModel.localId == model.localId];
+            deleteOverflowSuccess = deleteOverflowSuccess && success;
+        }
+        return deleteOverflowSuccess;
     }
 }
 
@@ -265,14 +298,186 @@
     }
 }
 
+- (BOOL)insertMyPublishedPost:(TLWDBMyPublishedModel *)post {
+    @synchronized (self) {
+        [self setupMyPublishedTableIfNeeded];
+        TLWDBMyPublishedModel *normalizedPost = [self normalizedMyPublishedPostFromPost:post existingPost:nil];
+        if (!normalizedPost) {
+            return NO;
+        }
+        normalizedPost.localId = [self generateNextMyPublishedLocalId];
+        return [self.myPublishedTable insertObject:normalizedPost];
+    }
+}
+
+- (BOOL)updateMyPublishedPost:(TLWDBMyPublishedModel *)post {
+    @synchronized (self) {
+        [self setupMyPublishedTableIfNeeded];
+        TLWDBMyPublishedModel *existingPost = nil;
+        if (post.localId > 0) {
+            existingPost = [self fetchMyPublishedPostByLocalId_unlocked:post.localId];
+        }
+        if (!existingPost && post.postId) {
+            existingPost = [self fetchMyPublishedPostByPostId_unlocked:post.postId];
+        }
+
+        TLWDBMyPublishedModel *normalizedPost = [self normalizedMyPublishedPostFromPost:post existingPost:existingPost];
+        if (!normalizedPost || !existingPost) {
+            return NO;
+        }
+        normalizedPost.localId = existingPost.localId;
+        return [self.myPublishedTable insertOrReplaceObject:normalizedPost];
+    }
+}
+
+- (BOOL)upsertMyPublishedPost:(TLWDBMyPublishedModel *)post {
+    @synchronized (self) {
+        [self setupMyPublishedTableIfNeeded];
+        TLWDBMyPublishedModel *existingPost = [self fetchMyPublishedPostByPostId_unlocked:post.postId];
+        TLWDBMyPublishedModel *normalizedPost = [self normalizedMyPublishedPostFromPost:post existingPost:existingPost];
+        if (!normalizedPost) {
+            return NO;
+        }
+
+        if (existingPost) {
+            normalizedPost.localId = existingPost.localId;
+            return [self.myPublishedTable insertOrReplaceObject:normalizedPost];
+        }
+
+        normalizedPost.localId = [self generateNextMyPublishedLocalId];
+        return [self.myPublishedTable insertObject:normalizedPost];
+    }
+}
+
+- (BOOL)upsertMyPublishedPostFromDto:(AGPostResponseDto *)postDto {
+    TLWDBMyPublishedModel *post = [self buildMyPublishedPostFromDto:postDto];
+    if (!post) {
+        return NO;
+    }
+    return [self upsertMyPublishedPost:post];
+}
+
+- (BOOL)upsertMyPublishedPostsFromDtos:(NSArray<AGPostResponseDto *> *)postDtos {
+    @synchronized (self) {
+        [self setupMyPublishedTableIfNeeded];
+        if (postDtos.count == 0) {
+            return YES;
+        }
+
+        NSMutableArray<TLWDBMyPublishedModel *> *insertPosts = [NSMutableArray array];
+        NSMutableArray<TLWDBMyPublishedModel *> *replacePosts = [NSMutableArray array];
+        for (AGPostResponseDto *dto in postDtos) {
+            TLWDBMyPublishedModel *post = [self buildMyPublishedPostFromDto:dto];
+            if (!post) {
+                continue;
+            }
+
+            TLWDBMyPublishedModel *existingPost = [self fetchMyPublishedPostByPostId_unlocked:post.postId];
+            TLWDBMyPublishedModel *normalizedPost = [self normalizedMyPublishedPostFromPost:post existingPost:existingPost];
+            if (!normalizedPost) {
+                continue;
+            }
+
+            if (existingPost) {
+                normalizedPost.localId = existingPost.localId;
+                [replacePosts addObject:normalizedPost];
+            } else {
+                normalizedPost.localId = [self generateNextMyPublishedLocalId];
+                [insertPosts addObject:normalizedPost];
+            }
+        }
+
+        if (insertPosts.count == 0 && replacePosts.count == 0) {
+            return NO;
+        }
+
+        BOOL insertSuccess = YES;
+        if (insertPosts.count > 0) {
+            insertSuccess = [self.myPublishedTable insertObjects:insertPosts];
+        }
+
+        BOOL replaceSuccess = YES;
+        if (replacePosts.count > 0) {
+            replaceSuccess = [self.myPublishedTable insertOrReplaceObjects:replacePosts];
+        }
+
+        return insertSuccess && replaceSuccess;
+    }
+}
+
+- (NSArray<TLWDBMyPublishedModel *> *)fetchAllMyPublishedPosts {
+    @synchronized (self) {
+        [self setupMyPublishedTableIfNeeded];
+        NSArray<TLWDBMyPublishedModel *> *result = [self.myPublishedTable getObjectsOrders:TLWDBMyPublishedModel.publishedAt.asOrder(WCTOrderedDescending)];
+        return result ?: @[];
+    }
+}
+
+- (nullable TLWDBMyPublishedModel *)fetchMyPublishedPostByLocalId:(NSInteger)localId {
+    @synchronized (self) {
+        return [self fetchMyPublishedPostByLocalId_unlocked:localId];
+    }
+}
+
+- (nullable TLWDBMyPublishedModel *)fetchMyPublishedPostByLocalId_unlocked:(NSInteger)localId {
+    [self setupMyPublishedTableIfNeeded];
+    if (localId <= 0) {
+        return nil;
+    }
+    return [self.myPublishedTable getObjectWhere:TLWDBMyPublishedModel.localId == localId];
+}
+
+- (nullable TLWDBMyPublishedModel *)fetchMyPublishedPostByPostId:(NSNumber *)postId {
+    @synchronized (self) {
+        return [self fetchMyPublishedPostByPostId_unlocked:postId];
+    }
+}
+
+- (nullable TLWDBMyPublishedModel *)fetchMyPublishedPostByPostId_unlocked:(NSNumber *)postId {
+    [self setupMyPublishedTableIfNeeded];
+    if (!postId) {
+        return nil;
+    }
+    return [self.myPublishedTable getObjectWhere:TLWDBMyPublishedModel.postId == postId];
+}
+
+- (BOOL)deleteMyPublishedPostByLocalId:(NSInteger)localId {
+    @synchronized (self) {
+        [self setupMyPublishedTableIfNeeded];
+        if (localId <= 0) {
+            return NO;
+        }
+        return [self.myPublishedTable deleteObjectsWhere:TLWDBMyPublishedModel.localId == localId];
+    }
+}
+
+- (BOOL)deleteMyPublishedPostByPostId:(NSNumber *)postId {
+    @synchronized (self) {
+        [self setupMyPublishedTableIfNeeded];
+        if (!postId) {
+            return NO;
+        }
+        return [self.myPublishedTable deleteObjectsWhere:TLWDBMyPublishedModel.postId == postId];
+    }
+}
+
+- (BOOL)deleteAllMyPublishedPosts {
+    @synchronized (self) {
+        [self setupMyPublishedTableIfNeeded];
+        return [self.myPublishedTable deleteObjects];
+    }
+}
+
 - (void)reopenForCurrentUser {
     @synchronized (self) {
         [self.database close:^{}];
         self.database = nil;
         self.collectedTable = nil;
         self.identificationTable = nil;
+        self.myPublishedTable = nil;
         self.didSetupCollectedTable = NO;
         self.didSetupIdentificationTable = NO;
+        self.didSetupMyPublishedTable = NO;
         [self setupDatabase];
     }
 }
@@ -322,6 +527,22 @@
     }
 }
 
+- (void)setupMyPublishedTableIfNeeded {
+    @synchronized (self) {
+        if (self.didSetupMyPublishedTable) {
+            return;
+        }
+
+        [self setupDatabase];
+        TLWDBMyPublishedModel *tableObject = [[TLWDBMyPublishedModel alloc] init];
+        NSString *tableName = [self tableNameForObject:tableObject];
+        [self.database createTable:tableName withClass:TLWDBMyPublishedModel.class];
+        self.myPublishedTable = [self.database getTable:tableName withClass:TLWDBMyPublishedModel.class];
+        self.didSetupMyPublishedTable = YES;
+        self.nextGeneratedMyPublishedLocalId = [self loadNextMyPublishedLocalId];
+    }
+}
+
 - (NSString *)tableNameForObject:(NSObject *)object {
     if (!object) {
         return @"";
@@ -349,15 +570,116 @@
     model.authorAvatar = postDto.authorAvatar ?: @"";
     model.favoriteCount = postDto.favoriteCount ?: @0;
     model.collectedAt = (long long)([[NSDate date] timeIntervalSince1970] * 1000);
-  NSLog(@"\nPost ID: %@\nTitle: %@\nImages: %@\nAuthor Name: %@\nAuthor Avatar: %@\nFavorite Count: %@\nCollected At: %lld\n",
-        model.postId,
-        model.title,
-        model.images,
-        model.authorName,
-        model.authorAvatar,
-        model.favoriteCount,
-        model.collectedAt);
     return model;
+}
+
+- (TLWDBMyPublishedModel *)buildMyPublishedPostFromDto:(AGPostResponseDto *)postDto {
+    if (!postDto || !postDto._id) {
+        return nil;
+    }
+
+    TLWDBMyPublishedModel *post = [[TLWDBMyPublishedModel alloc] init];
+    post.postId = postDto._id;
+    post.title = postDto.title ?: @"";
+    post.content = postDto.content ?: @"";
+    post.images = [self stringArrayFromArray:postDto.images];
+    post.tags = [self stringArrayFromArray:postDto.tags];
+    post.authorName = postDto.authorName ?: @"";
+    post.authorAvatar = postDto.authorAvatar ?: @"";
+    post.likeCount = postDto.likeCount ?: @0;
+    post.favoriteCount = postDto.favoriteCount ?: @0;
+    post.isLiked = postDto.isLiked.boolValue;
+    post.isFavorited = postDto.isFavorited.boolValue;
+    if ([postDto.createdAt isKindOfClass:NSDate.class]) {
+        post.publishedAt = (long long)([postDto.createdAt timeIntervalSince1970] * 1000);
+    }
+    return post;
+}
+
+- (TLWDBMyPublishedModel *)normalizedMyPublishedPostFromPost:(TLWDBMyPublishedModel *)post existingPost:(nullable TLWDBMyPublishedModel *)existingPost {
+    if (![post isKindOfClass:TLWDBMyPublishedModel.class] || !post.postId) {
+        return nil;
+    }
+
+    long long now = (long long)([[NSDate date] timeIntervalSince1970] * 1000);
+    TLWDBMyPublishedModel *normalizedPost = [[TLWDBMyPublishedModel alloc] init];
+    normalizedPost.localId = post.localId;
+    normalizedPost.postId = post.postId;
+    normalizedPost.title = ([post.title isKindOfClass:NSString.class] && post.title.length > 0) ? post.title : @"";
+    normalizedPost.content = ([post.content isKindOfClass:NSString.class] && post.content.length > 0) ? post.content : @"";
+    normalizedPost.images = [self stringArrayFromArray:post.images];
+    normalizedPost.tags = [self stringArrayFromArray:post.tags];
+    normalizedPost.authorName = ([post.authorName isKindOfClass:NSString.class] && post.authorName.length > 0) ? post.authorName : @"";
+    normalizedPost.authorAvatar = ([post.authorAvatar isKindOfClass:NSString.class] && post.authorAvatar.length > 0) ? post.authorAvatar : @"";
+    normalizedPost.likeCount = post.likeCount ?: @0;
+    normalizedPost.favoriteCount = post.favoriteCount ?: @0;
+    normalizedPost.isLiked = post.isLiked;
+    normalizedPost.isFavorited = post.isFavorited;
+    normalizedPost.publishedAt = post.publishedAt > 0 ? post.publishedAt : (existingPost.publishedAt > 0 ? existingPost.publishedAt : now);
+    normalizedPost.updatedAt = now;
+    return normalizedPost;
+}
+
+- (NSArray<NSString *> *)stringArrayFromArray:(NSArray *)array {
+    if (![array isKindOfClass:NSArray.class] || array.count == 0) {
+        return @[];
+    }
+
+    NSMutableArray<NSString *> *strings = [NSMutableArray array];
+    for (id item in array) {
+        if ([item isKindOfClass:NSString.class] && [((NSString *)item) length] > 0) {
+            [strings addObject:item];
+        }
+    }
+    return [strings copy];
+}
+
+- (NSString *)formattedDescriptionForCollectedPosts:(NSArray<TLWDBCollectedModel *> *)posts {
+    NSMutableString *output = [NSMutableString stringWithFormat:@"\n========== 收藏帖子（共 %lu 条） ==========\n", (unsigned long)posts.count];
+    if (posts.count == 0) {
+        [output appendString:@"暂无收藏帖子\n"];
+        [output appendString:@"========================================\n"];
+        return [output copy];
+    }
+
+    [posts enumerateObjectsUsingBlock:^(TLWDBCollectedModel *post, NSUInteger idx, BOOL *stop) {
+        [output appendFormat:@"\n[%lu]\n", (unsigned long)idx + 1];
+        [output appendFormat:@"本地 ID: %ld\n", (long)post.localId];
+        [output appendFormat:@"帖子 ID: %@\n", post.postId ?: @"-"];
+        [output appendFormat:@"标题: %@\n", [self safeText:post.title fallback:@"未命名帖子"]];
+        [output appendFormat:@"作者: %@\n", [self safeText:post.authorName fallback:@"匿名用户"]];
+        [output appendFormat:@"作者头像: %@\n", [self safeText:post.authorAvatar fallback:@"-"]];
+        [output appendFormat:@"收藏数: %@\n", post.favoriteCount ?: @0];
+        [output appendFormat:@"收藏时间: %@ (%lld)\n", [self readableDateStringFromMilliseconds:post.collectedAt], post.collectedAt];
+        [output appendFormat:@"图片数: %lu\n", (unsigned long)post.images.count];
+        if (post.images.count > 0) {
+            [post.images enumerateObjectsUsingBlock:^(NSString *imageUrl, NSUInteger imageIdx, BOOL *imageStop) {
+                [output appendFormat:@"  - 图片 %lu: %@\n", (unsigned long)imageIdx + 1, [self safeText:imageUrl fallback:@"-"]];
+            }];
+        }
+    }];
+
+    [output appendString:@"\n========================================\n"];
+    return [output copy];
+}
+
+- (NSString *)safeText:(NSString *)text fallback:(NSString *)fallback {
+    if (![text isKindOfClass:[NSString class]] || text.length == 0) {
+        return fallback;
+    }
+    return text;
+}
+
+- (NSString *)readableDateStringFromMilliseconds:(long long)milliseconds {
+    if (milliseconds <= 0) {
+        return @"-";
+    }
+
+    NSDate *date = [NSDate dateWithTimeIntervalSince1970:milliseconds / 1000.0];
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.locale = [NSLocale localeWithLocaleIdentifier:@"zh_CN"];
+    formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    return [formatter stringFromDate:date];
 }
 
 - (NSInteger)loadNextLocalId {
@@ -406,6 +728,23 @@
 - (NSInteger)generateNextIdentificationLocalId {
     NSInteger localId = self.nextGeneratedIdentificationLocalId;
     self.nextGeneratedIdentificationLocalId += 1;
+    return localId;
+}
+
+- (NSInteger)loadNextMyPublishedLocalId {
+    NSArray<TLWDBMyPublishedModel *> *allPosts = [self fetchAllMyPublishedPosts];
+    NSInteger maxLocalId = 0;
+    for (TLWDBMyPublishedModel *post in allPosts) {
+        if (post.localId > maxLocalId) {
+            maxLocalId = post.localId;
+        }
+    }
+    return maxLocalId + 1;
+}
+
+- (NSInteger)generateNextMyPublishedLocalId {
+    NSInteger localId = self.nextGeneratedMyPublishedLocalId;
+    self.nextGeneratedMyPublishedLocalId += 1;
     return localId;
 }
 

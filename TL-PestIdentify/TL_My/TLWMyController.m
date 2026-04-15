@@ -13,14 +13,25 @@
 #import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
+#import "TLWDBManager.h"
+#import "TLWDBMyPublishedModel.h"
 
 extern NSString * const TLWAvatarDidUpdateNotification;
 extern NSString * const TLWProfileDidUpdateNotification;
+
+static NSInteger const kMyPublishedPageSize = 30;
+static NSTimeInterval const kMyPublishedSyncInterval = 5 * 60;
 
 @interface TLWMyController ()
 
 @property (nonatomic, strong) TLWMyView *myView;
 @property (nonatomic, assign) BOOL hasLoadedMyPostsOnce;
+@property (nonatomic, assign) NSInteger currentMyPostsPage;
+@property (nonatomic, assign) BOOL hasMoreMyPosts;
+@property (nonatomic, assign) BOOL isLoadingMyPosts;
+@property (nonatomic, strong) NSDate *lastMyPostsSyncDate;
+@property (nonatomic, strong) NSURLSessionTask *myPostsTask;
+@property (nonatomic, strong) NSMutableSet<NSNumber *> *remoteSyncedMyPostIds;
 
 @end
 
@@ -28,6 +39,10 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    self.currentMyPostsPage = -1;
+    self.hasMoreMyPosts = YES;
+    self.remoteSyncedMyPostIds = [NSMutableSet set];
+
     [self.view addSubview:self.myView];
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
@@ -53,6 +68,9 @@ extern NSString * const TLWProfileDidUpdateNotification;
     self.myView.onRefreshPosts = ^{
         [weakSelf tl_fetchMyPostsForRefresh];
     };
+    self.myView.onLoadMorePosts = ^{
+        [weakSelf tl_loadMoreMyPostsIfNeeded];
+    };
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -60,15 +78,18 @@ extern NSString * const TLWProfileDidUpdateNotification;
     if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
         return;
     }
+    [[TLWDBManager shared] printFormattedCollectedPosts];
     __weak typeof(self) weakSelf = self;
     [[TLWSDKManager shared].sessionManager fetchProfileWithCompletion:^(AGUserProfileDto *profile) {
         // TLWProfileDidUpdateNotification 会自动触发 applyProfile，无需额外处理
         (void)weakSelf;
     }];
-    [self fetchMyPosts];
+    [self reloadMyPostsFromDatabase];
+    [self syncFirstMyPostsIfNeeded];
 }
 
 - (void)dealloc {
+    [self.myPostsTask cancel];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
@@ -131,67 +152,157 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)fetchMyPosts {
-    if (![TLWSDKManager shared].sessionManager.isLoggedIn) return;
-    if (!self.hasLoadedMyPostsOnce) {
-        [self.myView showPostsLoading];
-    }
-    __weak typeof(self) weakSelf = self;
-    [[TLWSDKManager shared] getMyPostsWithPage:@(0) size:@(20) completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) return;
-        if (error || !output) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (!strongSelf.hasLoadedMyPostsOnce) {
-                    [strongSelf.myView showPostsStatusText:@"帖子加载失败，请稍后重试"];
-                }
-            });
-            return;
-        }
-        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-            [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-                [strongSelf fetchMyPosts];
-            }];
-            return;
-        }
-        if (output.code.integerValue != 200) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (!strongSelf.hasLoadedMyPostsOnce) {
-                    [strongSelf.myView showPostsStatusText:@"帖子加载失败，请稍后重试"];
-                }
-            });
-            return;
-        }
-        NSArray<AGPostResponseDto *> *posts = output.data.list ?: @[];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            strongSelf.hasLoadedMyPostsOnce = YES;
-            [strongSelf.myView reloadPosts:posts];
-        });
-    }];
+    [self reloadMyPostsFromDatabase];
+    [self syncFirstMyPostsIfNeeded];
 }
+
 - (void)tl_fetchMyPostsForRefresh {
-    if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
+    if (self.isLoadingMyPosts) {
         [self.myView endRefreshingPosts];
         return;
     }
+    [self fetchMyPostsRemotePage:0 force:YES];
+}
+
+- (void)reloadMyPostsFromDatabase {
+    NSArray<TLWDBMyPublishedModel *> *storedPosts = [[TLWDBManager shared] fetchAllMyPublishedPosts];
+    NSMutableArray<AGPostResponseDto *> *posts = [NSMutableArray arrayWithCapacity:storedPosts.count];
+    for (TLWDBMyPublishedModel *storedPost in storedPosts) {
+        AGPostResponseDto *dto = [self tl_postDtoFromMyPublishedModel:storedPost];
+        if (dto) {
+            [posts addObject:dto];
+        }
+    }
+
+    self.hasLoadedMyPostsOnce = YES;
+    [self.myView reloadPosts:posts];
+}
+
+- (void)syncFirstMyPostsIfNeeded {
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn || self.isLoadingMyPosts) {
+        return;
+    }
+
+    BOOL hasNoLocalData = !self.hasLoadedMyPostsOnce;
+    BOOL syncExpired = !self.lastMyPostsSyncDate || [[NSDate date] timeIntervalSinceDate:self.lastMyPostsSyncDate] > kMyPublishedSyncInterval;
+    if (hasNoLocalData || syncExpired) {
+        [self fetchMyPostsRemotePage:0 force:NO];
+    }
+}
+
+- (void)tl_loadMoreMyPostsIfNeeded {
+    if (!self.hasMoreMyPosts || self.isLoadingMyPosts) {
+        return;
+    }
+    [self fetchMyPostsRemotePage:self.currentMyPostsPage + 1 force:YES];
+}
+
+- (void)fetchMyPostsRemotePage:(NSInteger)page force:(BOOL)force {
+    if (self.isLoadingMyPosts) return;
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
+        [self finishMyPostsLoading];
+        return;
+    }
+    if (!force && page == 0 && self.lastMyPostsSyncDate && [[NSDate date] timeIntervalSinceDate:self.lastMyPostsSyncDate] <= kMyPublishedSyncInterval && self.hasLoadedMyPostsOnce) {
+        return;
+    }
+
+    self.isLoadingMyPosts = YES;
+    if (page == 0) {
+        self.hasMoreMyPosts = YES;
+    }
+    if (!self.hasLoadedMyPostsOnce) {
+        [self.myView showPostsLoading];
+    }
+
     __weak typeof(self) weakSelf = self;
-    [[TLWSDKManager shared] getMyPostsWithPage:@(0) size:@(20) completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
+    self.myPostsTask = [[TLWSDKManager shared] getMyPostsWithPage:@(page) size:@(kMyPublishedPageSize) completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
         dispatch_async(dispatch_get_main_queue(), ^{
-            [strongSelf.myView endRefreshingPosts];
-            if (error || !output || output.code.integerValue != 200) {
-                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-                        [strongSelf tl_fetchMyPostsForRefresh];
-                    }];
+            strongSelf.myPostsTask = nil;
+            [strongSelf finishMyPostsLoading];
+
+            if (error || !output) {
+                if (!strongSelf.hasLoadedMyPostsOnce) {
+                    [strongSelf.myView showPostsStatusText:@"帖子加载失败，请稍后重试"];
                 }
                 return;
             }
+            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
+                    [strongSelf fetchMyPostsRemotePage:page force:YES];
+                }];
+                return;
+            }
+            if (output.code.integerValue != 200 || !output.data) {
+                if (!strongSelf.hasLoadedMyPostsOnce) {
+                    [strongSelf.myView showPostsStatusText:@"帖子加载失败，请稍后重试"];
+                }
+                return;
+            }
+
             NSArray<AGPostResponseDto *> *posts = output.data.list ?: @[];
-            strongSelf.hasLoadedMyPostsOnce = YES;
-            [strongSelf.myView reloadPosts:posts];
+            [[TLWDBManager shared] upsertMyPublishedPostsFromDtos:posts];
+
+            if (page == 0) {
+                [strongSelf.remoteSyncedMyPostIds removeAllObjects];
+            }
+            [strongSelf addRemoteSyncedMyPostIdsFromDtos:posts];
+
+            strongSelf.currentMyPostsPage = page;
+            strongSelf.hasMoreMyPosts = output.data.hasNext.boolValue;
+            strongSelf.lastMyPostsSyncDate = [NSDate date];
+
+            if (!strongSelf.hasMoreMyPosts) {
+                [strongSelf deleteLocalMyPostsMissingFromRemoteIds:strongSelf.remoteSyncedMyPostIds];
+            }
+            [strongSelf reloadMyPostsFromDatabase];
         });
     }];
+}
+
+- (void)finishMyPostsLoading {
+    self.isLoadingMyPosts = NO;
+    [self.myView endRefreshingPosts];
+}
+
+- (nullable AGPostResponseDto *)tl_postDtoFromMyPublishedModel:(TLWDBMyPublishedModel *)model {
+    if (!model.postId) return nil;
+
+    AGPostResponseDto *dto = [[AGPostResponseDto alloc] init];
+    dto._id = model.postId;
+    dto.title = model.title ?: @"";
+    dto.content = model.content ?: @"";
+    dto.images = model.images ?: @[];
+    dto.tags = model.tags ?: @[];
+    dto.authorName = model.authorName ?: @"";
+    dto.authorAvatar = model.authorAvatar ?: @"";
+    dto.likeCount = model.likeCount ?: @0;
+    dto.favoriteCount = model.favoriteCount ?: @0;
+    dto.isLiked = @(model.isLiked);
+    dto.isFavorited = @(model.isFavorited);
+    if (model.publishedAt > 0) {
+        dto.createdAt = [NSDate dateWithTimeIntervalSince1970:model.publishedAt / 1000.0];
+    }
+    return dto;
+}
+
+- (void)addRemoteSyncedMyPostIdsFromDtos:(NSArray<AGPostResponseDto *> *)dtos {
+    for (AGPostResponseDto *dto in dtos) {
+        if (dto._id) {
+            [self.remoteSyncedMyPostIds addObject:dto._id];
+        }
+    }
+}
+
+- (void)deleteLocalMyPostsMissingFromRemoteIds:(NSSet<NSNumber *> *)remoteIds {
+    NSArray<TLWDBMyPublishedModel *> *localPosts = [[TLWDBManager shared] fetchAllMyPublishedPosts];
+    for (TLWDBMyPublishedModel *model in localPosts) {
+        if (model.postId && ![remoteIds containsObject:model.postId]) {
+            [[TLWDBManager shared] deleteMyPublishedPostByPostId:model.postId];
+        }
+    }
 }
 
 - (void)onFavorite {
@@ -206,5 +317,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         _myView.postAvatarImageView.image = avatar;
     }
 }
+
+
 
 @end

@@ -8,7 +8,7 @@
 #import <SDWebImage/SDWebImage.h>
 #import "TLWLoadingIndicator.h"
 
-@interface TLWMyView ()
+@interface TLWMyView () <UIScrollViewDelegate>
 
 @property (nonatomic, strong, readwrite) UIImageView *avatarImageView;
 @property (nonatomic, strong, readwrite) UILabel     *userNameLabel;
@@ -206,6 +206,7 @@
     // 可滚动的帖子列表
     UIScrollView *sv = [UIScrollView new];
     sv.showsVerticalScrollIndicator = NO;
+    sv.delegate = self;
     _postsScrollView = sv;
 
     _postsRefreshControl = [[UIRefreshControl alloc] init];
@@ -351,6 +352,19 @@
 - (void)endRefreshingPosts {
     [_postsRefreshControl endRefreshing];
     [TLWLoadingIndicator hideInView:_postsScrollView];
+}
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+    if (scrollView != _postsScrollView || !self.onLoadMorePosts) {
+        return;
+    }
+
+    CGFloat offsetY = scrollView.contentOffset.y;
+    CGFloat contentH = scrollView.contentSize.height;
+    CGFloat frameH = scrollView.bounds.size.height;
+    if (contentH > 0 && offsetY > contentH - frameH - 100) {
+        self.onLoadMorePosts();
+    }
 }
 
 - (void)tl_postItemTapped:(UITapGestureRecognizer *)tap {
