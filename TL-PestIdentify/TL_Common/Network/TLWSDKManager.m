@@ -241,7 +241,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
     return;
   }
 
-  NSInteger pageSize = 20;
+  NSInteger pageSize = 30;
   NSInteger maxPages = 50;
   NSMutableArray<AGPostResponseDto *> *accumulator = [NSMutableArray array];
   __weak typeof(self) weakSelf = self;

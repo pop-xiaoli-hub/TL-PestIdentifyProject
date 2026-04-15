@@ -7,6 +7,7 @@
 #import <Security/Security.h>
 #import <objc/message.h>
 #import "TLWDBManager.h"
+#import "TLWDBMyPublishedModel.h"
 
 @interface TLWSDKManager : NSObject
 + (instancetype)shared;
@@ -554,6 +555,38 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [dbManager deleteAllCollectedPosts];
 }
 
+
+
+- (void)testMyPublishedDatabaseCrudFlow {
+    NSInteger userId = 61004;
+    [self tl_clearMyPublishedPostsForUserId:userId];
+
+    TLWDBManager *dbManager = [TLWDBManager shared];
+    [self.manager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_my_post"
+                                                     refreshToken:@"db_refresh_my_post"
+                                                           userId:userId
+                                                         username:@"db_user_my_post"
+                                                generatedPassword:nil]];
+
+    XCTAssertTrue([dbManager upsertMyPublishedPostFromDto:[self tl_postWithId:@92001 title:@"My Published Post"]]);
+    NSArray<TLWDBMyPublishedModel *> *posts = [dbManager fetchAllMyPublishedPosts];
+    XCTAssertEqual(posts.count, 1);
+    XCTAssertEqualObjects(posts.firstObject.postId, @92001);
+    XCTAssertEqualObjects(posts.firstObject.title, @"My Published Post");
+
+    TLWDBMyPublishedModel *updatedPost = posts.firstObject;
+    updatedPost.title = @"Updated Published Post";
+    updatedPost.likeCount = @7;
+    XCTAssertTrue([dbManager updateMyPublishedPost:updatedPost]);
+
+    TLWDBMyPublishedModel *fetchedPost = [dbManager fetchMyPublishedPostByPostId:@92001];
+    XCTAssertEqualObjects(fetchedPost.title, @"Updated Published Post");
+    XCTAssertEqualObjects(fetchedPost.likeCount, @7);
+
+    XCTAssertTrue([dbManager deleteMyPublishedPostByPostId:@92001]);
+    XCTAssertEqual([dbManager fetchAllMyPublishedPosts].count, 0);
+}
+
 #pragma mark - Helpers
 
 - (void)tl_clearPersistedAuthState {
@@ -643,14 +676,25 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [[TLWDBManager shared] deleteAllCollectedPosts];
 }
 
+- (void)tl_clearMyPublishedPostsForUserId:(NSInteger)userId {
+    self.manager.userId = userId;
+    [[TLWDBManager shared] reopenForCurrentUser];
+    [[TLWDBManager shared] deleteAllMyPublishedPosts];
+}
+
 - (id)tl_postWithId:(NSNumber *)postId title:(NSString *)title {
     id post = [[NSClassFromString(@"AGPostResponseDto") alloc] init];
     [post setValue:postId forKey:@"_id"];
     [post setValue:title forKey:@"title"];
+    [post setValue:[NSString stringWithFormat:@"%@ content", title] forKey:@"content"];
     [post setValue:@[] forKey:@"images"];
+    [post setValue:@[] forKey:@"tags"];
     [post setValue:@"author" forKey:@"authorName"];
     [post setValue:@"avatar" forKey:@"authorAvatar"];
+    [post setValue:@0 forKey:@"likeCount"];
     [post setValue:@1 forKey:@"favoriteCount"];
+    [post setValue:@NO forKey:@"isLiked"];
+    [post setValue:@NO forKey:@"isFavorited"];
     return post;
 }
 

@@ -11,10 +11,18 @@
 #import "TLWSDKManager.h"
 #import <AgriPestClient/AGPostResponseDto.h>
 #import <Masonry/Masonry.h>
+#import "TLWDBCollectedModel.h"
+#import "TLWDBManager.h"
+
 #import "TLWLoadingIndicator.h"
 
+/*
+本地数据库优先+网络分页同步
+ */
+
 static NSString * const kFavoriteCellID = @"TLWFavoriteCell";
-static NSInteger  const kPageSize       = 20;
+static NSInteger  const kFavoritePageSize = 30;
+static NSTimeInterval const kFavoriteSyncInterval = 5 * 60;
 
 @interface TLWMyFavoriteController () <UICollectionViewDataSource, UICollectionViewDelegate>
 
@@ -24,6 +32,9 @@ static NSInteger  const kPageSize       = 20;
 @property (nonatomic, assign) BOOL hasMore;
 @property (nonatomic, assign) BOOL isLoading;
 @property (nonatomic, assign) BOOL hasAppearedOnce;
+@property (nonatomic, strong) NSDate *lastRemoteSyncDate;
+@property (nonatomic, strong) NSURLSessionTask *favoriteFetchTask;
+@property (nonatomic, strong) NSMutableSet<NSNumber *> *remoteSyncedPostIds;
 
 @end
 
@@ -34,8 +45,9 @@ static NSInteger  const kPageSize       = 20;
     if (self) {
         self.hidesBottomBarWhenPushed = YES;
         _favorites   = [NSMutableArray array];
-        _currentPage = 0;
+        _currentPage = -1;
         _hasMore     = YES;
+        _remoteSyncedPostIds = [NSMutableSet set];
     }
     return self;
 }
@@ -45,6 +57,12 @@ static NSInteger  const kPageSize       = 20;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+  BOOL temp = [[TLWDBManager shared] cleanCacheWithDeadDate];
+  if (temp) {
+    [self tl_showTopToast:@"内存清理成功"];
+  } else {
+    [self tl_showTopToast:@"内存清理失败"];
+  }
     [self.navBar setRightButtonTitle:@"筛选" iconName:@"filter"];
 
     [self.view addSubview:self.favoriteView];
@@ -69,10 +87,15 @@ static NSInteger  const kPageSize       = 20;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self reloadFavoritesFromDatabase];
     if (self.hasAppearedOnce) {
-        [self onRefresh];
+        [self syncFirstRemotePageIfNeeded];
     }
     self.hasAppearedOnce = YES;
+}
+
+- (void)dealloc {
+    [self.favoriteFetchTask cancel];
 }
 
 #pragma mark - Lazy
@@ -87,64 +110,147 @@ static NSInteger  const kPageSize       = 20;
 #pragma mark - Data Loading
 
 - (void)loadFirstPage {
-    _currentPage = 0;
-    _hasMore     = YES;
-    [_favorites removeAllObjects];
-    [self.favoriteView.collectionView reloadData];
-    [self fetchPage:0];
+    [self reloadFavoritesFromDatabase];
+    [self syncFirstRemotePageIfNeeded];
 }
 
 - (void)onRefresh {
-    _currentPage = 0;
-    _hasMore     = YES;
-    [_favorites removeAllObjects];
-    [self.favoriteView.collectionView reloadData];
+    if (self.isLoading) {
+        return;
+    }
     [TLWLoadingIndicator showPullToRefreshInScrollView:self.favoriteView.collectionView size:40];
-    [self fetchPage:0];
+    [self fetchRemotePage:0 force:YES];
 }
 
-- (void)fetchPage:(NSInteger)page {
-    if (_isLoading) return;
-    _isLoading = YES;
+- (void)reloadFavoritesFromDatabase {
+    NSArray<TLWDBCollectedModel *> *storedPosts = [[TLWDBManager shared] fetchAllCollectedPosts];
+    NSMutableArray<AGPostResponseDto *> *posts = [NSMutableArray arrayWithCapacity:storedPosts.count];
+    for (TLWDBCollectedModel *storedPost in storedPosts) {
+        AGPostResponseDto *dto = [self tl_postDtoFromCollectedModel:storedPost];
+        if (dto) {
+            [posts addObject:dto];
+        }
+    }
+
+    [self.favorites removeAllObjects];
+    [self.favorites addObjectsFromArray:posts];
+    [self.favoriteView showEmpty:(self.favorites.count == 0)];
+    [self.favoriteView.collectionView reloadData];
+}
+
+//网络同步加载
+- (void)syncFirstRemotePageIfNeeded {
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn || self.isLoading) {
+        return;
+    }
+
+    BOOL hasNoLocalData = self.favorites.count == 0;
+    BOOL syncExpired = !self.lastRemoteSyncDate || [[NSDate date] timeIntervalSinceDate:self.lastRemoteSyncDate] > kFavoriteSyncInterval;
+    if (hasNoLocalData || syncExpired) {
+        [self fetchRemotePage:0 force:NO];
+    }
+}
+
+- (void)fetchRemotePage:(NSInteger)page force:(BOOL)force {
+    if (self.isLoading) return;
+    if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
+        [self finishRemoteLoading];
+        return;
+    }
+    if (!force && page == 0 && self.lastRemoteSyncDate && [[NSDate date] timeIntervalSinceDate:self.lastRemoteSyncDate] <= kFavoriteSyncInterval && self.favorites.count > 0) {
+        return;
+    }
+
+    self.isLoading = YES;
+    if (page == 0) {
+        self.hasMore = YES;
+    }
 
     __weak typeof(self) weakSelf = self;
-    [[TLWSDKManager shared].api getFavoritedPostsWithPage:@(page)
-                                                     size:@(kPageSize)
-                                        completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
+    self.favoriteFetchTask = [[TLWSDKManager shared] getFavoritedPostsWithPage:@(page)
+                                                                          size:@(kFavoritePageSize)
+                                                             completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
-            self.isLoading = NO;
-            [self.favoriteView.collectionView.refreshControl endRefreshing];
-            [TLWLoadingIndicator hideInView:self.favoriteView.collectionView];
+            self.favoriteFetchTask = nil;
+            [self finishRemoteLoading];
 
-            if (error || output.code.integerValue != 200) {
-                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+            if (error || !output || output.code.integerValue != 200) {
+                if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-                        [self fetchPage:page];
+                        [self fetchRemotePage:page force:YES];
                     }];
                     return;
                 }
-                NSLog(@"[Favorite] 加载失败: %@", error ?: output.message);
+                NSLog(@"[Favorite] 网络同步失败，保留本地收藏: %@", error ?: output.message);
                 [self.favoriteView showEmpty:(self.favorites.count == 0)];
                 return;
             }
 
             AGPageResultPostResponseDto *pageData = output.data;
+            if (!pageData) {
+                NSLog(@"[Favorite] 网络同步失败，返回数据为空，保留本地收藏");
+                [self.favoriteView showEmpty:(self.favorites.count == 0)];
+                return;
+            }
+
             NSArray<AGPostResponseDto *> *list = pageData.list ?: @[];
+            [[TLWDBManager shared] upsertCollectedPostsFromDtos:list];
 
             if (page == 0) {
-                [self.favorites removeAllObjects];
+                [self.remoteSyncedPostIds removeAllObjects];
             }
-            [self.favorites addObjectsFromArray:list];
+            [self addRemoteSyncedPostIdsFromDtos:list];
 
             self.currentPage = page;
             self.hasMore     = pageData.hasNext.boolValue;
+            self.lastRemoteSyncDate = [NSDate date];
 
-            [self.favoriteView showEmpty:(self.favorites.count == 0)];
-            [self.favoriteView.collectionView reloadData];
+            if (!self.hasMore) {
+                [self deleteLocalFavoritesMissingFromRemoteIds:self.remoteSyncedPostIds];
+            }
+            [self reloadFavoritesFromDatabase];
         });
     }];
+}
+
+- (void)finishRemoteLoading {
+    self.isLoading = NO;
+    [self.favoriteView.collectionView.refreshControl endRefreshing];
+    [TLWLoadingIndicator hideInView:self.favoriteView.collectionView];
+}
+
+- (nullable AGPostResponseDto *)tl_postDtoFromCollectedModel:(TLWDBCollectedModel *)model {
+    if (!model.postId) return nil;
+
+    AGPostResponseDto *dto = [[AGPostResponseDto alloc] init];
+    dto._id = model.postId;
+    dto.title = model.title ?: @"";
+    dto.content = model.title ?: @"";
+    dto.images = model.images ?: @[];
+    dto.authorName = model.authorName ?: @"";
+    dto.authorAvatar = model.authorAvatar ?: @"";
+    dto.favoriteCount = model.favoriteCount ?: @0;
+    dto.isFavorited = @YES;
+    return dto;
+}
+
+- (void)addRemoteSyncedPostIdsFromDtos:(NSArray<AGPostResponseDto *> *)dtos {
+    for (AGPostResponseDto *dto in dtos) {
+        if (dto._id) {
+            [self.remoteSyncedPostIds addObject:dto._id];
+        }
+    }
+}
+
+- (void)deleteLocalFavoritesMissingFromRemoteIds:(NSSet<NSNumber *> *)remoteIds {
+    NSArray<TLWDBCollectedModel *> *localPosts = [[TLWDBManager shared] fetchAllCollectedPosts];
+    for (TLWDBCollectedModel *model in localPosts) {
+        if (model.postId && ![remoteIds containsObject:model.postId]) {
+            [[TLWDBManager shared] deleteCollectedPostByPostId:model.postId];
+        }
+    }
 }
 
 #pragma mark - Actions
@@ -211,8 +317,78 @@ static NSInteger  const kPageSize       = 20;
     CGFloat contentH   = scrollView.contentSize.height;
     CGFloat frameH     = scrollView.frame.size.height;
     if (offsetY > contentH - frameH - 100 && contentH > 0) {
-        [self fetchPage:_currentPage + 1];
+        [self fetchRemotePage:_currentPage + 1 force:YES];
     }
+}
+
+
+- (void)tl_showTopToast:(NSString *)text {
+  if (text.length == 0) return;
+
+  // 挂到“全局 window”，保证在任何页面都能看到
+  UIWindow *hostWindow = nil;
+  if (@available(iOS 13.0, *)) {
+    // 仅使用前台激活的 Scene，避免取到后台/其他窗口的 keyWindow
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+      if (scene.activationState != UISceneActivationStateForegroundActive) continue;
+      if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+      UIWindowScene *windowScene = (UIWindowScene *)scene;
+
+      // 优先取 key window（当前场景正在接收事件的窗口）
+      for (UIWindow *w in windowScene.windows) {
+        if (w.isKeyWindow) {
+          hostWindow = w;
+          break;
+        }
+      }
+      if (!hostWindow) {
+        hostWindow = windowScene.windows.firstObject;
+      }
+      if (hostWindow) break;
+    }
+  } else {
+    // iOS 12 及以下：直接用当前控制器关联的 window 即可（避免使用废弃的 UIApplication.windows）
+    hostWindow = self.view.window;
+  }
+  if (!hostWindow) return;
+
+  UIView *old = [hostWindow viewWithTag:1107];
+  if (old) [old removeFromSuperview];
+
+  UILabel *toast = [UILabel new];
+  toast.tag = 1107;
+  toast.text = text;
+  toast.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+  toast.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
+  toast.textAlignment = NSTextAlignmentCenter;
+  toast.backgroundColor = UIColor.whiteColor;
+  toast.layer.cornerRadius = 19;
+  toast.layer.masksToBounds = YES;
+  toast.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
+  toast.layer.shadowOpacity = 1;
+  toast.layer.shadowRadius = 6;
+  toast.layer.shadowOffset = CGSizeMake(0, 2);
+  [hostWindow addSubview:toast];
+
+  [toast mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(hostWindow.mas_safeAreaLayoutGuideTop).offset(10);
+    make.centerX.equalTo(hostWindow);
+    make.width.mas_equalTo(190);
+    make.height.mas_equalTo(38);
+  }];
+
+  toast.alpha = 0;
+  [UIView animateWithDuration:0.25 animations:^{
+    toast.alpha = 1;
+  } completion:^(BOOL finished) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      [UIView animateWithDuration:0.25 animations:^{
+        toast.alpha = 0;
+      } completion:^(BOOL done) {
+        [toast removeFromSuperview];
+      }];
+    });
+  }];
 }
 
 @end
