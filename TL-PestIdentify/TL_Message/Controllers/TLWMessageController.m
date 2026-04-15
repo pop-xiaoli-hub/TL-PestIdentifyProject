@@ -183,7 +183,6 @@ static NSInteger const kMessagePageSize = 20;
                 commentItem.timeString      = [self tl_relativeTime:dto.createdAt];
                 commentItem.postId          = dto.postId;
                 commentItem.messageId       = dto._id;
-                commentItem.postImageUrl    = dto.postImageUrl;
                 [newCommentItems addObject:commentItem];
             }
 

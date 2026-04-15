@@ -24,9 +24,13 @@ static CGFloat const TLWIdentifyMinLocalFallbackConfidence = 0.60f;
 static NSInteger const TLWIdentifyDisplayResultCount = 3;
 
 @interface TLWIdentifyPageController ()<AVCapturePhotoCaptureDelegate>
+//  主视图
 @property (nonatomic, strong) TLWIdentifyPageView *myView;
+//  相机会话
 @property (nonatomic, strong) AVCaptureSession *session;
+//  相机预览层
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
+//  拍照输出对象，由他输出对象
 @property (nonatomic, strong) AVCapturePhotoOutput *photoOutput;
 @property (nonatomic, strong) UIImageView *capturedImageView;
 @property (nonatomic, strong) UIImageView *loadingImageView;
