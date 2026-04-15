@@ -13,8 +13,6 @@
 
 @interface TLWAICallController () <SpeechEngineDelegate>
 @property (nonatomic, strong) CAGradientLayer *gradientLayer;
-@property (nonatomic, strong) UIButton *backButton;
-@property (nonatomic, strong) UILabel *navTitleLabel;
 @property (nonatomic, strong) UIView *aiIconContainer;
 @property (nonatomic, strong) UIImageView *aiIconImageView;
 @property (nonatomic, strong) UILabel *hintLabel;
@@ -31,17 +29,23 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
-        self.hideNavBar = YES;
         self.hidesBottomBarWhenPushed = YES;
     }
     return self;
+}
+
+- (NSString *)navTitle {
+    return @"AI电话";
+}
+
+- (NSString *)navTitleIconName {
+    return @"aiAssisstantIcon";
 }
 
 - (void)viewDidLoad {
     [super viewDidLoad];
 
     [self tl_setupGradientBackground];
-    [self tl_setupNavBar];
     [self tl_setupAIIcon];
     [self tl_setupHintLabel];
     [self tl_setupHangUpButton];
@@ -51,14 +55,7 @@
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    self.gradientLayer.frame = self.view.bounds;
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    [self.navigationController setNavigationBarHidden:YES animated:animated];
-    self.navigationController.interactivePopGestureRecognizer.enabled = YES;
-    self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+    self.gradientLayer.frame = self.contentView.bounds;
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -80,6 +77,12 @@
     [self tl_stopCallIfNeeded];
 }
 
+#pragma mark - Base
+
+- (void)onBackAction {
+    [self tl_leaveCallPage];
+}
+
 #pragma mark - UI Setup
 
 - (void)tl_setupGradientBackground {
@@ -91,36 +94,8 @@
     ];
     self.gradientLayer.startPoint = CGPointMake(0, 0);
     self.gradientLayer.endPoint = CGPointMake(1, 1);
-    self.gradientLayer.frame = self.view.bounds;
-    [self.view.layer insertSublayer:self.gradientLayer atIndex:0];
-}
-
-- (void)tl_setupNavBar {
-    // 返回按钮
-    _backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-    UIImage *backImage = [UIImage imageNamed:@"iconBack"];
-    [_backButton setImage:[backImage imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] forState:UIControlStateNormal];
-    _backButton.tintColor = [UIColor whiteColor];
-    _backButton.contentMode = UIViewContentModeScaleAspectFit;
-    [_backButton addTarget:self action:@selector(tl_back) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:_backButton];
-    [_backButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.mas_equalTo(8);
-        make.top.equalTo(self.view.mas_safeAreaLayoutGuideTop).offset(8);
-        make.width.height.mas_equalTo(40);
-    }];
-
-    // 标题
-    _navTitleLabel = [[UILabel alloc] init];
-    _navTitleLabel.text = @"AI电话";
-    _navTitleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
-    _navTitleLabel.textColor = [UIColor whiteColor];
-    _navTitleLabel.textAlignment = NSTextAlignmentCenter;
-    [self.view addSubview:_navTitleLabel];
-    [_navTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
-        make.centerY.equalTo(self->_backButton);
-    }];
+    self.gradientLayer.frame = self.contentView.bounds;
+    [self.contentView.layer insertSublayer:self.gradientLayer atIndex:0];
 }
 
 - (void)tl_setupAIIcon {
@@ -134,10 +109,10 @@
     _aiIconContainer.layer.shadowOpacity = 1.0;
     _aiIconContainer.layer.shadowRadius = 26.0;
     _aiIconContainer.layer.shadowOffset = CGSizeZero;
-    [self.view addSubview:_aiIconContainer];
+    [self.contentView addSubview:_aiIconContainer];
     [_aiIconContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
-        make.centerY.equalTo(self.view).offset(-60);
+        make.centerX.equalTo(self.contentView);
+        make.centerY.equalTo(self.contentView).offset(-60);
         make.width.height.mas_equalTo(iconContainerSize);
     }];
 
@@ -158,11 +133,11 @@
     _hintLabel.textColor = [UIColor whiteColor];
     _hintLabel.textAlignment = NSTextAlignmentCenter;
     _hintLabel.numberOfLines = 0;
-    [self.view addSubview:_hintLabel];
+    [self.contentView addSubview:_hintLabel];
     [_hintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
-        make.left.equalTo(self.view).offset(32);
-        make.right.equalTo(self.view).offset(-32);
+        make.centerX.equalTo(self.contentView);
+        make.left.equalTo(self.contentView).offset(32);
+        make.right.equalTo(self.contentView).offset(-32);
         make.top.equalTo(self->_aiIconContainer.mas_bottom).offset(36);
     }];
 
@@ -171,11 +146,11 @@
     _statusLabel.textColor = [UIColor colorWithWhite:1.0 alpha:0.88];
     _statusLabel.textAlignment = NSTextAlignmentCenter;
     _statusLabel.numberOfLines = 0;
-    [self.view addSubview:_statusLabel];
+    [self.contentView addSubview:_statusLabel];
     [_statusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
-        make.left.equalTo(self.view).offset(36);
-        make.right.equalTo(self.view).offset(-36);
+        make.centerX.equalTo(self.contentView);
+        make.left.equalTo(self.contentView).offset(36);
+        make.right.equalTo(self.contentView).offset(-36);
         make.top.equalTo(self->_hintLabel.mas_bottom).offset(12);
     }];
 }
@@ -192,10 +167,10 @@
     _hangUpButton.layer.borderWidth = 2.6;
     _hangUpButton.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.9].CGColor;
     [_hangUpButton addTarget:self action:@selector(tl_hangUp) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:_hangUpButton];
+    [self.contentView addSubview:_hangUpButton];
     [_hangUpButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.centerX.equalTo(self.view);
-        make.bottom.equalTo(self.view.mas_safeAreaLayoutGuideBottom).offset(-80);
+        make.centerX.equalTo(self.contentView);
+        make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-80);
         make.width.height.mas_equalTo(btnSize);
     }];
 
@@ -214,7 +189,7 @@
     _hangUpLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
     _hangUpLabel.textColor = [UIColor whiteColor];
     _hangUpLabel.textAlignment = NSTextAlignmentCenter;
-    [self.view addSubview:_hangUpLabel];
+    [self.contentView addSubview:_hangUpLabel];
     [_hangUpLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self->_hangUpButton);
         make.top.equalTo(self->_hangUpButton.mas_bottom).offset(12);
@@ -222,10 +197,6 @@
 }
 
 #pragma mark - Actions
-
-- (void)tl_back {
-    [self tl_leaveCallPage];
-}
 
 - (void)tl_hangUp {
     [self tl_leaveCallPage];

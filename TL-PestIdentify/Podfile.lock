@@ -14,7 +14,7 @@ PODS:
   - AFNetworking/Serialization (3.2.1)
   - AFNetworking/UIKit (3.2.1):
     - AFNetworking/NSURLSession
-  - AgriPestClient (1.0.108):
+  - AgriPestClient (1.0.110):
     - AFNetworking (~> 3)
     - ISO8601 (~> 0.6)
     - JSONModel (~> 1.2)
@@ -36,7 +36,7 @@ PODS:
   - YYModel (1.0.4)
 
 DEPENDENCIES:
-  - AgriPestClient (from `https://github.com/Biscoffee/AgriPest-IOS-SDK.git`, tag `v1.0.109`)
+  - AgriPestClient (from `https://github.com/lukecc00/AgriPest-IOS-SDK.git`, tag `v1.0.110`)
   - LookinServer
   - Masonry
   - SDWebImage (~> 5.0)
@@ -61,23 +61,23 @@ SPEC REPOS:
 
 EXTERNAL SOURCES:
   AgriPestClient:
-    :git: https://github.com/Biscoffee/AgriPest-IOS-SDK.git
-    :tag: v1.0.109
+    :git: https://github.com/lukecc00/AgriPest-IOS-SDK.git
+    :tag: v1.0.110
   WCDB.objc:
     :branch: master
     :git: https://github.com/Tencent/wcdb.git
 
 CHECKOUT OPTIONS:
   AgriPestClient:
-    :git: https://github.com/Biscoffee/AgriPest-IOS-SDK.git
-    :tag: v1.0.109
+    :git: https://github.com/lukecc00/AgriPest-IOS-SDK.git
+    :tag: v1.0.110
   WCDB.objc:
-    :commit: a859680cebd25cadf448861e905caa850b06f1e8
+    :commit: 39dd797099d41cf1953d5668acd8cb608016c599
     :git: https://github.com/Tencent/wcdb.git
 
 SPEC CHECKSUMS:
   AFNetworking: cb604b1c2bded0871f5f61f5d53653739e841d6b
-  AgriPestClient: 168cd4ba533a02a32272e7084d5ffd2077ce5465
+  AgriPestClient: 627fb76875eb7d0ebfa8def77ecd8b8d29daf315
   ISO8601: d3ea3ba9b752820cf92c6b47a9ee327e9f0e13fc
   JSONModel: 02ab723958366a3fd27da57ea2af2113658762e9
   LookinServer: 1b2b61c6402ae29fa22182d48f5cd067b4e99e80
@@ -89,6 +89,6 @@ SPEC CHECKSUMS:
   WCDBOptimizedSQLCipher: 871994f7f620302fdf87a2729c099a1efa2223da
   YYModel: 2a7fdd96aaa4b86a824e26d0c517de8928c04b30
 
-PODFILE CHECKSUM: 8dbad13dade2c7d17096a5ef76b48c9ecdbd45ac
+PODFILE CHECKSUM: 21666d97188bd8026046076a0af261ace7b8b343
 
 COCOAPODS: 1.16.2

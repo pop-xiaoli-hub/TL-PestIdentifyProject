@@ -13,6 +13,7 @@
 #import "TLWSDKManager.h"
 #import <AgriPestClient/AGChatRequest.h>
 #import <AgriPestClient/AGResultChatProfileResponse.h>
+#import <AgriPestClient/AGDefaultConfiguration.h>
 #import "TLWPhotoPickerController.h"
 #import "TLWLocalIdentifyManager.h"
 #import "TLWToast.h"
@@ -23,9 +24,13 @@ static CGFloat const TLWIdentifyMinLocalFallbackConfidence = 0.60f;
 static NSInteger const TLWIdentifyDisplayResultCount = 3;
 
 @interface TLWIdentifyPageController ()<AVCapturePhotoCaptureDelegate>
+//  主视图
 @property (nonatomic, strong) TLWIdentifyPageView *myView;
+//  相机会话
 @property (nonatomic, strong) AVCaptureSession *session;
+//  相机预览层
 @property (nonatomic, strong) AVCaptureVideoPreviewLayer *previewLayer;
+//  拍照输出对象，由他输出对象
 @property (nonatomic, strong) AVCapturePhotoOutput *photoOutput;
 @property (nonatomic, strong) UIImageView *capturedImageView;
 @property (nonatomic, strong) UIImageView *loadingImageView;
@@ -320,7 +325,10 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
   request.useSingleModel = @(NO);
 
   TLWSDKManager *manager = [TLWSDKManager shared];
-  NSLog(@"AI识别：开始识别，payload=%lu bytes", (unsigned long)imageData.length);
+  NSString *currentToken = [AGDefaultConfiguration sharedConfig].accessToken;
+  NSLog(@"AI识别：开始识别，payload=%lu bytes，token=%@",
+        (unsigned long)imageData.length,
+        currentToken.length > 0 ? @"有" : @"无（未登录？）");
   __block void (^performCloudIdentify)(BOOL);
   performCloudIdentify = ^(BOOL didRetryAuth) {
     [manager.api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *chatOutput, NSError *chatError) {
@@ -341,8 +349,19 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
 
         if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.answer.length == 0) {
           NSLog(@"========== [云端] AI识别失败 ==========");
-          NSLog(@"[云端] chatError: %@", chatError.localizedDescription);
-          NSLog(@"[云端] code: %@, message: %@", chatOutput.code, chatOutput.message);
+          if (chatError) {
+            NSLog(@"[云端] NSError domain=%@ code=%ld msg=%@",
+                  chatError.domain, (long)chatError.code, chatError.localizedDescription);
+            NSLog(@"[云端] NSError userInfo=%@", chatError.userInfo);
+          } else {
+            NSLog(@"[云端] NSError=nil");
+          }
+          if (!chatOutput) {
+            NSLog(@"[云端] chatOutput=nil（响应体解析失败或无响应）");
+          } else {
+            NSLog(@"[云端] code=%@, message=%@", chatOutput.code, chatOutput.message);
+            NSLog(@"[云端] answer=%@", chatOutput.data.answer);
+          }
           NSLog(@"============================================");
           waitingForLocalFallback = YES;
           presentLocalFallbackIfNeeded();
@@ -409,6 +428,88 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
     [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
   }
+}
+
+
+- (NSData *)tl_cloudImageDataForIdentify:(UIImage *)image {
+  if (![image isKindOfClass:[UIImage class]]) {
+    return nil;
+  }
+
+  CGFloat width = image.size.width;
+  CGFloat height = image.size.height;
+  UIImage *workingImage = image;
+  if (width > TLWIdentifyCloudMaxEdge || height > TLWIdentifyCloudMaxEdge) {
+    CGFloat scale = (width > height) ? (TLWIdentifyCloudMaxEdge / width) : (TLWIdentifyCloudMaxEdge / height);
+    CGSize newSize = CGSizeMake(MAX(1.0, floor(width * scale)),
+                                MAX(1.0, floor(height * scale)));
+    UIGraphicsBeginImageContextWithOptions(newSize, YES, 1.0);
+    [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+    UIImage *resized = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    if (resized) {
+      workingImage = resized;
+    }
+  }
+
+  return UIImageJPEGRepresentation(workingImage, TLWIdentifyCloudJPEGQuality);
+}
+
+- (UIImage *)tl_croppedCameraImageToPreview:(UIImage *)image {
+  UIImage *normalizedImage = [self tl_normalizedImageForProcessing:image];
+  if (!normalizedImage || !self.previewLayer) {
+    return normalizedImage ?: image;
+  }
+
+  CGRect visibleRect = [self.previewLayer metadataOutputRectOfInterestForRect:self.previewLayer.bounds];
+  if (CGRectIsEmpty(visibleRect) || CGRectIsNull(visibleRect)) {
+    return normalizedImage;
+  }
+
+  CGFloat imageWidth = normalizedImage.size.width;
+  CGFloat imageHeight = normalizedImage.size.height;
+  CGRect cropRect = CGRectMake(CGRectGetMinX(visibleRect) * imageWidth,
+                               CGRectGetMinY(visibleRect) * imageHeight,
+                               CGRectGetWidth(visibleRect) * imageWidth,
+                               CGRectGetHeight(visibleRect) * imageHeight);
+  CGRect imageBounds = CGRectMake(0, 0, imageWidth, imageHeight);
+  cropRect = CGRectIntersection(CGRectIntegral(cropRect), imageBounds);
+  if (CGRectIsEmpty(cropRect) || CGRectIsNull(cropRect)) {
+    return normalizedImage;
+  }
+
+  CGImageRef croppedCGImage = CGImageCreateWithImageInRect(normalizedImage.CGImage, cropRect);
+  if (!croppedCGImage) {
+    return normalizedImage;
+  }
+
+  UIImage *croppedImage = [UIImage imageWithCGImage:croppedCGImage scale:normalizedImage.scale orientation:UIImageOrientationUp];
+  CGImageRelease(croppedCGImage);
+  return croppedImage ?: normalizedImage;
+}
+
+- (UIImage *)tl_normalizedImageForProcessing:(UIImage *)image {
+  if (![image isKindOfClass:[UIImage class]]) {
+    return nil;
+  }
+  if (image.imageOrientation == UIImageOrientationUp) {
+    return image;
+  }
+
+  UIGraphicsBeginImageContextWithOptions(image.size, YES, image.scale);
+  [image drawInRect:CGRectMake(0, 0, image.size.width, image.size.height)];
+  UIImage *normalizedImage = UIGraphicsGetImageFromCurrentImageContext();
+  UIGraphicsEndImageContext();
+  return normalizedImage ?: image;
+}
+
+- (NSString *)tl_identifyPrompt {
+  return @"请只根据图片中可见的农作物症状进行判断，不要为了凑满结果而猜测。"
+         "结论可以是病害、虫害、健康，或待确认。"
+         "如果证据不足、图像不清晰、主体不明确，必须返回待确认，不要编造具体病名。"
+         "严格返回 JSON，不要输出任何额外文字。"
+         "格式为：{\"results\":[{\"title\":\"结果一\",\"name\":\"结论名称\",\"confidence\":\"百分比\",\"reason\":\"只写图像中可见依据\",\"advice\":\"给出简短处理建议\"}]}"
+         "。results 按置信度从高到低返回 1 到 3 项。";
 }
 
 - (NSArray<NSDictionary *> *)tl_parseIdentifyResultsFromJSONString:(NSString *)jsonString {
@@ -489,87 +590,6 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
   }
 
   return [parsedResults copy];
-}
-
-- (NSData *)tl_cloudImageDataForIdentify:(UIImage *)image {
-  if (![image isKindOfClass:[UIImage class]]) {
-    return nil;
-  }
-
-  CGFloat width = image.size.width;
-  CGFloat height = image.size.height;
-  UIImage *workingImage = image;
-  if (width > TLWIdentifyCloudMaxEdge || height > TLWIdentifyCloudMaxEdge) {
-    CGFloat scale = (width > height) ? (TLWIdentifyCloudMaxEdge / width) : (TLWIdentifyCloudMaxEdge / height);
-    CGSize newSize = CGSizeMake(MAX(1.0, floor(width * scale)),
-                                MAX(1.0, floor(height * scale)));
-    UIGraphicsBeginImageContextWithOptions(newSize, YES, 1.0);
-    [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
-    UIImage *resized = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    if (resized) {
-      workingImage = resized;
-    }
-  }
-
-  return UIImageJPEGRepresentation(workingImage, TLWIdentifyCloudJPEGQuality);
-}
-
-- (UIImage *)tl_croppedCameraImageToPreview:(UIImage *)image {
-  UIImage *normalizedImage = [self tl_normalizedImageForProcessing:image];
-  if (!normalizedImage || !self.previewLayer) {
-    return normalizedImage ?: image;
-  }
-
-  CGRect visibleRect = [self.previewLayer metadataOutputRectOfInterestForRect:self.previewLayer.bounds];
-  if (CGRectIsEmpty(visibleRect) || CGRectIsNull(visibleRect)) {
-    return normalizedImage;
-  }
-
-  CGFloat imageWidth = normalizedImage.size.width;
-  CGFloat imageHeight = normalizedImage.size.height;
-  CGRect cropRect = CGRectMake(CGRectGetMinX(visibleRect) * imageWidth,
-                               CGRectGetMinY(visibleRect) * imageHeight,
-                               CGRectGetWidth(visibleRect) * imageWidth,
-                               CGRectGetHeight(visibleRect) * imageHeight);
-  CGRect imageBounds = CGRectMake(0, 0, imageWidth, imageHeight);
-  cropRect = CGRectIntersection(CGRectIntegral(cropRect), imageBounds);
-  if (CGRectIsEmpty(cropRect) || CGRectIsNull(cropRect)) {
-    return normalizedImage;
-  }
-
-  CGImageRef croppedCGImage = CGImageCreateWithImageInRect(normalizedImage.CGImage, cropRect);
-  if (!croppedCGImage) {
-    return normalizedImage;
-  }
-
-  UIImage *croppedImage = [UIImage imageWithCGImage:croppedCGImage scale:normalizedImage.scale orientation:UIImageOrientationUp];
-  CGImageRelease(croppedCGImage);
-  return croppedImage ?: normalizedImage;
-}
-
-- (UIImage *)tl_normalizedImageForProcessing:(UIImage *)image {
-  if (![image isKindOfClass:[UIImage class]]) {
-    return nil;
-  }
-  if (image.imageOrientation == UIImageOrientationUp) {
-    return image;
-  }
-
-  UIGraphicsBeginImageContextWithOptions(image.size, YES, image.scale);
-  [image drawInRect:CGRectMake(0, 0, image.size.width, image.size.height)];
-  UIImage *normalizedImage = UIGraphicsGetImageFromCurrentImageContext();
-  UIGraphicsEndImageContext();
-  return normalizedImage ?: image;
-}
-
-- (NSString *)tl_identifyPrompt {
-  return @"请只根据图片中可见的农作物症状进行判断，不要为了凑满结果而猜测。"
-         @"结论可以是病害、虫害、健康，或“待确认”。"
-         @"如果证据不足、图像不清晰、主体不明确，必须返回“待确认”，不要编造具体病名。"
-         @"严格返回 JSON，不要输出任何额外文字。"
-         @"格式为：{\"results\":[{\"title\":\"结果一\",\"name\":\"结论名称\",\"confidence\":\"百分比\",\"reason\":\"只写图像中可见依据\",\"advice\":\"给出简短处理建议\"}]}"
-         @"。results 按置信度从高到低返回 1 到 3 项。";
 }
 
 - (NSArray<NSDictionary *> *)tl_buildLocalFallbackResultsFromIdentifyResults:(NSArray<TLWLocalIdentifyResult *> *)results {
