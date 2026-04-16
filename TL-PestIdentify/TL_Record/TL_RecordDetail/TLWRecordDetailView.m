@@ -192,7 +192,7 @@ static CGFloat const kCardGap   = 13;
     [_diseaseTagView.layer insertSublayer:_diseaseTagGradient atIndex:0];
 
   _pestNameLabel = [[UILabel alloc] init];
-  _pestNameLabel.backgroundColor = [UIColor systemBlueColor];
+  //_pestNameLabel.backgroundColor = [UIColor systemBlueColor];
     _pestNameLabel.textColor = [UIColor whiteColor];
   _pestNameLabel.layer.masksToBounds = YES;
   _pestNameLabel.layer.cornerRadius = 10;
