@@ -23,6 +23,7 @@
 @property (nonatomic, strong) UIView *plusVerticalLine;
 @property (nonatomic, strong) CAGradientLayer *createButtonGradientLayer;
 @property (nonatomic, strong) UILabel *plantTagLabel;
+@property (nonatomic, strong) UILongPressGestureRecognizer *contentCardLongPressGesture;
 
 @end
 
@@ -40,6 +41,7 @@
   [super prepareForReuse];
   self.clickCreateButton = nil;
   self.clickContentCard = nil;
+  self.longPressContentCard = nil;
   self.contentImageView.image = nil;
   self.plantTagLabel.text = nil;
 }
@@ -165,6 +167,10 @@
   contentCardButton.layer.cornerRadius = 16.0;
   contentCardButton.layer.masksToBounds = YES;
   [contentCardButton addTarget:self action:@selector(tl_contentCardTapped) forControlEvents:UIControlEventTouchUpInside];
+  UILongPressGestureRecognizer *longPressGesture = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(tl_contentCardLongPressed:)];
+  longPressGesture.minimumPressDuration = 0.45;
+  [contentCardButton addGestureRecognizer:longPressGesture];
+  self.contentCardLongPressGesture = longPressGesture;
   [cardView addSubview:contentCardButton];
   self.contentCardButton = contentCardButton;
 
@@ -273,6 +279,7 @@
   self.plusHorizontalLine.hidden = NO;
   self.plusVerticalLine.hidden = NO;
   self.contentCardButton.userInteractionEnabled = YES;
+  self.contentCardLongPressGesture.enabled = NO;
 }
 
 - (void)configureWithPlantModel:(TLWPlantModel *)plantModel locationName:(nullable NSString *)locationName {
@@ -295,6 +302,7 @@
   self.plusHorizontalLine.hidden = YES;
   self.plusVerticalLine.hidden = YES;
   self.contentCardButton.userInteractionEnabled = YES;
+  self.contentCardLongPressGesture.enabled = YES;
 }
 
 - (void)tl_createButtonTapped {
@@ -306,6 +314,16 @@
 - (void)tl_contentCardTapped {
   if (self.clickContentCard) {
     self.clickContentCard();
+  }
+}
+
+- (void)tl_contentCardLongPressed:(UILongPressGestureRecognizer *)gesture {
+  if (gesture.state != UIGestureRecognizerStateBegan) {
+    return;
+  }
+
+  if (self.longPressContentCard) {
+    self.longPressContentCard();
   }
 }
 

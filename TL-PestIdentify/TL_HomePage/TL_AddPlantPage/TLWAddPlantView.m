@@ -17,6 +17,7 @@
 @property (nonatomic, strong, readwrite) UIButton *confirmButton;
 
 @property (nonatomic, strong) UIScrollView *scrollView;
+@property (nonatomic, strong) UIView *sheetView;
 @property (nonatomic, strong) UIView *contentView;
 @property (nonatomic, strong) UIView *nameCardView;
 @property (nonatomic, strong) UIView *plantCardView;
@@ -57,16 +58,10 @@
   UIImage *image = [UIImage imageNamed:@"hp_backView.png"];
   if (image) {
     self.layer.contents = (__bridge id)image.CGImage;
+    self.layer.contentsGravity = kCAGravityResizeAspectFill;
   } else {
     self.backgroundColor = [UIColor colorWithRed:0.26 green:0.76 blue:0.95 alpha:1.0];
   }
-
-  UIView *overlay = [[UIView alloc] init];
-  overlay.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.82];
-  [self addSubview:overlay];
-  [overlay mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.edges.equalTo(self);
-  }];
 }
 
 - (void)tl_setupHeader {
@@ -116,10 +111,18 @@
 }
 
 - (void)tl_setupScrollContent {
+  UIView *sheetView = [[UIView alloc] init];
+  sheetView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.88];
+  sheetView.layer.cornerRadius = 26.0;
+  sheetView.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMaxXMinYCorner;
+  sheetView.layer.masksToBounds = YES;
+  [self addSubview:sheetView];
+  self.sheetView = sheetView;
+
   UIScrollView *scrollView = [[UIScrollView alloc] init];
   scrollView.backgroundColor = [UIColor clearColor];
   scrollView.showsVerticalScrollIndicator = NO;
-  [self addSubview:scrollView];
+  [sheetView addSubview:scrollView];
   self.scrollView = scrollView;
 
   UIView *contentView = [[UIView alloc] init];
@@ -127,10 +130,13 @@
   [scrollView addSubview:contentView];
   self.contentView = contentView;
 
+  [sheetView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(68.0);
+    make.left.right.bottom.equalTo(self);
+  }];
+
   [scrollView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(56.0);
-    make.left.right.equalTo(self);
-    make.bottom.equalTo(self);
+    make.edges.equalTo(sheetView);
   }];
 
   [contentView mas_makeConstraints:^(MASConstraintMaker *make) {

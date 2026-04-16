@@ -48,6 +48,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 @property (nonatomic, copy) NSString *currentWeatherText;
 @property (nonatomic, copy) NSString *currentWeatherIconCode;
 @property (nonatomic, assign) BOOL isLoadingWeather;
+@property (nonatomic, strong) NSMutableSet<NSNumber *> *deletingPlantIds;
 
 @end
 
@@ -81,6 +82,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
   self.currentWeatherTemperature = @"--";
   self.currentWeatherText = @"获取中";
   self.currentWeatherIconCode = @"999";
+  self.deletingPlantIds = [NSMutableSet set];
   [self.homePageView configureWithTemperature:self.currentWeatherTemperature weatherText:self.currentWeatherText iconCode:self.currentWeatherIconCode];
   self.managedPlants = [NSMutableArray array];
   [self applyProfile];
@@ -666,6 +668,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
       if (!strongSelf) return;
       [strongSelf tl_openAddPlantController];
     };
+    cell.longPressContentCard = nil;
   } else {
     NSInteger plantIndex = indexPath.row - 3;
     if (plantIndex >= 0 && plantIndex < self.managedPlants.count) {
@@ -681,6 +684,11 @@ extern NSString * const TLWProfileDidUpdateNotification;
           detailController.hidesBottomBarWhenPushed = YES;
           [strongSelf.navigationController pushViewController:detailController animated:YES];
         }
+      };
+      cell.longPressContentCard = ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        [strongSelf tl_confirmDeletePlantModel:plantModel];
       };
     }
     cell.clickCreateButton = nil;
@@ -769,6 +777,89 @@ extern NSString * const TLWProfileDidUpdateNotification;
   };
 
   fetchCropsBlock(NO);
+}
+
+- (void)tl_confirmDeletePlantModel:(TLWPlantModel *)plantModel {
+  if (![plantModel isKindOfClass:[TLWPlantModel class]]) {
+    return;
+  }
+  if (plantModel.isUploading || plantModel.plantId.integerValue <= 0) {
+    [TLWToast show:@"该植物暂时无法删除"];
+    return;
+  }
+  if ([self.deletingPlantIds containsObject:plantModel.plantId]) {
+    return;
+  }
+
+  NSString *plantName = plantModel.plantName.length > 0 ? plantModel.plantName : @"该植物";
+  NSString *message = [NSString stringWithFormat:@"确认删除“%@”吗？", plantName];
+  UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"删除植物"
+                                                                 message:message
+                                                          preferredStyle:UIAlertControllerStyleAlert];
+  __weak typeof(self) weakSelf = self;
+  [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+  [alert addAction:[UIAlertAction actionWithTitle:@"确认"
+                                            style:UIAlertActionStyleDestructive
+                                          handler:^(__unused UIAlertAction *action) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+    [strongSelf tl_deletePlantModel:plantModel didRetryAuth:NO];
+  }]];
+  [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)tl_deletePlantModel:(TLWPlantModel *)plantModel didRetryAuth:(BOOL)didRetryAuth {
+  NSNumber *plantId = plantModel.plantId;
+  if (plantId.integerValue <= 0) {
+    [TLWToast show:@"植物信息异常，无法删除"];
+    return;
+  }
+  if ([self.deletingPlantIds containsObject:plantId]) {
+    return;
+  }
+
+  [self.deletingPlantIds addObject:plantId];
+  __weak typeof(self) weakSelf = self;
+  TLWSDKManager *manager = [TLWSDKManager shared];
+  [manager deleteCropWithId:plantId completionHandler:^(AGResultVoid * output, NSError * error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) return;
+
+      [strongSelf.deletingPlantIds removeObject:plantId];
+      if (!didRetryAuth
+          && [manager.sessionManager handleAuthFailureForCode:output.code
+                                                     message:output.message
+                                                  retryBlock:^{
+        [strongSelf tl_deletePlantModel:plantModel didRetryAuth:YES];
+      }]) {
+        return;
+      }
+
+      if (error || output.code.integerValue != 200) {
+        [TLWToast show:[manager.sessionManager userFacingMessageForError:error
+                                                                   code:output.code
+                                                          serverMessage:output.message
+                                                         defaultMessage:@"删除植物失败，请稍后重试"]];
+        return;
+      }
+
+      NSUInteger plantIndex = [strongSelf.managedPlants indexOfObjectIdenticalTo:plantModel];
+      if (plantIndex != NSNotFound) {
+        [strongSelf.managedPlants removeObjectAtIndex:plantIndex];
+      } else {
+        NSIndexSet *matchedIndexes = [strongSelf.managedPlants indexesOfObjectsPassingTest:^BOOL(TLWPlantModel * _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+          return [obj.plantId isEqualToNumber:plantId];
+        }];
+        if (matchedIndexes.count > 0) {
+          [strongSelf.managedPlants removeObjectsAtIndexes:matchedIndexes];
+        }
+      }
+      [strongSelf.homePageView.tableView reloadData];
+      [TLWToast show:@"删除成功"];
+      [strongSelf tl_fetchMyCrops];
+    });
+  }];
 }
 
 - (void)tl_uploadPlantModel:(TLWPlantModel *)plantModel {
