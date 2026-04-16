@@ -326,28 +326,39 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
     return;
   }
 
-  AGChatRequest *request = [[AGChatRequest alloc] init];
-  request.text = [self tl_identifyPrompt];
-  request.imageUrl = [NSString stringWithFormat:@"data:image/jpeg;base64,%@",
-                      [imageData base64EncodedStringWithOptions:0]];
-  request.useSingleModel = @(NO);
-  request.saveHistory = @(YES);
-
   TLWSDKManager *manager = [TLWSDKManager shared];
   NSTimeInterval previousTimeout = manager.api.apiClient.timeoutInterval;
   manager.api.apiClient.timeoutInterval = TLWIdentifyCloudTimeout;
-  NSString *currentToken = [AGDefaultConfiguration sharedConfig].accessToken;
-  NSLog(@"AI识别：开始识别，payload=%lu bytes，token=%@",
-        (unsigned long)imageData.length,
-        currentToken.length > 0 ? @"有" : @"无（未登录？）");
-  NSLog(@"[云端] SDK timeoutInterval=%.0fs, saveHistory=%@, useSingleModel=%@, profileProbe=%@",
-        manager.api.apiClient.timeoutInterval,
-        request.saveHistory.boolValue ? @"YES" : @"NO",
-        request.useSingleModel.boolValue ? @"YES" : @"NO",
-        TLWIdentifyEnableProfileProbe ? @"YES" : @"NO");
-  __block void (^performCloudIdentify)(BOOL);
-  performCloudIdentify = ^(BOOL didRetryAuth) {
-    [manager.api chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *chatOutput, NSError *chatError) {
+
+  [self tl_uploadIdentifyImageData:imageData completion:^(NSString *imageURL, NSError *uploadError) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (uploadError || imageURL.length == 0) {
+        manager.api.apiClient.timeoutInterval = previousTimeout;
+        NSLog(@"[云端] 图片上传失败 error=%@", uploadError.localizedDescription ?: @"<nil>");
+        waitingForLocalFallback = YES;
+        presentLocalFallbackIfNeeded();
+        return;
+      }
+
+      AGChatRequest *request = [[AGChatRequest alloc] init];
+      request.text = [self tl_identifyPrompt];
+      request.imageUrl = imageURL;
+      request.useSingleModel = @(NO);
+      request.saveHistory = @(YES);
+
+      NSString *currentToken = [AGDefaultConfiguration sharedConfig].accessToken;
+      NSLog(@"AI识别：开始识别，uploadURL=%@ token=%@",
+            imageURL,
+            currentToken.length > 0 ? @"有" : @"无（未登录？）");
+      NSLog(@"[云端] SDK timeoutInterval=%.0fs, saveHistory=%@, useSingleModel=%@, profileProbe=%@",
+            manager.api.apiClient.timeoutInterval,
+            request.saveHistory.boolValue ? @"YES" : @"NO",
+            request.useSingleModel.boolValue ? @"YES" : @"NO",
+            TLWIdentifyEnableProfileProbe ? @"YES" : @"NO");
+
+      __block void (^performCloudIdentify)(BOOL);
+      performCloudIdentify = ^(BOOL didRetryAuth) {
+        [manager.api chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *chatOutput, NSError *chatError) {
       dispatch_async(dispatch_get_main_queue(), ^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
         manager.api.apiClient.timeoutInterval = previousTimeout;
@@ -432,9 +443,11 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
     vc.hidesBottomBarWhenPushed = YES;
         [strongSelf.navigationController pushViewController:vc animated:YES];
       });
-    }];
-  };
-  performCloudIdentify(NO);
+        }];
+      };
+      performCloudIdentify(NO);
+    });
+  }];
 }
 
 #pragma mark - 本地识别兜底
@@ -484,6 +497,56 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
   }
 
   return UIImageJPEGRepresentation(workingImage, TLWIdentifyCloudJPEGQuality);
+}
+
+- (void)tl_uploadIdentifyImageData:(NSData *)imageData
+                        completion:(void (^)(NSString *imageURL, NSError *error))completion {
+  if (imageData.length == 0) {
+    if (completion) {
+      completion(nil, [NSError errorWithDomain:@"TLWIdentifyUpload"
+                                          code:-1
+                                      userInfo:@{NSLocalizedDescriptionKey: @"图片数据为空"}]);
+    }
+    return;
+  }
+
+  NSString *fileName = [NSString stringWithFormat:@"identify_%@.jpg", NSUUID.UUID.UUIDString];
+  NSString *filePath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
+  BOOL wrote = [imageData writeToFile:filePath atomically:YES];
+  if (!wrote) {
+    if (completion) {
+      completion(nil, [NSError errorWithDomain:@"TLWIdentifyUpload"
+                                          code:-2
+                                      userInfo:@{NSLocalizedDescriptionKey: @"图片临时文件写入失败"}]);
+    }
+    return;
+  }
+
+  NSURL *fileURL = [NSURL fileURLWithPath:filePath];
+  [[TLWSDKManager shared] uploadFileWithFile:fileURL
+                                      prefix:@"identify/"
+                           completionHandler:^(AGResultString *output, NSError *error) {
+    [[NSFileManager defaultManager] removeItemAtPath:filePath error:nil];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (error || !output || output.code.integerValue != 200 || output.data.length == 0) {
+        NSError *finalError = error;
+        if (!finalError) {
+          NSString *message = output.message ?: @"图片上传失败";
+          finalError = [NSError errorWithDomain:@"TLWIdentifyUpload"
+                                           code:output.code.integerValue ?: -3
+                                       userInfo:@{NSLocalizedDescriptionKey: message}];
+        }
+        if (completion) {
+          completion(nil, finalError);
+        }
+        return;
+      }
+
+      if (completion) {
+        completion(output.data, nil);
+      }
+    });
+  }];
 }
 
 - (UIImage *)tl_preparedAlbumImageForIdentify:(UIImage *)image {

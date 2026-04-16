@@ -65,7 +65,7 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
                                 action:@selector(tl_filter)
                       forControlEvents:UIControlEventTouchUpInside];
 
-    [self tl_debugFetchHistoryWithoutSDK];
+  //  [self tl_debugFetchHistoryWithoutSDK];
     [self tl_fetchRecords];
 }
 

@@ -43,7 +43,7 @@
 
         _nameLabel = [[UILabel alloc] init];
         _nameLabel.textColor = [UIColor whiteColor];
-        _nameLabel.font = [UIFont boldSystemFontOfSize:18];
+        _nameLabel.font = [UIFont boldSystemFontOfSize:15];
         _nameLabel.textAlignment = NSTextAlignmentCenter;
         [self.contentView addSubview:_nameLabel];
         [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -55,8 +55,7 @@
 }
 
 - (void)configureWithItem:(TLWRecordItem *)item {
-    _nameLabel.text = item.topPestName;
-  NSLog(@"pestName:%@", item.topPestName);
+    _nameLabel.text = [self tl_displayNameForText:item.topPestName];
 
 
     NSString *imageURL = item.imageURL ?: @"";
@@ -85,6 +84,14 @@
             [self tl_resetImagePlaceholder];
         }
     }];
+}
+
+- (NSString *)tl_displayNameForText:(NSString *)text {
+    NSString *name = text ?: @"";
+    if (name.length <= 8) {
+        return name;
+    }
+    return [[name substringToIndex:8] stringByAppendingString:@"..."];
 }
 
 - (void)tl_configureImageWithDataURL:(NSString *)dataURL {
