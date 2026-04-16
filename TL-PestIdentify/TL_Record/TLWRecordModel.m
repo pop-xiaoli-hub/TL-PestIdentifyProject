@@ -25,7 +25,6 @@
         TLWRecordResult *result = [[TLWRecordResult alloc] init];
         result.title = [self tl_titleFromValue:item[@"title"] index:idx];
         result.pestName = [self tl_nameFromDictionary:item fallback:userQuery];
-      NSLog(@"pestName:%@", result.pestName);
         result.reason = [self tl_stringFromValue:item[@"reason"]];
         result.solution = [self tl_solutionFromDictionary:item fallbackReason:result.reason];
         result.hasConfidence = [self tl_fillConfidenceForResult:result fromValue:item[@"confidence"]];
@@ -186,9 +185,11 @@
         return NO;
     }
     return dictionary[@"name"] != nil ||
+           dictionary[@"diseaseName"] != nil ||
            dictionary[@"names"] != nil ||
            dictionary[@"confidence"] != nil ||
            dictionary[@"advice"] != nil ||
+           dictionary[@"controlPlan"] != nil ||
            dictionary[@"solution"] != nil ||
            dictionary[@"reason"] != nil;
 }
@@ -208,6 +209,9 @@
 
 + (NSString *)tl_nameFromDictionary:(NSDictionary *)dictionary fallback:(NSString *)fallback {
     NSString *name = [self tl_stringFromValue:dictionary[@"name"]];
+    if (name.length == 0) {
+        name = [self tl_stringFromValue:dictionary[@"diseaseName"]];
+    }
     if (name.length > 0) {
         return name;
     }
@@ -228,6 +232,9 @@
 
 + (NSString *)tl_solutionFromDictionary:(NSDictionary *)dictionary fallbackReason:(NSString *)reason {
     NSString *solution = [self tl_stringFromValue:dictionary[@"advice"]];
+    if (solution.length == 0) {
+        solution = [self tl_stringFromValue:dictionary[@"controlPlan"]];
+    }
     if (solution.length == 0) {
         solution = [self tl_stringFromValue:dictionary[@"solution"]];
     }
