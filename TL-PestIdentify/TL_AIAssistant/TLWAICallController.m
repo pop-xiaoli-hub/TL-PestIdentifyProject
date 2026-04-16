@@ -207,7 +207,6 @@
 
 - (void)onMessageWithType:(SEMessageType)type andData:(NSData *)data {
     NSString *displayText = [self tl_extractPrimaryTextFromData:data];
-    NSString *payloadText = [self tl_stringFromData:data];
 
     dispatch_async(dispatch_get_main_queue(), ^{
         switch (type) {
@@ -250,17 +249,12 @@
                 break;
             case SEEventConnectionFailed:
             case SEEventSessionFailed:
-            case SEEngineError: {
-                NSString *errorText = displayText.length > 0 ? displayText : payloadText;
-                if (errorText.length == 0) {
-                    errorText = @"AI 通话启动失败，请稍后重试";
-                }
+            case SEEngineError:
                 self.callActive = NO;
                 [self tl_stopIconBreathingAnimation];
-                [self tl_updateHint:@"AI 通话异常中断" status:errorText];
-                [TLWToast show:errorText];
+                [self tl_updateHint:@"AI 通话异常中断" status:@"连接出现问题，请退出后重试"];
+                [TLWToast show:@"AI 通话异常中断，请稍后重试"];
                 break;
-            }
             case SEEngineStop:
             case SEEventConnectionFinished:
             case SEEventSessionCanceled:
@@ -404,7 +398,7 @@
 - (NSString *)tl_extractPrimaryTextFromData:(NSData *)data {
     id jsonObject = [self tl_JSONObjectFromData:data];
     if (!jsonObject) {
-        return [self tl_sanitizedText:[self tl_stringFromData:data]];
+        return nil;
     }
 
     NSString *foundText = [self tl_findTextInJSONObject:jsonObject];
@@ -412,7 +406,7 @@
         return foundText;
     }
 
-    return [self tl_sanitizedText:[self tl_stringFromData:data]];
+    return nil;
 }
 
 - (id)tl_JSONObjectFromData:(NSData *)data {
@@ -429,10 +423,6 @@
 - (NSString *)tl_findTextInJSONObject:(id)object {
     if ([object isKindOfClass:[NSString class]]) {
         return [self tl_sanitizedText:(NSString *)object];
-    }
-
-    if ([object isKindOfClass:[NSNumber class]]) {
-        return [(NSNumber *)object stringValue];
     }
 
     if ([object isKindOfClass:[NSArray class]]) {
@@ -484,7 +474,7 @@
         return rawText;
     }
 
-    return [NSString stringWithFormat:@"<binary %lu bytes>", (unsigned long)data.length];
+    return @"";
 }
 
 - (NSString *)tl_sanitizedText:(NSString *)text {
