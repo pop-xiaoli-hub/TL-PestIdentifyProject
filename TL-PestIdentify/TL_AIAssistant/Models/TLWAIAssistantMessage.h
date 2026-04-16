@@ -28,6 +28,8 @@ typedef NS_ENUM(NSInteger, TLWAIAssistantMessageStatus) {
 @property (nonatomic, assign) TLWAIAssistantMessageStatus status;
 @property (nonatomic, copy) NSString *text;
 @property (nonatomic, copy) NSArray<UIImage *> *localImages;
+/// 高清原图，仅用于点击放大全屏预览；localImages 存的是 120px 缩略图给气泡渲染。
+@property (nonatomic, copy, nullable) NSArray<UIImage *> *previewImages;
 @property (nonatomic, copy) NSArray<NSString *> *remoteImageURLs;
 /// 第一张图片的原始尺寸，用于 cell 按比例显示。CGSizeZero 表示未知，fallback 正方形。
 @property (nonatomic, assign) CGSize imageDisplaySize;

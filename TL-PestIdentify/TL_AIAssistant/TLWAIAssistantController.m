@@ -10,6 +10,7 @@
 #import "TLWAIAssistantMessage.h"
 #import "TLWAIAssistantSession.h"
 #import "TLWAIAssistantView.h"
+#import "TLWIdentifyPageController.h"
 #import "TLWImagePickerManager.h"
 #import "TWLSpeechManager.h"
 #import "TLWToast.h"
@@ -30,6 +31,8 @@
 @property (nonatomic, strong) NSMutableArray<UIImage *> *pendingImages;
 @property (nonatomic, strong) TLWAIAssistantSession *session;
 @property (nonatomic, weak)   TLWAIAssistantMessage *currentAIMessage;
+@property (nonatomic, strong) NSURLSessionTask *currentUploadTask;
+@property (nonatomic, strong) NSURLSessionTask *currentChatTask;
 @end
 
 @implementation TLWAIAssistantController
@@ -141,9 +144,16 @@
 #pragma mark - Actions
 
 - (void)tl_camera {
-    TLWImagePickerManager *picker = [[TLWImagePickerManager alloc] init];
-    picker.delegate = self;
-    [picker openCameraFrom:self];
+    TLWIdentifyPageController *cameraVC = [[TLWIdentifyPageController alloc] init];
+    cameraVC.mode = TLWIdentifyPageModePickerOnly;
+    __weak typeof(self) weakSelf = self;
+    cameraVC.onImagePicked = ^(UIImage * _Nonnull image) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf || !image) return;
+        [strongSelf tl_applySelectedImages:@[image]];
+    };
+    cameraVC.hidesBottomBarWhenPushed = YES;
+    [self.navigationController pushViewController:cameraVC animated:YES];
 }
 
 - (void)tl_mic {
@@ -246,6 +256,8 @@
 }
 
 - (void)dealloc {
+    [self.currentUploadTask cancel];
+    [self.currentChatTask cancel];
     [[TWLSpeechManager sharedManager] stopRecording];
     [TWLSpeechManager sharedManager].resultHandler = nil;
     [TWLSpeechManager sharedManager].errorHandler = nil;
@@ -255,6 +267,11 @@
 - (void)tl_stopAI {
     TLWAIAssistantMessage *aiMessage = self.currentAIMessage;
     if (!aiMessage) return;
+
+    [self.currentUploadTask cancel];
+    [self.currentChatTask cancel];
+    self.currentUploadTask = nil;
+    self.currentChatTask = nil;
 
     // 标记已停止
     aiMessage.status = TLWAIAssistantMessageStatusIdle;
@@ -283,18 +300,22 @@
 #pragma mark - TLWImagePickerDelegate
 
 - (void)imagePicker:(TLWImagePickerManager *)picker didSelectImage:(UIImage *)image {
-    [self tl_compressImages:@[image] completion:^(NSArray<UIImage *> *results) {
-        [self.pendingImages removeAllObjects];
-        [self.pendingImages addObjectsFromArray:results];
-        [self.myView showSelectedImage:results.firstObject];
-    }];
+    [self tl_applySelectedImages:@[image]];
 }
 
 - (void)imagePicker:(TLWImagePickerManager *)picker didSelectImages:(NSArray<UIImage *> *)images {
+    [self tl_applySelectedImages:images];
+}
+
+- (void)tl_applySelectedImages:(NSArray<UIImage *> *)images {
     if (images.count == 0) return;
     [self tl_compressImages:images completion:^(NSArray<UIImage *> *results) {
         [self.pendingImages removeAllObjects];
         [self.pendingImages addObjectsFromArray:results];
+        if (self.pendingImages.count <= 1) {
+            [self.myView showSelectedImage:self.pendingImages.firstObject];
+            return;
+        }
         [self.myView showSelectedImages:self.pendingImages];
     }];
 }
@@ -327,8 +348,9 @@
     }
     [self.session appendMessage:userMessage];
 
-    // 发送后立刻把消息里的原图替换为缩略图，释放大图内存
+    // 发送后把高清原图迁到 previewImages 留给点击放大用，localImages 改成 120px 缩略图给气泡渲染省内存
     if (userMessage.localImages.count > 0) {
+        userMessage.previewImages = userMessage.localImages;
         NSMutableArray<UIImage *> *thumbnails = [NSMutableArray arrayWithCapacity:userMessage.localImages.count];
         for (UIImage *img in userMessage.localImages) {
             [thumbnails addObject:[self tl_thumbnailFromImage:img maxEdge:120]];
@@ -368,51 +390,59 @@
             request.imageUrl = imageURL;
         }
 
-        [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                __strong typeof(weakSelf) strongSelf = weakSelf;
-                if (!strongSelf) return;
+        __block void (^sendChatRequest)(BOOL);
+        sendChatRequest = ^(BOOL didRetryAuth) {
+            self.currentChatTask = [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    __strong typeof(weakSelf) strongSelf = weakSelf;
+                    if (!strongSelf) return;
+                    strongSelf.currentChatTask = nil;
 
-                // 用户已手动停止，忽略回调
-                if (strongSelf.currentAIMessage != aiMessage) return;
+                    // 用户已手动停止，忽略回调
+                    if (strongSelf.currentAIMessage != aiMessage) return;
 
-                if (error) {
-                    strongSelf.currentAIMessage = nil;
-                    [strongSelf.myView exitAILoadingMode];
-                    aiMessage.status = TLWAIAssistantMessageStatusFailed;
-                    aiMessage.text = @"网络请求失败，请稍后重试";
-                    aiMessage.errorMessage = error.localizedDescription;
-                    [strongSelf.myView displayMessages:strongSelf.session.messages];
-                    [TLWToast show:@"请求失败，请检查网络"];
-                    return;
-                }
+                    if (error) {
+                        strongSelf.currentAIMessage = nil;
+                        [strongSelf.myView exitAILoadingMode];
+                        aiMessage.status = TLWAIAssistantMessageStatusFailed;
+                        aiMessage.text = @"网络请求失败，请稍后重试";
+                        aiMessage.errorMessage = error.localizedDescription;
+                        [strongSelf.myView displayMessages:strongSelf.session.messages];
+                        [TLWToast show:@"请求失败，请检查网络"];
+                        return;
+                    }
 
-                // 鉴权失效（401/403），自动续期后重试
-                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-                        [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *retryOutput, NSError *retryError) {
-                            dispatch_async(dispatch_get_main_queue(), ^{
-                                __strong typeof(weakSelf) strongSelf2 = weakSelf;
-                                if (!strongSelf2) return;
-                                [strongSelf2 tl_handleChatResponse:retryOutput error:retryError forMessage:aiMessage];
-                            });
-                        }];
-                    }];
-                    return;
-                }
+                    TLWSessionManager *sessionManager = [TLWSDKManager shared].sessionManager;
+                    if (!didRetryAuth
+                        && [sessionManager handleAuthFailureForCode:output.code
+                                                            message:output.message
+                                                         retryBlock:^{
+                        sendChatRequest(YES);
+                    }]) {
+                        return;
+                    }
 
-                [strongSelf tl_handleChatResponse:output error:nil forMessage:aiMessage];
-            });
-        }];
+                    if (didRetryAuth && [sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                        [sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
+                        return;
+                    }
+
+                    [strongSelf tl_handleChatResponse:output error:nil forMessage:aiMessage];
+                });
+            }];
+        };
+
+        sendChatRequest(NO);
     };
 
     // 4. 如果有图片，先上传拿 URL；没有图片直接发
     if (imagesToSend.count > 0) {
-        [[TLWSDKManager shared] uploadImages:@[imagesToSend.firstObject]
-                                       prefix:@"ai_assistant/"
-                                   completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable uploadError) {
+        self.currentUploadTask = [[TLWSDKManager shared] uploadImages:@[imagesToSend.firstObject]
+                                                               prefix:@"ai_assistant/"
+                                                           completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable uploadError) {
             __strong typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
+            strongSelf.currentUploadTask = nil;
             if (strongSelf.currentAIMessage != aiMessage) return;
 
             if (uploadError || urls.count == 0) {
@@ -437,6 +467,8 @@
                          error:(NSError *)error
                     forMessage:(TLWAIAssistantMessage *)aiMessage {
     // 退出 AI 加载态
+    self.currentUploadTask = nil;
+    self.currentChatTask = nil;
     self.currentAIMessage = nil;
     [self.myView exitAILoadingMode];
 
