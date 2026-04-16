@@ -11,17 +11,22 @@
 #import <AVFoundation/AVFoundation.h>
 #import "TLWIdentifyResultController.h"
 #import "TLWSDKManager.h"
+#import <AgriPestClient/AGApiClient.h>
 #import <AgriPestClient/AGChatRequest.h>
+#import <AgriPestClient/AGDiagnosisItem.h>
 #import <AgriPestClient/AGResultChatProfileResponse.h>
+#import <AgriPestClient/AGResultListDiagnosisItem.h>
 #import <AgriPestClient/AGDefaultConfiguration.h>
 #import "TLWPhotoPickerController.h"
 #import "TLWLocalIdentifyManager.h"
 #import "TLWToast.h"
 
-static CGFloat const TLWIdentifyCloudJPEGQuality = 0.92f;
-static CGFloat const TLWIdentifyCloudMaxEdge = 2048.0f;
+static CGFloat const TLWIdentifyCloudJPEGQuality = 0.78f;
+static CGFloat const TLWIdentifyCloudMaxEdge = 1280.0f;
 static CGFloat const TLWIdentifyMinLocalFallbackConfidence = 0.60f;
 static NSInteger const TLWIdentifyDisplayResultCount = 3;
+static NSTimeInterval const TLWIdentifyCloudTimeout = 240.0f;
+static BOOL const TLWIdentifyEnableProfileProbe = YES;
 
 @interface TLWIdentifyPageController ()<AVCapturePhotoCaptureDelegate>
 //  主视图
@@ -93,8 +98,9 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
   pickerVC.onSelectImage = ^(UIImage *image) {
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf || !image) return;
-    strongSelf.capturedImage = image;
-    strongSelf.capturedImageView.image = image;
+    UIImage *preparedImage = [strongSelf tl_preparedAlbumImageForIdentify:image];
+    strongSelf.capturedImage = preparedImage;
+    strongSelf.capturedImageView.image = preparedImage;
     strongSelf.capturedImageView.hidden = NO;
     strongSelf.previewLayer.hidden = YES;
     [strongSelf tl_identifyFromAI];
@@ -323,17 +329,26 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
   request.imageUrl = [NSString stringWithFormat:@"data:image/jpeg;base64,%@",
                       [imageData base64EncodedStringWithOptions:0]];
   request.useSingleModel = @(NO);
+  request.saveHistory = @(YES);
 
   TLWSDKManager *manager = [TLWSDKManager shared];
+  NSTimeInterval previousTimeout = manager.api.apiClient.timeoutInterval;
+  manager.api.apiClient.timeoutInterval = TLWIdentifyCloudTimeout;
   NSString *currentToken = [AGDefaultConfiguration sharedConfig].accessToken;
   NSLog(@"AI识别：开始识别，payload=%lu bytes，token=%@",
         (unsigned long)imageData.length,
         currentToken.length > 0 ? @"有" : @"无（未登录？）");
+  NSLog(@"[云端] SDK timeoutInterval=%.0fs, saveHistory=%@, useSingleModel=%@, profileProbe=%@",
+        manager.api.apiClient.timeoutInterval,
+        request.saveHistory.boolValue ? @"YES" : @"NO",
+        request.useSingleModel.boolValue ? @"YES" : @"NO",
+        TLWIdentifyEnableProfileProbe ? @"YES" : @"NO");
   __block void (^performCloudIdentify)(BOOL);
   performCloudIdentify = ^(BOOL didRetryAuth) {
-    [manager.api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *chatOutput, NSError *chatError) {
+    [manager.api chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *chatOutput, NSError *chatError) {
       dispatch_async(dispatch_get_main_queue(), ^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
+        manager.api.apiClient.timeoutInterval = previousTimeout;
         if (!strongSelf) {
           return;
         }
@@ -342,12 +357,13 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
             && [manager.sessionManager handleAuthFailureForCode:chatOutput.code
                                                        message:chatOutput.message
                                                     retryBlock:^{
+          manager.api.apiClient.timeoutInterval = TLWIdentifyCloudTimeout;
           performCloudIdentify(YES);
         }]) {
           return;
         }
 
-        if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.answer.length == 0) {
+        if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.count == 0) {
           NSLog(@"========== [云端] AI识别失败 ==========");
           if (chatError) {
             NSLog(@"[云端] NSError domain=%@ code=%ld msg=%@",
@@ -360,38 +376,46 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
             NSLog(@"[云端] chatOutput=nil（响应体解析失败或无响应）");
           } else {
             NSLog(@"[云端] code=%@, message=%@", chatOutput.code, chatOutput.message);
-            NSLog(@"[云端] answer=%@", chatOutput.data.answer);
+            NSLog(@"[云端] diagnosisCount=%lu", (unsigned long)chatOutput.data.count);
           }
           NSLog(@"============================================");
+          if (TLWIdentifyEnableProfileProbe) {
+            [strongSelf tl_probeCloudIdentifyProfileWithRequest:request manager:manager];
+          }
           waitingForLocalFallback = YES;
           presentLocalFallbackIfNeeded();
           return;
         }
 
         NSLog(@"========== [云端] AI识别成功 ==========");
-        NSLog(@"[云端] 原始返回: %@", chatOutput.data.answer);
-        if (chatOutput.data.profile) {
-          NSLog(@"[云端] profile: singleModel=%@, imageType=%@, imageLength=%@, totalMs=%@",
-                chatOutput.data.profile.singleModel,
-                chatOutput.data.profile.imageUrlType,
-                chatOutput.data.profile.imageUrlLength,
-                chatOutput.data.profile.totalMs);
-        }
-
         NSArray<NSDictionary *> *parsedResults = [strongSelf tl_normalizedIdentifyResultsForDisplay:
-                                                  [strongSelf tl_parseIdentifyResultsFromJSONString:chatOutput.data.answer]];
+                                                  [strongSelf tl_resultsFromDiagnosisItems:chatOutput.data]];
         if (parsedResults.count == 0) {
           NSLog(@"[云端] 结构化结果解析失败，回退本地识别");
+          if (TLWIdentifyEnableProfileProbe) {
+            [strongSelf tl_probeCloudIdentifyProfileWithRequest:request manager:manager];
+          }
           waitingForLocalFallback = YES;
           presentLocalFallbackIfNeeded();
           return;
         }
 
         for (NSInteger i = 0; i < parsedResults.count; i++) {
+          AGDiagnosisItem *rawItem = i < chatOutput.data.count ? chatOutput.data[i] : nil;
+          if ([rawItem isKindOfClass:[AGDiagnosisItem class]]) {
+            NSLog(@"[云端] 原始 DiagnosisItem Top%ld -> diseaseName=%@, confidence=%@, controlPlan=%@",
+                  (long)(i + 1),
+                  rawItem.diseaseName ?: @"<nil>",
+                  rawItem.confidence ?: @"<nil>",
+                  rawItem.controlPlan ?: @"<nil>");
+          }
           NSDictionary *r = parsedResults[i];
           NSLog(@"[云端] Top%ld: %@ | 置信度: %@ | 依据: %@", (long)(i + 1), r[@"name"], r[@"confidence"], r[@"reason"]);
         }
         NSLog(@"============================================");
+        if (TLWIdentifyEnableProfileProbe) {
+          [strongSelf tl_probeCloudIdentifyProfileWithRequest:request manager:manager];
+        }
 
         [strongSelf tl_stopLoadingIndicator];
         TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
@@ -455,6 +479,45 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
   return UIImageJPEGRepresentation(workingImage, TLWIdentifyCloudJPEGQuality);
 }
 
+- (UIImage *)tl_preparedAlbumImageForIdentify:(UIImage *)image {
+  UIImage *normalizedImage = [self tl_normalizedImageForProcessing:image];
+  if (!normalizedImage) {
+    return image;
+  }
+
+  CGSize targetSize = self.previewLayer ? self.previewLayer.bounds.size : CGSizeZero;
+  if (targetSize.width <= 0 || targetSize.height <= 0) {
+    return normalizedImage;
+  }
+
+  CGFloat targetAspect = targetSize.width / targetSize.height;
+  CGFloat imageAspect = normalizedImage.size.width / normalizedImage.size.height;
+  CGRect cropRect = CGRectMake(0, 0, normalizedImage.size.width, normalizedImage.size.height);
+
+  if (fabs(imageAspect - targetAspect) < 0.01) {
+    return normalizedImage;
+  }
+
+  if (imageAspect > targetAspect) {
+    CGFloat cropWidth = normalizedImage.size.height * targetAspect;
+    cropRect.origin.x = floor((normalizedImage.size.width - cropWidth) * 0.5);
+    cropRect.size.width = floor(cropWidth);
+  } else {
+    CGFloat cropHeight = normalizedImage.size.width / targetAspect;
+    cropRect.origin.y = floor((normalizedImage.size.height - cropHeight) * 0.5);
+    cropRect.size.height = floor(cropHeight);
+  }
+
+  CGImageRef croppedCGImage = CGImageCreateWithImageInRect(normalizedImage.CGImage, CGRectIntegral(cropRect));
+  if (!croppedCGImage) {
+    return normalizedImage;
+  }
+
+  UIImage *croppedImage = [UIImage imageWithCGImage:croppedCGImage scale:normalizedImage.scale orientation:UIImageOrientationUp];
+  CGImageRelease(croppedCGImage);
+  return croppedImage ?: normalizedImage;
+}
+
 - (UIImage *)tl_croppedCameraImageToPreview:(UIImage *)image {
   UIImage *normalizedImage = [self tl_normalizedImageForProcessing:image];
   if (!normalizedImage || !self.previewLayer) {
@@ -504,12 +567,73 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
 }
 
 - (NSString *)tl_identifyPrompt {
-  return @"请只根据图片中可见的农作物症状进行判断，不要为了凑满结果而猜测。"
-         "结论可以是病害、虫害、健康，或待确认。"
-         "如果证据不足、图像不清晰、主体不明确，必须返回待确认，不要编造具体病名。"
-         "严格返回 JSON，不要输出任何额外文字。"
-         "格式为：{\"results\":[{\"title\":\"结果一\",\"name\":\"结论名称\",\"confidence\":\"百分比\",\"reason\":\"只写图像中可见依据\",\"advice\":\"给出简短处理建议\"}]}"
-         "。results 按置信度从高到低返回 1 到 3 项。";
+  return @"请识别图片中农作物最可能的病害或虫害，并给出清晰、克制的诊断结论。"
+         "请仅根据图片中可见症状判断，不要凭空猜测；如果证据明显不足、图像模糊或主体不明确，再返回待确认。"
+         "如果能够判断，请优先给出最可能的病虫害名称，并提供简明、防治导向的建议。";
+}
+
+- (NSArray<NSDictionary *> *)tl_resultsFromDiagnosisItems:(NSArray<AGDiagnosisItem *> *)items {
+  if (![items isKindOfClass:[NSArray class]] || items.count == 0) {
+    return @[];
+  }
+
+  NSMutableArray<NSDictionary *> *results = [NSMutableArray array];
+  NSArray<NSString *> *titles = @[@"结果一", @"结果二", @"结果三"];
+  for (NSUInteger idx = 0; idx < MIN(items.count, TLWIdentifyDisplayResultCount); idx++) {
+    AGDiagnosisItem *item = items[idx];
+    if (![item isKindOfClass:[AGDiagnosisItem class]]) {
+      continue;
+    }
+
+    NSString *name = item.diseaseName.length > 0 ? item.diseaseName : @"待确认";
+    NSString *confidence = item.confidence ? [NSString stringWithFormat:@"%@%%", item.confidence] : @"--";
+    NSString *advice = item.controlPlan.length > 0 ? item.controlPlan : @"";
+    NSString *title = idx < titles.count ? titles[idx] : [NSString stringWithFormat:@"结果%lu", (unsigned long)(idx + 1)];
+    [results addObject:@{
+      @"title": title,
+      @"name": name,
+      @"names": @[name],
+      @"confidence": confidence,
+      @"reason": @"",
+      @"advice": advice
+    }];
+  }
+  return results.copy;
+}
+
+- (void)tl_probeCloudIdentifyProfileWithRequest:(AGChatRequest *)request manager:(TLWSDKManager *)manager {
+  AGChatRequest *probeRequest = [[AGChatRequest alloc] init];
+  probeRequest.text = request.text;
+  probeRequest.imageUrl = request.imageUrl;
+  probeRequest.useSingleModel = request.useSingleModel;
+  probeRequest.extraInfo = request.extraInfo;
+  probeRequest.saveHistory = @(NO);
+
+  NSTimeInterval previousTimeout = manager.api.apiClient.timeoutInterval;
+  manager.api.apiClient.timeoutInterval = TLWIdentifyCloudTimeout;
+  [manager.api chatProfileWithChatRequest:probeRequest completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      manager.api.apiClient.timeoutInterval = previousTimeout;
+      if (error || !output || output.code.integerValue != 200 || !output.data.profile) {
+        NSLog(@"[云端][profile] 探针失败 error=%@ code=%@ message=%@",
+              error.localizedDescription ?: @"<nil>",
+              output.code ?: @"<nil>",
+              output.message ?: @"<nil>");
+        return;
+      }
+
+      NSLog(@"[云端][profile] requestId=%@ requestBytes=%@ imageType=%@ imageLength=%@ singleModel=%@ totalMs=%@ visionMs=%@ agentMs=%@ saveHistoryMs=%@",
+            output.data.profile.requestId ?: @"<nil>",
+            output.data.profile.requestBytes ?: @"<nil>",
+            output.data.profile.imageUrlType ?: @"<nil>",
+            output.data.profile.imageUrlLength ?: @"<nil>",
+            output.data.profile.singleModel ?: @"<nil>",
+            output.data.profile.totalMs ?: @"<nil>",
+            output.data.profile.visionMs ?: @"<nil>",
+            output.data.profile.agentMs ?: @"<nil>",
+            output.data.profile.saveHistoryMs ?: @"<nil>");
+    });
+  }];
 }
 
 - (NSArray<NSDictionary *> *)tl_parseIdentifyResultsFromJSONString:(NSString *)jsonString {
@@ -656,18 +780,6 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
       @"confidence": confidence,
       @"reason": reason ?: @"",
       @"advice": advice
-    }];
-  }
-
-  while (normalized.count < TLWIdentifyDisplayResultCount) {
-    NSInteger idx = normalized.count;
-    [normalized addObject:@{
-      @"title": [self tl_identifyTitleForIndex:idx],
-      @"name": @"待确认",
-      @"names": @[@"待确认"],
-      @"confidence": @"--",
-      @"reason": @"当前图片证据不足。",
-      @"advice": @"建议补拍叶片近景、病斑局部、叶背或虫体细节后再次识别。"
     }];
   }
 
