@@ -55,7 +55,7 @@
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    self.gradientLayer.frame = self.contentView.bounds;
+    self.gradientLayer.frame = self.view.bounds;
 }
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -86,6 +86,7 @@
 #pragma mark - UI Setup
 
 - (void)tl_setupGradientBackground {
+    self.view.backgroundColor = [UIColor colorWithRed:0.0 green:0.59 blue:0.68 alpha:1.0];
     self.gradientLayer = [CAGradientLayer layer];
     self.gradientLayer.colors = @[
         (__bridge id)[UIColor colorWithRed:0.0 green:0.59 blue:0.68 alpha:1.0].CGColor,  // #0097AE
@@ -94,8 +95,8 @@
     ];
     self.gradientLayer.startPoint = CGPointMake(0, 0);
     self.gradientLayer.endPoint = CGPointMake(1, 1);
-    self.gradientLayer.frame = self.contentView.bounds;
-    [self.contentView.layer insertSublayer:self.gradientLayer atIndex:0];
+    self.gradientLayer.frame = self.view.bounds;
+    [self.view.layer insertSublayer:self.gradientLayer atIndex:0];
 }
 
 - (void)tl_setupAIIcon {

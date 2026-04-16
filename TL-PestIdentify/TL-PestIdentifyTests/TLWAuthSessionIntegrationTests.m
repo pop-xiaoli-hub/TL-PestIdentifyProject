@@ -406,6 +406,55 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     XCTAssertNil([[NSUserDefaults standardUserDefaults] stringForKey:kGeneratedPasswordKey]);
 }
 
+- (void)testForbiddenAfterSuccessfulRefreshDoesNotTriggerSecondRefresh {
+    TLWFakeAuthResponse *initialAuth = [self tl_authResponseWithToken:@"initial_access"
+                                                         refreshToken:@"initial_refresh"
+                                                               userId:5152
+                                                             username:@"refresh_user"
+                                                    generatedPassword:nil];
+    XCTAssertTrue([self.manager saveAuthResponse:initialAuth]);
+    XCTAssertTrue([self.manager shouldAttemptTokenRefreshForCode:@403]);
+
+    TLWMockApiService *mockApi = [[TLWMockApiService alloc] init];
+    [self.manager setValue:mockApi forKey:@"api"];
+
+    XCTestExpectation *refreshStarted = [self expectationWithDescription:@"refresh started"];
+    XCTestExpectation *callbackHandled = [self expectationWithDescription:@"refresh callback handled"];
+
+    __block TLWRefreshCompletion refreshCompletion = nil;
+
+    mockApi.onRefreshCalled = ^(TLWRefreshCompletion completion) {
+        refreshCompletion = [completion copy];
+        [refreshStarted fulfill];
+    };
+
+    [self.manager handleUnauthorizedWithRetry:nil];
+
+    [self waitForExpectations:@[refreshStarted] timeout:2.0];
+    XCTAssertNotNil(refreshCompletion);
+
+    TLWFakeAuthResponse *refreshedAuth = [self tl_authResponseWithToken:@"refreshed_access"
+                                                           refreshToken:@"refreshed_refresh"
+                                                                 userId:5152
+                                                               username:@"refresh_user"
+                                                      generatedPassword:nil];
+    TLWFakeResultAuthResponse *result = [[TLWFakeResultAuthResponse alloc] init];
+    result.code = @200;
+    result.data = refreshedAuth;
+
+    refreshCompletion(result, nil);
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [callbackHandled fulfill];
+    });
+    [self waitForExpectations:@[callbackHandled] timeout:2.0];
+
+    XCTAssertEqual(mockApi.refreshCallCount, 1);
+    XCTAssertFalse([self.manager shouldAttemptTokenRefreshForCode:@403]);
+    XCTAssertTrue([self.manager shouldAttemptTokenRefreshForCode:@401]);
+    XCTAssertEqualObjects([self.manager refreshToken], @"refreshed_refresh");
+}
+
 - (void)testRefreshRejectsIncompleteAuthPayloadAndLogsOut {
     TLWFakeAuthResponse *initialAuth = [self tl_authResponseWithToken:@"initial_access"
                                                          refreshToken:@"initial_refresh"

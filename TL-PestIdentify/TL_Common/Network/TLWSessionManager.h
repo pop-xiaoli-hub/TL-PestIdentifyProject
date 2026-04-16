@@ -60,6 +60,8 @@ extern NSString * const TLWProfileDidUpdateNotification;
 - (nullable NSString *)refreshToken;
 
 /// 判断响应码是否应视为鉴权失效并触发 token 续期。
+/// 当前策略：401 始终触发 refresh；403 只在当前 access token 尚未完成过一次 refresh 时触发，
+/// 避免 refresh 成功后同一请求再次返回 403 时陷入循环重试。
 - (BOOL)shouldAttemptTokenRefreshForCode:(nullable NSNumber *)code;
 
 /// 统一处理鉴权失败：识别 401/403、展示节流提示，并在 refresh 成功后执行 retryBlock。
