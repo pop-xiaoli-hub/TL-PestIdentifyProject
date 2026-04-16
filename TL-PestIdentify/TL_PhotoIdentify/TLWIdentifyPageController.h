@@ -9,7 +9,15 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef NS_ENUM(NSUInteger, TLWIdentifyPageMode) {
+    TLWIdentifyPageModeIdentify = 0,
+    TLWIdentifyPageModePickerOnly = 1,
+};
+
 @interface TLWIdentifyPageController : UIViewController
+
+@property (nonatomic, assign) TLWIdentifyPageMode mode;
+@property (nonatomic, copy, nullable) void (^onImagePicked)(UIImage *image);
 
 - (void)prepareForRetakeCapture;
 

@@ -26,7 +26,6 @@ static CGFloat const TLWIdentifyCloudJPEGQuality = 0.78f;
 static CGFloat const TLWIdentifyCloudMaxEdge = 1280.0f;
 static CGFloat const TLWIdentifyMinLocalFallbackConfidence = 0.60f;
 static NSInteger const TLWIdentifyDisplayResultCount = 3;
-static NSTimeInterval const TLWIdentifyCloudTimeout = 240.0f;
 static BOOL const TLWIdentifyEnableProfileProbe = YES;
 
 @interface TLWIdentifyPageController ()<AVCapturePhotoCaptureDelegate>
@@ -44,6 +43,14 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
 @end
 
 @implementation TLWIdentifyPageController
+
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _mode = TLWIdentifyPageModeIdentify;
+  }
+  return self;
+}
 
 - (void)viewDidLoad {
   [super viewDidLoad];
@@ -63,6 +70,9 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
   [self.myView.photosButton addTarget:self action:@selector(tl_openPhotoAlbum) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.recordButton addTarget:self action:@selector(tl_openRecord) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.captureButton addTarget:self action:@selector(tl_capturePhoto) forControlEvents:UIControlEventTouchUpInside];
+  if (self.mode == TLWIdentifyPageModePickerOnly) {
+    self.myView.recordButton.hidden = YES;
+  }
   [[TLWLocationManager shared] requestLocationPermission];
 }
 
@@ -74,8 +84,10 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
 
 - (void)viewWillDisappear:(BOOL)animated {
   [super viewWillDisappear:animated];
-  if (self.isMovingFromParentViewController && self.session.isRunning) {
-    [self.session stopRunning];
+  if (self.session.isRunning) {
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+      [self.session stopRunning];
+    });
   }
 }
 
@@ -101,11 +113,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf || !image) return;
     UIImage *preparedImage = [strongSelf tl_preparedAlbumImageForIdentify:image];
-    strongSelf.capturedImage = preparedImage;
-    strongSelf.capturedImageView.image = preparedImage;
-    strongSelf.capturedImageView.hidden = NO;
-    strongSelf.previewLayer.hidden = YES;
-    [strongSelf tl_identifyFromAI];
+    [strongSelf tl_handlePickedImage:preparedImage];
   };
   pickerVC.hidesBottomBarWhenPushed = YES;
   [self.navigationController pushViewController:pickerVC animated:YES];
@@ -148,10 +156,13 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
 }
 
 - (void)tl_dismissCurrentView:(UIButton* )button {
-  [self.navigationController popToRootViewControllerAnimated:YES];
+  [self.navigationController popViewControllerAnimated:YES];
 }
 
 - (void)tl_openRecord {
+  if (self.mode == TLWIdentifyPageModePickerOnly) {
+    return;
+  }
   TLWRecordController *vc = [[TLWRecordController alloc] init];
   vc.hidesBottomBarWhenPushed = YES;
   [self.navigationController pushViewController:vc animated:YES];
@@ -261,12 +272,28 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
   }
   UIImage *processedImage = [self tl_croppedCameraImageToPreview:image];
   dispatch_async(dispatch_get_main_queue(), ^{
-    self.capturedImage = processedImage;
-    self.capturedImageView.image = processedImage;
-    self.capturedImageView.hidden = NO;
-    self.previewLayer.hidden = YES;
-    [self tl_identifyFromAI];
+    [self tl_handlePickedImage:processedImage];
   });
+}
+
+- (void)tl_handlePickedImage:(UIImage *)image {
+  if (![image isKindOfClass:[UIImage class]]) {
+    return;
+  }
+  self.capturedImage = image;
+  self.capturedImageView.image = image;
+  self.capturedImageView.hidden = NO;
+  self.previewLayer.hidden = YES;
+
+  if (self.mode == TLWIdentifyPageModePickerOnly) {
+    if (self.onImagePicked) {
+      self.onImagePicked(image);
+    }
+    [self.navigationController popViewControllerAnimated:YES];
+    return;
+  }
+
+  [self tl_identifyFromAI];
 }
 
 - (void)tl_identifyFromAI {
@@ -327,13 +354,10 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
   }
 
   TLWSDKManager *manager = [TLWSDKManager shared];
-  NSTimeInterval previousTimeout = manager.api.apiClient.timeoutInterval;
-  manager.api.apiClient.timeoutInterval = TLWIdentifyCloudTimeout;
 
   [self tl_uploadIdentifyImageData:imageData completion:^(NSString *imageURL, NSError *uploadError) {
     dispatch_async(dispatch_get_main_queue(), ^{
       if (uploadError || imageURL.length == 0) {
-        manager.api.apiClient.timeoutInterval = previousTimeout;
         NSLog(@"[云端] 图片上传失败 error=%@", uploadError.localizedDescription ?: @"<nil>");
         waitingForLocalFallback = YES;
         presentLocalFallbackIfNeeded();
@@ -350,8 +374,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
       NSLog(@"AI识别：开始识别，uploadURL=%@ token=%@",
             imageURL,
             currentToken.length > 0 ? @"有" : @"无（未登录？）");
-      NSLog(@"[云端] SDK timeoutInterval=%.0fs, saveHistory=%@, useSingleModel=%@, profileProbe=%@",
-            manager.api.apiClient.timeoutInterval,
+      NSLog(@"[云端] saveHistory=%@, useSingleModel=%@, profileProbe=%@",
             request.saveHistory.boolValue ? @"YES" : @"NO",
             request.useSingleModel.boolValue ? @"YES" : @"NO",
             TLWIdentifyEnableProfileProbe ? @"YES" : @"NO");
@@ -361,7 +384,6 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
         [manager.api chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *chatOutput, NSError *chatError) {
       dispatch_async(dispatch_get_main_queue(), ^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
-        manager.api.apiClient.timeoutInterval = previousTimeout;
         if (!strongSelf) {
           return;
         }
@@ -370,7 +392,6 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
             && [manager.sessionManager handleAuthFailureForCode:chatOutput.code
                                                        message:chatOutput.message
                                                     retryBlock:^{
-          manager.api.apiClient.timeoutInterval = TLWIdentifyCloudTimeout;
           performCloudIdentify(YES);
         }]) {
           return;
@@ -679,11 +700,8 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
   probeRequest.extraInfo = request.extraInfo;
   probeRequest.saveHistory = @(NO);
 
-  NSTimeInterval previousTimeout = manager.api.apiClient.timeoutInterval;
-  manager.api.apiClient.timeoutInterval = TLWIdentifyCloudTimeout;
   [manager.api chatProfileWithChatRequest:probeRequest completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
     dispatch_async(dispatch_get_main_queue(), ^{
-      manager.api.apiClient.timeoutInterval = previousTimeout;
       if (error || !output || output.code.integerValue != 200 || !output.data.profile) {
         NSLog(@"[云端][profile] 探针失败 error=%@ code=%@ message=%@",
               error.localizedDescription ?: @"<nil>",
