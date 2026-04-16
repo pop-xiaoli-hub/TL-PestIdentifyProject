@@ -430,8 +430,11 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
     vc.image = strongSelf.capturedImage;
     vc.identifyResults = parsedResults;
     vc.hidesBottomBarWhenPushed = YES;
-    [strongSelf.navigationController pushViewController:vc animated:YES];
-  }];
+        [strongSelf.navigationController pushViewController:vc animated:YES];
+      });
+    }];
+  };
+  performCloudIdentify(NO);
 }
 
 #pragma mark - 本地识别兜底
