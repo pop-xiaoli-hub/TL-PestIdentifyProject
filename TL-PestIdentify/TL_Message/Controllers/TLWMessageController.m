@@ -369,34 +369,57 @@ static NSInteger const kMessagePageSize = 20;
 
     // 等所有请求完成后一次性刷新，避免多次 reloadData 导致闪烁
     dispatch_group_t group = dispatch_group_create();
-    TLWSDKManager *manager = [TLWSDKManager shared];
     for (NSNumber *postId in postIdToItems) {
         dispatch_group_enter(group);
-        [manager.api getPostDetailWithId:postId completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if ([manager.sessionManager handleAuthFailureForCode:output.code
-                                                             message:output.message
-                                                          retryBlock:nil]) {
-                    dispatch_group_leave(group);
-                    return;
-                }
-
-                if (!error && output.code.integerValue == 200) {
-                    NSString *imageUrl = output.data.images.firstObject;
-                    if (imageUrl.length > 0) {
-                        for (TLWMessageItem *item in postIdToItems[postId]) {
-                            item.postImageUrl = imageUrl;
-                        }
-                    }
-                }
-                dispatch_group_leave(group);
-            });
-        }];
+        [self tl_fillMissingPostImageForPostId:postId
+                                         items:postIdToItems[postId]
+                                         group:group
+                                  didRetryAuth:NO];
     }
 
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
         [self.myView.tableView reloadData];
     });
+}
+
+- (void)tl_fillMissingPostImageForPostId:(NSNumber *)postId
+                                   items:(NSArray<TLWMessageItem *> *)items
+                                   group:(dispatch_group_t)group
+                            didRetryAuth:(BOOL)didRetryAuth {
+    TLWSDKManager *manager = [TLWSDKManager shared];
+    [manager.api getPostDetailWithId:postId completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!didRetryAuth
+                && [manager.sessionManager handleAuthFailureForCode:output.code
+                                                             message:output.message
+                                                          retryBlock:^{
+                dispatch_group_enter(group);
+                [self tl_fillMissingPostImageForPostId:postId
+                                                 items:items
+                                                 group:group
+                                          didRetryAuth:YES];
+            }]) {
+                dispatch_group_leave(group);
+                return;
+            }
+
+            if (didRetryAuth && [manager.sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                [manager.sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
+                dispatch_group_leave(group);
+                return;
+            }
+
+            if (!error && output.code.integerValue == 200) {
+                NSString *imageUrl = output.data.images.firstObject;
+                if (imageUrl.length > 0) {
+                    for (TLWMessageItem *item in items) {
+                        item.postImageUrl = imageUrl;
+                    }
+                }
+            }
+            dispatch_group_leave(group);
+        });
+    }];
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
