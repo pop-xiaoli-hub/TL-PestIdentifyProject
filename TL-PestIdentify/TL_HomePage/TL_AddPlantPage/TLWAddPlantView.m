@@ -7,6 +7,7 @@
 
 #import "TLWAddPlantView.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImage.h>
 
 @interface TLWAddPlantView ()
 
@@ -24,6 +25,7 @@
 @property (nonatomic, strong) CAGradientLayer *createGradientLayer;
 @property (nonatomic, strong) CAGradientLayer *confirmGradientLayer;
 @property (nonatomic, strong) UIImageView *selectedPlantImageView;
+@property (nonatomic, strong) UIImageView *userAvatarImageView;
 @property (nonatomic, strong) UIView *plusHorizontalLine;
 @property (nonatomic, strong) UIView *plusVerticalLine;
 
@@ -209,6 +211,7 @@
   avatarImageView.clipsToBounds = YES;
   avatarImageView.layer.cornerRadius = 22.0;
   [plantCardView addSubview:avatarImageView];
+  self.userAvatarImageView = avatarImageView;
 
   UILabel *titleLabel = [[UILabel alloc] init];
   titleLabel.text = @"我的种植物";
@@ -399,6 +402,15 @@
   self.plusHorizontalLine.hidden = hasImage;
   self.plusVerticalLine.hidden = hasImage;
   self.contentCardButton.backgroundColor = hasImage ? [UIColor clearColor] : [UIColor colorWithWhite:0.88 alpha:1.0];
+}
+
+- (void)updateUserAvatarWithURLString:(nullable NSString *)avatarURLString {
+  UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar.png"];
+  if (avatarURLString.length > 0) {
+    [self.userAvatarImageView sd_setImageWithURL:[NSURL URLWithString:avatarURLString] placeholderImage:placeholderImage];
+  } else {
+    self.userAvatarImageView.image = placeholderImage;
+  }
 }
 
 @end

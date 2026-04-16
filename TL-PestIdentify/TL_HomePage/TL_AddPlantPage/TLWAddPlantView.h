@@ -18,6 +18,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIButton *confirmButton;
 
 - (void)updateSelectedPlantImage:(nullable UIImage *)image;
+- (void)updateUserAvatarWithURLString:(nullable NSString *)avatarURLString;
 
 @end
 
