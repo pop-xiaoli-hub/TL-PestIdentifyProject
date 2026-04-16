@@ -56,22 +56,76 @@
 
 - (void)configureWithItem:(TLWRecordItem *)item {
     _nameLabel.text = item.topPestName;
+  NSLog(@"pestName:%@", item.topPestName);
 
-    if (item.imageURL.length > 0) {
-        // 图片加载成功后移除占位色，避免颜色闪烁
-        [_photoView sd_setImageWithURL:[NSURL URLWithString:item.imageURL]
-                      placeholderImage:nil
-                             completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, NSURL *url) {
-            if (image) {
-                self->_photoView.backgroundColor = [UIColor clearColor];
-            }
-        }];
-    } else {
-        // 无 URL 时清除上一次 cell 复用残留的图片
-        [_photoView sd_cancelCurrentImageLoad];
-        _photoView.image = nil;
-        _photoView.backgroundColor = [UIColor colorWithRed:0.85 green:0.90 blue:0.85 alpha:1];
+
+    NSString *imageURL = item.imageURL ?: @"";
+    if (imageURL.length == 0) {
+        [self tl_resetImagePlaceholder];
+        return;
     }
+
+    if ([imageURL hasPrefix:@"data:image"]) {
+        [self tl_configureImageWithDataURL:imageURL];
+        return;
+    }
+
+    NSURL *url = [NSURL URLWithString:imageURL];
+    if (!url) {
+        [self tl_resetImagePlaceholder];
+        return;
+    }
+
+    [_photoView sd_setImageWithURL:url
+                  placeholderImage:nil
+                         completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, NSURL *loadedURL) {
+        if (image) {
+            self->_photoView.backgroundColor = [UIColor clearColor];
+        } else {
+            [self tl_resetImagePlaceholder];
+        }
+    }];
+}
+
+- (void)tl_configureImageWithDataURL:(NSString *)dataURL {
+    [_photoView sd_cancelCurrentImageLoad];
+
+    NSRange commaRange = [dataURL rangeOfString:@","];
+    if (commaRange.location == NSNotFound || commaRange.location >= dataURL.length - 1) {
+      NSLog(@"[RecordCell] dataURL 格式异常，无法找到 base64 分隔符，length=%lu", (unsigned long)dataURL.length);
+        [self tl_resetImagePlaceholder];
+        return;
+    }
+
+    NSString *base64String = [dataURL substringFromIndex:commaRange.location + 1];
+    NSString *prefix = [base64String substringToIndex:MIN((NSUInteger)60, base64String.length)];
+    NSString *suffix = base64String.length > 60
+        ? [base64String substringFromIndex:base64String.length - 60]
+        : base64String;
+    NSLog(@"[RecordCell] dataURL.length=%lu, base64.length=%lu",
+          (unsigned long)dataURL.length,
+          (unsigned long)base64String.length);
+    NSLog(@"[RecordCell] base64.prefix=%@", prefix);
+    NSLog(@"[RecordCell] base64.suffix=%@", suffix);
+
+    NSData *imageData = [[NSData alloc] initWithBase64EncodedString:base64String
+                                                            options:NSDataBase64DecodingIgnoreUnknownCharacters];
+    NSLog(@"[RecordCell] imageData.length=%lu", (unsigned long)imageData.length);
+    UIImage *image = imageData.length > 0 ? [UIImage imageWithData:imageData] : nil;
+    if (!image) {
+        [self tl_resetImagePlaceholder];
+      NSLog(@"[RecordCell] UIImage 解码失败");
+        return;
+    }
+    NSLog(@"[RecordCell] UIImage 解码成功 size=%@", NSStringFromCGSize(image.size));
+    _photoView.image = image;
+    _photoView.backgroundColor = [UIColor clearColor];
+}
+
+- (void)tl_resetImagePlaceholder {
+    [_photoView sd_cancelCurrentImageLoad];
+    _photoView.image = nil;
+    _photoView.backgroundColor = [UIColor colorWithRed:0.85 green:0.90 blue:0.85 alpha:1];
 }
 
 - (void)layoutSubviews {

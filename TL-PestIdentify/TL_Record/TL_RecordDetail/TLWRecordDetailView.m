@@ -175,9 +175,9 @@ static CGFloat const kCardGap   = 13;
     [container addSubview:_diseaseTagView];
     [_diseaseTagView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(pestSectionLabel.mas_bottom).offset(16);
-        make.left.equalTo(container).offset(30);
-        make.width.mas_equalTo(104);
-        make.height.mas_equalTo(70);
+        make.left.equalTo(container).offset(15);
+        make.width.greaterThanOrEqualTo(@104);
+        make.height.mas_equalTo(60);
     }];
 
     // 渐变层（frame 在 layoutSubviews 更新）
@@ -191,13 +191,24 @@ static CGFloat const kCardGap   = 13;
     _diseaseTagGradient.cornerRadius = 10;
     [_diseaseTagView.layer insertSublayer:_diseaseTagGradient atIndex:0];
 
-    _pestNameLabel = [[UILabel alloc] init];
+  _pestNameLabel = [[UILabel alloc] init];
+  _pestNameLabel.backgroundColor = [UIColor systemBlueColor];
     _pestNameLabel.textColor = [UIColor whiteColor];
+  _pestNameLabel.layer.masksToBounds = YES;
+  _pestNameLabel.layer.cornerRadius = 10;
     _pestNameLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
     _pestNameLabel.textAlignment = NSTextAlignmentCenter;
+    _pestNameLabel.numberOfLines = 1;
+    [_pestNameLabel setContentCompressionResistancePriority:UILayoutPriorityRequired
+                                                    forAxis:UILayoutConstraintAxisHorizontal];
+    [_pestNameLabel setContentHuggingPriority:UILayoutPriorityRequired
+                                      forAxis:UILayoutConstraintAxisHorizontal];
     [_diseaseTagView addSubview:_pestNameLabel];
     [_pestNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.center.equalTo(_diseaseTagView);
+        make.centerY.equalTo(_diseaseTagView);
+        make.left.equalTo(_diseaseTagView).offset(16);
+        make.right.equalTo(_diseaseTagView).offset(-16);
+      make.height.equalTo(_diseaseTagView);
     }];
 
     // 置信度角标（橙色，浮在标签右上角）

@@ -16,6 +16,7 @@
 #import "TLWToast.h"
 #import <AgriPestClient/AGAgentChatHistory.h>
 #import <AgriPestClient/AGResultListAgentChatHistory.h>
+#import <AgriPestClient/AGDefaultConfiguration.h>
 #import <Masonry/Masonry.h>
 
 static NSString *const kCellID   = @"TLWRecordCell";
@@ -64,6 +65,7 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
                                 action:@selector(tl_filter)
                       forControlEvents:UIControlEventTouchUpInside];
 
+    [self tl_debugFetchHistoryWithoutSDK];
     [self tl_fetchRecords];
 }
 
@@ -77,10 +79,77 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 
 #pragma mark - Data
 
+- (void)tl_debugFetchHistoryWithoutSDK {
+    NSString *token = [AGDefaultConfiguration sharedConfig].accessToken ?: @"";
+    if (token.length == 0) {
+        NSLog(@"[RecordDebug] accessToken 为空，无法直连识别历史接口");
+        return;
+    }
+
+    NSURL *url = [NSURL URLWithString:@"http://115.191.67.35:8080/api/v1/agent/history"];
+    if (!url) {
+        NSLog(@"[RecordDebug] 识别历史接口 URL 无效");
+        return;
+    }
+
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    request.HTTPMethod = @"GET";
+    [request setValue:@"*/*" forHTTPHeaderField:@"Accept"];
+    [request setValue:[NSString stringWithFormat:@"Bearer %@", token] forHTTPHeaderField:@"Authorization"];
+
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request
+                                                                 completionHandler:^(NSData * _Nullable data,
+                                                                                     NSURLResponse * _Nullable response,
+                                                                                     NSError * _Nullable error) {
+        if (error) {
+            NSLog(@"[RecordDebug] 直连识别历史失败: %@", error.localizedDescription);
+            return;
+        }
+
+        NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
+        NSLog(@"[RecordDebug] 直连识别历史 status=%ld", (long)httpResponse.statusCode);
+
+        if (data.length == 0) {
+            NSLog(@"[RecordDebug] 直连识别历史返回空数据");
+            return;
+        }
+
+        NSError *jsonError = nil;
+        id jsonObject = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+        if (jsonError || ![jsonObject isKindOfClass:[NSDictionary class]]) {
+            NSString *raw = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+            NSLog(@"[RecordDebug] JSON 解析失败: %@ raw=%@", jsonError.localizedDescription, raw ?: @"<nil>");
+            return;
+        }
+
+        NSDictionary *dictionary = (NSDictionary *)jsonObject;
+        NSArray *historyList = [dictionary[@"data"] isKindOfClass:[NSArray class]] ? dictionary[@"data"] : @[];
+        NSLog(@"[RecordDebug] 直连识别历史条数=%lu", (unsigned long)historyList.count);
+
+        [historyList enumerateObjectsUsingBlock:^(id  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+            if (![obj isKindOfClass:[NSDictionary class]]) {
+                return;
+            }
+            NSDictionary *item = (NSDictionary *)obj;
+            NSString *imageURL = [item[@"imageUrl"] isKindOfClass:[NSString class]] ? item[@"imageUrl"] : @"";
+            NSString *prefix = [imageURL substringToIndex:MIN((NSUInteger)80, imageURL.length)];
+            NSString *suffix = imageURL.length > 80 ? [imageURL substringFromIndex:imageURL.length - 80] : imageURL;
+            NSLog(@"[RecordDebug] item[%lu] imageUrl.length=%lu", (unsigned long)idx, (unsigned long)imageURL.length);
+            NSLog(@"[RecordDebug] item[%lu] imageUrl.prefix=%@", (unsigned long)idx, prefix);
+            NSLog(@"[RecordDebug] item[%lu] imageUrl.suffix=%@", (unsigned long)idx, suffix);
+        }];
+    }];
+    [task resume];
+}
+
 - (void)tl_fetchRecords {
     [self tl_setLoading:YES];
     __weak typeof(self) weakSelf = self;
     [[TLWSDKManager shared].api getHistoryWithCompletionHandler:^(AGResultListAgentChatHistory *output, NSError *error) {
+      NSArray* array = output.data;
+      for (AGAgentChatHistory* model in array) {
+        NSLog(@"识别机录：%@", model.agentResponse);
+      }
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
@@ -119,9 +188,9 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 /// 将 AGAgentChatHistory 数组转换为按日期分组的 TLWRecordSection 数组
 - (NSArray<TLWRecordSection *> *)tl_buildSectionsFromHistory:(NSArray<AGAgentChatHistory> *)historyList {
     NSDateFormatter *dateFmt = [[NSDateFormatter alloc] init];
-    dateFmt.dateFormat = @"yyyy-MM-dd";
+    dateFmt.dateFormat = @"yyyy-MM-dd";//分组时间
     NSDateFormatter *timeFmt = [[NSDateFormatter alloc] init];
-    timeFmt.dateFormat = @"yyyy-MM-dd HH:mm";
+    timeFmt.dateFormat = @"yyyy-MM-dd HH:mm";//展示时间
 
     // 按日期分组
     NSMutableDictionary<NSString *, NSMutableArray<TLWRecordItem *> *> *grouped = [NSMutableDictionary dictionary];
@@ -131,6 +200,7 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
         TLWRecordItem *item = [TLWRecordItem new];
         item.recordId = [NSString stringWithFormat:@"%@", history._id ?: @(0)];
         item.imageURL = history.imageUrl ?: @"";
+      NSLog(@"识别记录的图像URL：%@", item.imageURL);
 
         if (history.createTime) {
             item.recordTime = [timeFmt stringFromDate:history.createTime];
@@ -138,13 +208,8 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
             item.recordTime = @"";
         }
 
-        // 从 agentResponse 中提取病害名和解决方案
-        TLWRecordResult *result = [TLWRecordResult new];
-        result.pestName = [self tl_extractPestNameFromResponse:history.agentResponse
-                                                    userQuery:history.userQuery];
-        result.confidence = 0;
-        result.solution = history.agentResponse ?: @"";
-        item.results = @[result];
+        item.results = [TLWRecordResult resultsFromAgentResponse:history.agentResponse
+                                                   fallbackQuery:history.userQuery];
 
         NSString *dateKey = history.createTime ? [dateFmt stringFromDate:history.createTime] : @"未知日期";
         if (!grouped[dateKey]) {
@@ -184,20 +249,6 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
     return [filtered copy];
 }
 
-/// 从 agentResponse 中提取病害名称，优先取第一行或冒号前的关键词
-- (NSString *)tl_extractPestNameFromResponse:(NSString *)response userQuery:(NSString *)userQuery {
-    if (!response.length) {
-        return userQuery.length ? userQuery : @"未知病害";
-    }
-    // 尝试从第一行提取（通常 Agent 回复开头会包含病害名）
-    NSString *firstLine = [[response componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]] firstObject];
-    // 如果第一行太长（超过20字），可能不是病害名，截取前20字
-    if (firstLine.length > 20) {
-        firstLine = [firstLine substringToIndex:20];
-    }
-    return firstLine.length ? firstLine : @"识别结果";
-}
-
 /// 统一刷新入口，同时控制空态 UI 的显隐
 - (void)tl_reloadData {
     BOOL isEmpty = self.sections.count == 0;
@@ -219,12 +270,13 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 }
 
 #pragma mark - Filter Panel
-
+//设置默认筛选年月
 - (void)tl_prepareDefaultFilterIfNeededWithHistory:(NSArray<AGAgentChatHistory> *)historyList {
     if (self.selectedFilterYear > 0 && self.selectedFilterMonth > 0) {
         return;
     }
 
+  //设置一个参考日期，由于接口返回的是倒序，所以是最新识别记录
     NSDate *referenceDate = nil;
     for (AGAgentChatHistory *history in historyList) {
         if (history.createTime) {
@@ -232,6 +284,7 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
             break;
         }
     }
+  //都没有创建时间就默认当前时间筛选
     if (!referenceDate) {
         referenceDate = [NSDate date];
     }
@@ -476,6 +529,7 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
     TLWRecordCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:kCellID forIndexPath:indexPath];
     TLWRecordItem *item = self.sections[indexPath.section].items[indexPath.row];
+  NSLog(@"2pestName:%@",item.topPestName);
     [cell configureWithItem:item];
     return cell;
 }

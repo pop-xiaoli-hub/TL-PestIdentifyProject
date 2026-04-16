@@ -25,6 +25,7 @@
         TLWRecordResult *result = [[TLWRecordResult alloc] init];
         result.title = [self tl_titleFromValue:item[@"title"] index:idx];
         result.pestName = [self tl_nameFromDictionary:item fallback:userQuery];
+      NSLog(@"pestName:%@", result.pestName);
         result.reason = [self tl_stringFromValue:item[@"reason"]];
         result.solution = [self tl_solutionFromDictionary:item fallbackReason:result.reason];
         result.hasConfidence = [self tl_fillConfidenceForResult:result fromValue:item[@"confidence"]];
