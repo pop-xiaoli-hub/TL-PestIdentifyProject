@@ -343,7 +343,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
       AGChatRequest *request = [[AGChatRequest alloc] init];
       request.text = [self tl_identifyPrompt];
       request.imageUrl = imageURL;
-      request.useSingleModel = @(NO);
+      request.useSingleModel = @(YES);
       request.saveHistory = @(YES);
 
       NSString *currentToken = [AGDefaultConfiguration sharedConfig].accessToken;
@@ -713,8 +713,17 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
 - (void)tl_requestDiagnosisResultsWithImageData:(NSData *)imageData
                                      completion:(void (^)(NSArray<NSDictionary *> *results))completion {
   TLWLocationManager *locationManager = [TLWLocationManager shared];
-  void (^sendDiagnosisRequest)(NSDictionary * _Nullable) = ^(NSDictionary * _Nullable weatherInfo) {
-    AGChatRequest *request = [self tl_diagnosisRequestWithImageData:imageData
+  UIImage *imageForUpload = [UIImage imageWithData:imageData];
+  if (!imageForUpload) {
+    NSLog(@"[云端] 诊断图片解析失败，跳过上传");
+    if (completion) {
+      completion(@[]);
+    }
+    return;
+  }
+
+  void (^sendDiagnosisRequestWithURL)(NSString *, NSDictionary * _Nullable) = ^(NSString *imageURL, NSDictionary * _Nullable weatherInfo) {
+    AGChatRequest *request = [self tl_diagnosisRequestWithImageURL:imageURL
                                                       locationInfo:locationManager
                                                         weatherInfo:weatherInfo];
     [[TLWSDKManager shared] chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *output, NSError *error) {
@@ -758,29 +767,42 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
     }];
   };
 
-  if (locationManager.hasLocation) {
-    [[TLWSDKManager shared] getCurrentWeatherWithLatitude:locationManager.latitude
-                                                longitude:locationManager.longitude
-                                               completion:^(NSDictionary * _Nullable weatherInfo, NSError * _Nullable error) {
-      if (error) {
-        NSLog(@"[云端] 天气信息获取失败，继续发起诊断: %@", error.localizedDescription);
+  // 先上传图片拿 URL，避免 base64 body 膨胀
+  [[TLWSDKManager shared] uploadImages:@[imageForUpload]
+                                 prefix:@"identify/"
+                             completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable uploadError) {
+    if (uploadError || urls.count == 0) {
+      NSLog(@"[云端] 诊断图片上传失败: %@", uploadError.localizedDescription ?: @"无 URL");
+      if (completion) {
+        completion(@[]);
       }
-      sendDiagnosisRequest(weatherInfo);
-    }];
-    return;
-  }
+      return;
+    }
+    NSString *imageURL = urls.firstObject;
 
-  sendDiagnosisRequest(nil);
+    if (locationManager.hasLocation) {
+      [[TLWSDKManager shared] getCurrentWeatherWithLatitude:locationManager.latitude
+                                                  longitude:locationManager.longitude
+                                                 completion:^(NSDictionary * _Nullable weatherInfo, NSError * _Nullable error) {
+        if (error) {
+          NSLog(@"[云端] 天气信息获取失败，继续发起诊断: %@", error.localizedDescription);
+        }
+        sendDiagnosisRequestWithURL(imageURL, weatherInfo);
+      }];
+      return;
+    }
+
+    sendDiagnosisRequestWithURL(imageURL, nil);
+  }];
 }
 
-- (AGChatRequest *)tl_diagnosisRequestWithImageData:(NSData *)imageData
-                                      locationInfo:(TLWLocationManager *)locationManager
-                                        weatherInfo:(NSDictionary * _Nullable)weatherInfo {
+- (AGChatRequest *)tl_diagnosisRequestWithImageURL:(NSString *)imageURL
+                                     locationInfo:(TLWLocationManager *)locationManager
+                                       weatherInfo:(NSDictionary * _Nullable)weatherInfo {
   AGChatRequest *request = [[AGChatRequest alloc] init];
   request.text = [self tl_diagnosisPrompt];
-  request.imageUrl = [NSString stringWithFormat:@"data:image/jpeg;base64,%@",
-                      [imageData base64EncodedStringWithOptions:0]];
-  request.useSingleModel = @(NO);
+  request.imageUrl = imageURL;
+  request.useSingleModel = @(YES);
   request.extraInfo = [self tl_diagnosisExtraInfoWithLocationInfo:locationManager weatherInfo:weatherInfo];
   return request;
 }
