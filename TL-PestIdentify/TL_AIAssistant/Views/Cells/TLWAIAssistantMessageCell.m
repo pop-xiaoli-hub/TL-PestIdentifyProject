@@ -52,6 +52,7 @@ static CGFloat const kBubbleSidePad = 5.0;
     [super prepareForReuse];
     [self.imageScrollView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
     self.imageScrollView.contentSize = CGSizeZero;
+    self.messageLabel.attributedText = nil;
     self.statusLabel.text = @"";
     self.statusLabel.hidden = YES;
     self.bubbleView.layer.borderWidth = 0;
@@ -74,10 +75,12 @@ static CGFloat const kBubbleSidePad = 5.0;
         self.bubbleView.layer.borderWidth = 2.0;
         self.bubbleView.layer.borderColor = [UIColor colorWithRed:1.0 green:0.710 blue:0.141 alpha:1.0].CGColor;
     }
-    self.messageLabel.textColor = isUser
+    UIColor *textColor = isUser
         ? [UIColor whiteColor]
         : [UIColor colorWithRed:0.153 green:0.153 blue:0.153 alpha:1.0]; // #272727
-    self.messageLabel.text = message.text;
+    self.messageLabel.textColor = textColor;
+    NSString *preprocessed = [self tl_preprocessMarkdown:message.text];
+    self.messageLabel.attributedText = [self tl_attributedStringFromText:preprocessed textColor:textColor];
 
     [self.statusLeadingConstraint deactivate];
     [self.statusTrailingConstraint deactivate];
@@ -329,6 +332,91 @@ static CGFloat const kBubbleSidePad = 5.0;
         return message.errorMessage.length > 0 ? message.errorMessage : @"发送失败";
     }
     return @"";
+}
+
+/// 把 markdown 块级语法转成可读纯文本，保留内联语法（**bold**）供后续渲染
+- (NSString *)tl_preprocessMarkdown:(NSString *)text {
+    if (text.length == 0) return @"";
+    NSArray<NSString *> *lines = [text componentsSeparatedByString:@"\n"];
+    NSMutableArray<NSString *> *processed = [NSMutableArray arrayWithCapacity:lines.count];
+    for (NSString *line in lines) {
+        NSString *trimmed = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+        // ## 标题 → **标题**（h1/h2 保留粗体语义，h3+ 直接去掉 #）
+        if ([trimmed hasPrefix:@"#"]) {
+            NSUInteger hashCount = 0;
+            while (hashCount < trimmed.length && [trimmed characterAtIndex:hashCount] == '#') hashCount++;
+            NSString *headerText = [[trimmed substringFromIndex:hashCount]
+                                    stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+            [processed addObject:(hashCount <= 2)
+                ? [NSString stringWithFormat:@"**%@**", headerText]
+                : headerText];
+        // - 列表 / * 列表 / + 列表 → • 列表
+        } else if ([trimmed hasPrefix:@"- "] || [trimmed hasPrefix:@"* "] || [trimmed hasPrefix:@"+ "]) {
+            [processed addObject:[NSString stringWithFormat:@"• %@", [trimmed substringFromIndex:2]]];
+        } else {
+            [processed addObject:line];
+        }
+    }
+    NSString *joined = [processed componentsJoinedByString:@"\n"];
+    // 连续 3 个以上空行压缩为 2 个
+    NSRegularExpression *blankLines = [NSRegularExpression regularExpressionWithPattern:@"\n{3,}" options:0 error:nil];
+    return [blankLines stringByReplacingMatchesInString:joined options:0
+                                                  range:NSMakeRange(0, joined.length)
+                                           withTemplate:@"\n\n"];
+}
+
+/// iOS 15+ 用系统 inline markdown 渲染 **粗体**；iOS 12-14 降级纯文本清洗
+- (NSAttributedString *)tl_attributedStringFromText:(NSString *)text textColor:(UIColor *)textColor {
+    UIFont *baseFont = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+    UIFont *boldFont = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
+    NSDictionary *baseAttrs = @{ NSFontAttributeName: baseFont, NSForegroundColorAttributeName: textColor };
+    if (text.length == 0) return [[NSAttributedString alloc] initWithString:@"" attributes:baseAttrs];
+
+    if (@available(iOS 15.0, *)) {
+        NSAttributedStringMarkdownParsingOptions *opts = [[NSAttributedStringMarkdownParsingOptions alloc] init];
+        opts.interpretedSyntax = NSAttributedStringMarkdownInterpretedSyntaxInlineOnlyPreservingWhitespace;
+        NSError *err = nil;
+        NSAttributedString *attrStr = [[NSAttributedString alloc] initWithMarkdownString:text
+                                                                                 options:opts
+                                                                                 baseURL:nil
+                                                                                   error:&err];
+        if (err || !attrStr) {
+            return [[NSAttributedString alloc] initWithString:text attributes:baseAttrs];
+        }
+        NSMutableAttributedString *mutable = [attrStr mutableCopy];
+        [mutable enumerateAttributesInRange:NSMakeRange(0, mutable.length)
+                                    options:0
+                                 usingBlock:^(NSDictionary<NSAttributedStringKey, id> *attrs, NSRange range, BOOL *stop) {
+            UIFont *existing = attrs[NSFontAttributeName];
+            BOOL isBold = NO;
+            if (existing) {
+                UIFontDescriptorSymbolicTraits traits = existing.fontDescriptor.symbolicTraits;
+                isBold = (traits & UIFontDescriptorTraitBold) != 0;
+            }
+            [mutable addAttribute:NSFontAttributeName value:(isBold ? boldFont : baseFont) range:range];
+            [mutable addAttribute:NSForegroundColorAttributeName value:textColor range:range];
+        }];
+        return mutable.copy;
+    }
+
+    // iOS 12-14 降级：去掉剩余内联 markdown 符号
+    return [[NSAttributedString alloc] initWithString:[self tl_stripInlineMarkdown:text] attributes:baseAttrs];
+}
+
+/// 去掉 **bold**、*italic*、`code` 的符号，保留文字内容
+- (NSString *)tl_stripInlineMarkdown:(NSString *)text {
+    NSMutableString *result = [text mutableCopy];
+    for (NSArray *pair in @[
+        @[@"\\*\\*(.+?)\\*\\*", @"$1"],  // **bold**
+        @[@"\\*(.+?)\\*",       @"$1"],  // *italic*
+        @[@"`(.+?)`",           @"$1"],  // `code`
+    ]) {
+        NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:pair[0]
+                                                                            options:NSRegularExpressionDotMatchesLineSeparators
+                                                                              error:nil];
+        [re replaceMatchesInString:result options:0 range:NSMakeRange(0, result.length) withTemplate:pair[1]];
+    }
+    return result.copy;
 }
 
 @end
