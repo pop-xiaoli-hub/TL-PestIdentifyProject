@@ -357,58 +357,79 @@
     [self.pendingImages removeAllObjects];
     [self.myView hideSelectedImage];
 
-    // 3. 构建 SDK 请求
-    AGChatRequest *request = [[AGChatRequest alloc] init];
-    request.text = text;
-    request.saveHistory = @(NO);
-    request.useSingleModel = @(YES);
-
-    // 如果有图片，取第一张转 Base64 传给后端（SDK 只支持单张 imageUrl）
-    if (imagesToSend.count > 0) {
-        NSData *imageData = UIImageJPEGRepresentation(imagesToSend.firstObject, 0.8);
-        if (imageData) {
-            request.imageUrl = [imageData base64EncodedStringWithOptions:0];
-        }
-    }
-
-    // 4. 发起请求
+    // 3. 构建 SDK 请求（图片先上传拿 URL，避免大 body 走 base64）
     __weak typeof(self) weakSelf = self;
-    [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
+    void (^sendChatWithImageURL)(NSString *) = ^(NSString *imageURL) {
+        AGChatRequest *request = [[AGChatRequest alloc] init];
+        request.text = text;
+        request.saveHistory = @(NO);
+        request.useSingleModel = @(YES);
+        if (imageURL.length > 0) {
+            request.imageUrl = imageURL;
+        }
+
+        [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (!strongSelf) return;
+
+                // 用户已手动停止，忽略回调
+                if (strongSelf.currentAIMessage != aiMessage) return;
+
+                if (error) {
+                    strongSelf.currentAIMessage = nil;
+                    [strongSelf.myView exitAILoadingMode];
+                    aiMessage.status = TLWAIAssistantMessageStatusFailed;
+                    aiMessage.text = @"网络请求失败，请稍后重试";
+                    aiMessage.errorMessage = error.localizedDescription;
+                    [strongSelf.myView displayMessages:strongSelf.session.messages];
+                    [TLWToast show:@"请求失败，请检查网络"];
+                    return;
+                }
+
+                // 鉴权失效（401/403），自动续期后重试
+                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
+                        [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *retryOutput, NSError *retryError) {
+                            dispatch_async(dispatch_get_main_queue(), ^{
+                                __strong typeof(weakSelf) strongSelf2 = weakSelf;
+                                if (!strongSelf2) return;
+                                [strongSelf2 tl_handleChatResponse:retryOutput error:retryError forMessage:aiMessage];
+                            });
+                        }];
+                    }];
+                    return;
+                }
+
+                [strongSelf tl_handleChatResponse:output error:nil forMessage:aiMessage];
+            });
+        }];
+    };
+
+    // 4. 如果有图片，先上传拿 URL；没有图片直接发
+    if (imagesToSend.count > 0) {
+        [[TLWSDKManager shared] uploadImages:@[imagesToSend.firstObject]
+                                       prefix:@"ai_assistant/"
+                                   completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable uploadError) {
             __strong typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
-
-            // 用户已手动停止，忽略回调
             if (strongSelf.currentAIMessage != aiMessage) return;
 
-            if (error) {
+            if (uploadError || urls.count == 0) {
                 strongSelf.currentAIMessage = nil;
                 [strongSelf.myView exitAILoadingMode];
                 aiMessage.status = TLWAIAssistantMessageStatusFailed;
-                aiMessage.text = @"网络请求失败，请稍后重试";
-                aiMessage.errorMessage = error.localizedDescription;
+                aiMessage.text = @"图片上传失败，请稍后重试";
+                aiMessage.errorMessage = uploadError.localizedDescription ?: @"上传返回为空";
                 [strongSelf.myView displayMessages:strongSelf.session.messages];
-                [TLWToast show:@"请求失败，请检查网络"];
+                [TLWToast show:@"图片上传失败"];
                 return;
             }
-
-            // 鉴权失效（401/403），自动续期后重试
-            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-                    [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *retryOutput, NSError *retryError) {
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            __strong typeof(weakSelf) strongSelf2 = weakSelf;
-                            if (!strongSelf2) return;
-                            [strongSelf2 tl_handleChatResponse:retryOutput error:retryError forMessage:aiMessage];
-                        });
-                    }];
-                }];
-                return;
-            }
-
-            [strongSelf tl_handleChatResponse:output error:nil forMessage:aiMessage];
-        });
-    }];
+            sendChatWithImageURL(urls.firstObject);
+        }];
+    } else {
+        sendChatWithImageURL(nil);
+    }
 }
 
 /// 统一处理 AI 对话响应
