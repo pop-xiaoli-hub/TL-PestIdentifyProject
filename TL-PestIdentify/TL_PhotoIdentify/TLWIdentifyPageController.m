@@ -343,7 +343,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
       AGChatRequest *request = [[AGChatRequest alloc] init];
       request.text = [self tl_identifyPrompt];
       request.imageUrl = imageURL;
-      request.useSingleModel = @(NO);
+      request.useSingleModel = @(YES);
       request.saveHistory = @(YES);
 
       NSString *currentToken = [AGDefaultConfiguration sharedConfig].accessToken;
@@ -780,7 +780,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
   request.text = [self tl_diagnosisPrompt];
   request.imageUrl = [NSString stringWithFormat:@"data:image/jpeg;base64,%@",
                       [imageData base64EncodedStringWithOptions:0]];
-  request.useSingleModel = @(NO);
+  request.useSingleModel = @(YES);
   request.extraInfo = [self tl_diagnosisExtraInfoWithLocationInfo:locationManager weatherInfo:weatherInfo];
   return request;
 }

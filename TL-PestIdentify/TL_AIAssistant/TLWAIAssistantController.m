@@ -361,6 +361,7 @@
     AGChatRequest *request = [[AGChatRequest alloc] init];
     request.text = text;
     request.saveHistory = @(NO);
+    request.useSingleModel = @(YES);
 
     // 如果有图片，取第一张转 Base64 传给后端（SDK 只支持单张 imageUrl）
     if (imagesToSend.count > 0) {
