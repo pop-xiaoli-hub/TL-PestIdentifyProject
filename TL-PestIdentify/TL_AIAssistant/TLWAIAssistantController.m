@@ -25,6 +25,7 @@
 @property (nonatomic, copy)   NSString           *initialQuestion;
 @property (nonatomic, assign) BOOL                showVoicePanelAfterKeyboardHide;
 @property (nonatomic, assign) BOOL                showPlusPanelAfterKeyboardHide;
+@property (nonatomic, assign) BOOL                didSendInitialQuestion;
 // 草稿态图片先留在 controller，真正发送后再固化成 message 进入 session。
 @property (nonatomic, strong) NSMutableArray<UIImage *> *pendingImages;
 @property (nonatomic, strong) TLWAIAssistantSession *session;
@@ -121,8 +122,14 @@
     };
 
     [self tl_seedConversation];
-    if (self.initialQuestion.length > 0) {
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    if (self.initialQuestion.length > 0 && !self.didSendInitialQuestion) {
+        self.didSendInitialQuestion = YES;
         [self.myView setInputText:self.initialQuestion];
+        [self tl_send];
     }
 }
 
