@@ -70,6 +70,9 @@ extern NSString * const TLWProfileDidUpdateNotification;
                          message:(nullable NSString *)message
                       retryBlock:(nullable void(^)(void))retryBlock;
 
+/// 调用方已完成一次 refresh 重试，但鉴权仍失败时可直接强制结束当前会话并回到登录页。
+- (void)invalidateSessionWithMessage:(nullable NSString *)message;
+
 /// 生成更接近真实原因的失败文案，优先使用网络错误，其次回退服务端 message / 默认文案。
 - (NSString *)userFacingMessageForError:(nullable NSError *)error
                                    code:(nullable NSNumber *)code
