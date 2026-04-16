@@ -43,6 +43,9 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 @property (nonatomic, strong) NSArray<NSString *> *searchKeywordSuggestions;
 @property (nonatomic, strong) NSMutableArray<NSString *> *searchHistoryItems;
 @property (nonatomic, assign) BOOL isSearchingPosts;
+- (void)tl_cachePublishedPostFromDto:(AGPostResponseDto *)dto
+                              request:(AGPostCreateRequest *)request
+                            imageUrls:(NSArray<NSString *> *)imageUrls;
 @end
 
 @implementation TLWCommunityController
@@ -785,6 +788,9 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
             [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
               [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *r, NSError *e) {
                 dispatch_async(dispatch_get_main_queue(), ^{
+                  if (r.code.integerValue == 200) {
+                    [strongSelf tl_cachePublishedPostFromDto:r.data request:request imageUrls:urls];
+                  }
                   [TLWToast show:(r.code.integerValue == 200) ? @"帖子发布成功" : @"帖子发送失败"];
                 });
               }];
@@ -803,6 +809,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
         // 上传成功：找到本地发布中的帖子，清除 pending 标记并刷新对应 cell
         NSInteger pendingIndex = NSNotFound;
         AGPostResponseDto* dto = output.data;
+        [strongSelf tl_cachePublishedPostFromDto:dto request:request imageUrls:urls];
         for (NSInteger i = 0; i < (NSInteger)strongSelf.posts.count; i++) {
           TLWCommunityPost *p = strongSelf.posts[i];
           if (p.isLocalPending) {
@@ -823,6 +830,22 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
     }];
   }];
   NSLog(@"8");
+}
+
+- (void)tl_cachePublishedPostFromDto:(AGPostResponseDto *)dto
+                              request:(AGPostCreateRequest *)request
+                            imageUrls:(NSArray<NSString *> *)imageUrls {
+  if (!dto || !dto._id) {
+    return;
+  }
+
+  dto.title = dto.title ?: request.title ?: @"";
+  dto.content = dto.content ?: request.content ?: @"";
+  dto.images = dto.images ?: imageUrls ?: @[];
+  dto.tags = dto.tags ?: request.tags ?: @[];
+  dto.likeCount = dto.likeCount ?: @0;
+  dto.favoriteCount = dto.favoriteCount ?: @0;
+  [[TLWDBManager shared] upsertMyPublishedPostFromDto:dto];
 }
 
 - (void)tl_showTopToast:(NSString *)text {

@@ -241,7 +241,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
     return;
   }
 
-  NSInteger pageSize = 20;
+  NSInteger pageSize = 30;
   NSInteger maxPages = 50;
   NSMutableArray<AGPostResponseDto *> *accumulator = [NSMutableArray array];
   __weak typeof(self) weakSelf = self;
@@ -372,6 +372,37 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
                                           size:(NSNumber *)size
                              completionHandler:(void (^)(AGResultPageResultMessageResponseDto * output, NSError * error))handler {
   return [self.api getAlertMessagesWithPage:page size:size completionHandler:handler];
+}
+
+- (NSURLSessionTask *)chatWithChatRequest:(AGChatRequest *)chatRequest
+                        completionHandler:(void (^)(AGResultListDiagnosisItem * output, NSError * error))handler {
+  __block NSURLSessionTask *task = nil;
+  __weak typeof(self) weakSelf = self;
+  __block void (^performRequest)(BOOL);
+  performRequest = ^(BOOL didRetryAuth) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+
+    task = [strongSelf.api chatWithChatRequest:chatRequest completionHandler:^(AGResultListDiagnosisItem *output, NSError *error) {
+      if (!didRetryAuth
+          && [strongSelf.sessionManager handleAuthFailureForCode:output.code
+                                                         message:output.message
+                                                      retryBlock:^{
+        performRequest(YES);
+      }]) {
+        return;
+      }
+
+      if (handler) {
+        handler(output, error);
+      }
+    }];
+  };
+
+  performRequest(NO);
+  return task;
 }
 
 - (nullable NSURLSessionTask *)getCurrentWeatherWithLatitude:(double)latitude
