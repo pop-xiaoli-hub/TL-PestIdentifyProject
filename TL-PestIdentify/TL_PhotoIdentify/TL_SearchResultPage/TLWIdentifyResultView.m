@@ -104,6 +104,9 @@ static NSInteger const kResultPageCount = 3;
 
   self.backgroundGradientLayer.frame = self.bounds;
 
+  if (self.firstPageAIHintBackgroundView) {
+    [self bringSubviewToFront:self.firstPageAIHintBackgroundView];
+  }
   if (self.aiButton) {
     [self bringSubviewToFront:self.aiButton];
   }
@@ -281,6 +284,15 @@ static NSInteger const kResultPageCount = 3;
   retakeButton.imageView.contentMode = UIViewContentModeScaleToFill;
   [self addSubview:retakeButton];
 
+  UIImageView *aiHintBackgroundView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Ip_message.png"]];
+  aiHintBackgroundView.contentMode = UIViewContentModeScaleToFill;
+  aiHintBackgroundView.userInteractionEnabled = YES;
+  [self addSubview:aiHintBackgroundView];
+
+  UIImageView *warnIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Ip_warn.png"]];
+  warnIconView.contentMode = UIViewContentModeScaleAspectFit;
+  [aiHintBackgroundView addSubview:warnIconView];
+
   [aiButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self).offset(18.0);
     make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-70.0);
@@ -295,13 +307,26 @@ static NSInteger const kResultPageCount = 3;
   [retakeButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerY.equalTo(aiButton).offset(20.0);
     make.right.equalTo(self).offset(-20.0);
-    make.width.mas_equalTo(204.0);
+    make.width.mas_equalTo(160.0);
     make.height.mas_equalTo(72.0);
+  }];
+
+  [aiHintBackgroundView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(aiButton.mas_right).offset(10.0);
+    make.centerY.equalTo(aiButton);
+    make.width.mas_equalTo(118.0);
+    make.height.mas_equalTo(78.0);
+  }];
+
+  [warnIconView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(aiHintBackgroundView).insets(UIEdgeInsetsMake(10.0, 10.0, 12.0, 10.0));
   }];
 
   self.aiButton = aiButton;
   self.aiTextLabel = aiTextLabel;
   self.retakeButton = retakeButton;
+  self.firstPageAIHintBackgroundView = aiHintBackgroundView;
+  self.firstPageWarnIconView = warnIconView;
 }
 
 - (UIScrollView *)tl_buildVerticalPageAtIndex:(NSInteger)index {
@@ -330,15 +355,15 @@ static NSInteger const kResultPageCount = 3;
   [contentView addSubview:pestTitleLabel];
   [self.pagePestTitleLabels addObject:pestTitleLabel];
 
-  NSArray<NSString *> *pestNames = @[@"炭疽病", @"叶斑病", @"锈病"];
   UILabel *pestNameLabel = [[UILabel alloc] init];
-  pestNameLabel.text = pestNames[index];
+  pestNameLabel.text = @"无结果";
   pestNameLabel.textColor = [UIColor whiteColor];
   pestNameLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
   pestNameLabel.textAlignment = NSTextAlignmentCenter;
   pestNameLabel.backgroundColor = [UIColor colorWithRed:0.34 green:0.74 blue:0.98 alpha:1.0];
   pestNameLabel.layer.cornerRadius = 18.0;
   pestNameLabel.layer.masksToBounds = YES;
+  pestNameLabel.hidden = YES;
   [contentView addSubview:pestNameLabel];
   [self.pageTagLabels addObject:pestNameLabel];
 
@@ -349,13 +374,13 @@ static NSInteger const kResultPageCount = 3;
   [self.pageConfidenceBadgeViews addObject:confidenceBadgeView];
 
   UILabel *confidenceLabel = [[UILabel alloc] init];
-  NSArray<NSString *> *confidences = @[@"80%", @"76%", @"68%"];
-  confidenceLabel.text = confidences[index];
+  confidenceLabel.text = @"";
   confidenceLabel.textColor = [UIColor whiteColor];
   confidenceLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
   confidenceLabel.textAlignment = NSTextAlignmentCenter;
   [confidenceBadgeView addSubview:confidenceLabel];
   [self.pageConfidenceLabels addObject:confidenceLabel];
+  confidenceBadgeView.hidden = YES;
 
   UILabel *solutionTitleLabel = [[UILabel alloc] init];
   solutionTitleLabel.text = @"解决方案";
@@ -368,26 +393,12 @@ static NSInteger const kResultPageCount = 3;
   solutionLabel.numberOfLines = 0;
   solutionLabel.textColor = [UIColor colorWithWhite:0.32 alpha:1.0];
   solutionLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-  NSArray<NSString *> *solutions = @[
-    @"1. 清：清病株深埋，轮作豆/花生2-3年。\n2. 管：合理密植，少氮多磷钾，雨后排水。\n3. 药：播前用苯醚甲环唑拌种；发病初期喷咪鲜胺/丙环唑，7-10天一次，连喷2-3次，轮换用药。",
-    @"1. 清：及时摘除重病叶，集中处理。\n2. 管：加强通风透光，控制田间湿度。\n3. 药：发病初期喷施代森锰锌或嘧菌酯，间隔7天连续2-3次。",
-    @"1. 清：发现病叶立即剪除，减少传播源。\n2. 管：增施磷钾肥，降低叶面长时间积水。\n3. 药：选择三唑酮、戊唑醇等药剂轮换喷施。"
-  ];
-  solutionLabel.text = solutions[index];
+  solutionLabel.text = @"当前未返回该候选结果";
+  solutionLabel.hidden = NO;
   [self tl_applySolutionStyleToLabel:solutionLabel];
   [contentView addSubview:solutionLabel];
   [self.pageSolutionLabels addObject:solutionLabel];
 
-  UIImageView *aiHintBackgroundView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Ip_message.png"]];
-  aiHintBackgroundView.contentMode = UIViewContentModeScaleToFill;
-  aiHintBackgroundView.userInteractionEnabled = YES;
-  [contentView addSubview:aiHintBackgroundView];
-  [self.pageAIHintBackgroundViews addObject:aiHintBackgroundView];
-
-  UIImageView *warnIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Ip_warn.png"]];
-  warnIconView.contentMode = UIViewContentModeScaleAspectFit;
-  [aiHintBackgroundView addSubview:warnIconView];
-  [self.pageWarnIconViews addObject:warnIconView];
 
   [pestTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(contentView).offset(10.0);
@@ -424,19 +435,8 @@ static NSInteger const kResultPageCount = 3;
     make.right.equalTo(contentView).offset(-22.0);
   }];
 
-  [aiHintBackgroundView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(solutionLabel.mas_bottom).offset(34.0);
-    make.left.equalTo(contentView).offset(20.0);
-    make.width.mas_equalTo(118.0);
-    make.height.mas_equalTo(78.0);
-  }];
-
-  [warnIconView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.edges.equalTo(aiHintBackgroundView).insets(UIEdgeInsetsMake(10.0, 10.0, 12.0, 10.0));
-  }];
-
   [contentView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.bottom.equalTo(aiHintBackgroundView.mas_bottom).offset(34.0);
+    make.bottom.equalTo(solutionLabel.mas_bottom).offset(40.0);
   }];
   [self.pageContentViews addObject:contentView];
 
@@ -448,8 +448,6 @@ static NSInteger const kResultPageCount = 3;
     self.confidenceLabel = confidenceLabel;
     self.firstPageSolutionTitleLabel = solutionTitleLabel;
     self.solutionLabel = solutionLabel;
-    self.firstPageAIHintBackgroundView = aiHintBackgroundView;
-    self.firstPageWarnIconView = warnIconView;
   }
 
   return verticalScrollView;
@@ -461,6 +459,29 @@ static NSInteger const kResultPageCount = 3;
   if (image) {
     self.photoView.image = image;
   }
+
+  [self.pagePestTitleLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
+    label.hidden = NO;
+  }];
+  [self.pageTagLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
+    label.text = @"无结果";
+    label.hidden = NO;
+  }];
+  [self.pageConfidenceBadgeViews enumerateObjectsUsingBlock:^(UIView * _Nonnull badgeView, NSUInteger idx, BOOL * _Nonnull stop) {
+    badgeView.hidden = YES;
+  }];
+  [self.pageConfidenceLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
+    label.text = @"";
+  }];
+  [self.pageSolutionTitleLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
+    label.hidden = NO;
+  }];
+  [self.pageSolutionLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
+    label.text = @"当前未返回该候选结果";
+    label.attributedText = nil;
+    label.hidden = NO;
+    [self tl_applySolutionStyleToLabel:label];
+  }];
 
   [results enumerateObjectsUsingBlock:^(NSDictionary * _Nonnull result, NSUInteger idx, BOOL * _Nonnull stop) {
     if (idx >= kResultPageCount) {
@@ -486,8 +507,10 @@ static NSInteger const kResultPageCount = 3;
       }
     }
     if (name.length > 0 && idx < self.pageTagLabels.count) {
+      self.pagePestTitleLabels[idx].hidden = NO;
       UILabel *tagLabel = self.pageTagLabels[idx];
       tagLabel.text = name;
+      tagLabel.hidden = NO;
       [tagLabel mas_updateConstraints:^(MASConstraintMaker *make) {
         make.width.mas_equalTo([self tl_widthForTagText:name]);
       }];
@@ -496,6 +519,7 @@ static NSInteger const kResultPageCount = 3;
     NSString *confidence = [result[@"confidence"] isKindOfClass:[NSString class]] ? result[@"confidence"] : @"";
     if (idx < self.pageConfidenceLabels.count) {
       self.pageConfidenceLabels[idx].text = confidence.length > 0 ? confidence : @"--";
+      self.pageConfidenceBadgeViews[idx].hidden = (confidence.length == 0);
     }
 
     NSString *advice = [result[@"advice"] isKindOfClass:[NSString class]] ? result[@"advice"] : nil;
@@ -503,7 +527,9 @@ static NSInteger const kResultPageCount = 3;
       advice = result[@"solution"];
     }
     if (idx < self.pageSolutionLabels.count && advice.length > 0) {
+      self.pageSolutionTitleLabels[idx].hidden = NO;
       self.pageSolutionLabels[idx].text = advice;
+      self.pageSolutionLabels[idx].hidden = NO;
       [self tl_applySolutionStyleToLabel:self.pageSolutionLabels[idx]];
     }
   }];
@@ -559,7 +585,7 @@ static NSInteger const kResultPageCount = 3;
   [self.retakeButton mas_remakeConstraints:^(MASConstraintMaker *make) {
     make.right.equalTo(self).offset(-20.0);
     make.bottom.equalTo(self).offset(-28.0);
-    make.width.mas_equalTo(204.0);
+    make.width.mas_equalTo(160.0);
     make.height.mas_equalTo(72.0);
   }];
 
@@ -572,6 +598,14 @@ static NSInteger const kResultPageCount = 3;
   [self.aiTextLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(self.aiButton.mas_bottom).offset(4.0);
     make.centerX.equalTo(self.aiButton);
+  }];
+
+  self.firstPageAIHintBackgroundView.hidden = NO;
+  [self.firstPageAIHintBackgroundView mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.aiButton.mas_right).offset(10.0);
+    make.centerY.equalTo(self.aiButton);
+    make.width.mas_equalTo(118.0);
+    make.height.mas_equalTo(78.0);
   }];
 
   [self.pageSolutionLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
@@ -710,9 +744,7 @@ static NSInteger const kResultPageCount = 3;
         idx >= self.pageTagLabels.count ||
         idx >= self.pageConfidenceBadgeViews.count ||
         idx >= self.pageSolutionTitleLabels.count ||
-        idx >= self.pageSolutionLabels.count ||
-        idx >= self.pageAIHintBackgroundViews.count ||
-        idx >= self.pageWarnIconViews.count) {
+        idx >= self.pageSolutionLabels.count) {
       return;
     }
 
@@ -722,8 +754,6 @@ static NSInteger const kResultPageCount = 3;
     UIView *confidenceBadgeView = self.pageConfidenceBadgeViews[idx];
     UILabel *solutionTitleLabel = self.pageSolutionTitleLabels[idx];
     UILabel *solutionLabel = self.pageSolutionLabels[idx];
-    UIImageView *aiHintBackgroundView = self.pageAIHintBackgroundViews[idx];
-    UIImageView *warnIconView = self.pageWarnIconViews[idx];
 
     pestTitleLabel.font = [UIFont systemFontOfSize:25 weight:UIFontWeightBold];
     pestTitleLabel.textColor = [UIColor colorWithWhite:0.24 alpha:1.0];
@@ -736,8 +766,6 @@ static NSInteger const kResultPageCount = 3;
     confidenceBadgeView.backgroundColor = [UIColor colorWithRed:1.0 green:0.63 blue:0.20 alpha:1.0];
     solutionLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightMedium];
     solutionLabel.textColor = [UIColor colorWithWhite:0.39 alpha:1.0];
-    aiHintBackgroundView.hidden = YES;
-    warnIconView.hidden = YES;
     [self tl_applySolutionStyleToLabel:solutionLabel];
 
     [pestTitleLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
@@ -780,7 +808,7 @@ static NSInteger const kResultPageCount = 3;
   [self.retakeButton mas_remakeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self);
     make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-20.0);
-    make.width.mas_equalTo(190.0);
+    make.width.mas_equalTo(160.0);
     make.height.mas_equalTo(58.0);
   }];
 
@@ -794,6 +822,8 @@ static NSInteger const kResultPageCount = 3;
     make.top.equalTo(self.aiButton.mas_bottom).offset(4.0);
     make.centerX.equalTo(self.aiButton);
   }];
+
+  self.firstPageAIHintBackgroundView.hidden = YES;
 
   [self setNeedsLayout];
   [self layoutIfNeeded];
@@ -910,7 +940,7 @@ static NSInteger const kResultPageCount = 3;
 }
 
 - (CGFloat)tl_widthForTagText:(NSString *)text {
-  NSString *safeText = text.length > 0 ? text : @"未知病害";
+  NSString *safeText = text.length > 0 ? text : @"";
   CGSize textSize = [safeText sizeWithAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold]}];
   return MAX(88.0, ceil(textSize.width) + 32.0);
 }
