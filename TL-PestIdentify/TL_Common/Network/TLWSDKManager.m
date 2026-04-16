@@ -374,6 +374,37 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
   return [self.api getAlertMessagesWithPage:page size:size completionHandler:handler];
 }
 
+- (NSURLSessionTask *)chatWithChatRequest:(AGChatRequest *)chatRequest
+                        completionHandler:(void (^)(AGResultListDiagnosisItem * output, NSError * error))handler {
+  __block NSURLSessionTask *task = nil;
+  __weak typeof(self) weakSelf = self;
+  __block void (^performRequest)(BOOL);
+  performRequest = ^(BOOL didRetryAuth) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+
+    task = [strongSelf.api chatWithChatRequest:chatRequest completionHandler:^(AGResultListDiagnosisItem *output, NSError *error) {
+      if (!didRetryAuth
+          && [strongSelf.sessionManager handleAuthFailureForCode:output.code
+                                                         message:output.message
+                                                      retryBlock:^{
+        performRequest(YES);
+      }]) {
+        return;
+      }
+
+      if (handler) {
+        handler(output, error);
+      }
+    }];
+  };
+
+  performRequest(NO);
+  return task;
+}
+
 - (nullable NSURLSessionTask *)getCurrentWeatherWithLatitude:(double)latitude
                                            longitude:(double)longitude
                                           completion:(void (^)(NSDictionary * _Nullable weatherInfo, NSError * _Nullable error))completion {

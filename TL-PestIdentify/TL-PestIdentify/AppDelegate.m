@@ -8,7 +8,6 @@
 #import "AppDelegate.h"
 #import <SpeechEngineToB/SpeechEngine.h>
 #import <TargetConditionals.h>
-
 @interface AppDelegate ()
 
 @end

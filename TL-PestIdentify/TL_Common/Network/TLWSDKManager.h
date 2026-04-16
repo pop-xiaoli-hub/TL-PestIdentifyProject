@@ -38,6 +38,8 @@
 #import <AgriPestClient/AGResultPageResultMessageResponseDto.h>
 #import <AgriPestClient/AGPageResultMessageResponseDto.h>
 #import <AgriPestClient/AGMessageResponseDto.h>
+#import <AgriPestClient/AGChatRequest.h>
+#import <AgriPestClient/AGResultListDiagnosisItem.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -141,6 +143,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSURLSessionTask *)getAlertMessagesWithPage:(NSNumber *)page
                                           size:(NSNumber *)size
                              completionHandler:(void (^)(AGResultPageResultMessageResponseDto * output, NSError * error))handler;
+
+/// 发起多模态诊断请求
+- (NSURLSessionTask *)chatWithChatRequest:(AGChatRequest *)chatRequest
+                        completionHandler:(void (^)(AGResultListDiagnosisItem * output, NSError * error))handler;
 /// 获取首页实时天气（和风天气）
 - (nullable NSURLSessionTask *)getCurrentWeatherWithLatitude:(double)latitude
                                            longitude:(double)longitude

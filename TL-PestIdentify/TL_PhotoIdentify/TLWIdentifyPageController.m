@@ -12,10 +12,10 @@
 #import "TLWIdentifyResultController.h"
 #import "TLWSDKManager.h"
 #import <AgriPestClient/AGChatRequest.h>
-#import <AgriPestClient/AGResultChatProfileResponse.h>
-#import <AgriPestClient/AGDefaultConfiguration.h>
+#import <AgriPestClient/AGDiagnosisItem.h>
 #import "TLWPhotoPickerController.h"
 #import "TLWLocalIdentifyManager.h"
+#import "TLWLocationManager.h"
 #import "TLWToast.h"
 
 static CGFloat const TLWIdentifyCloudJPEGQuality = 0.92f;
@@ -57,6 +57,7 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
   [self.myView.photosButton addTarget:self action:@selector(tl_openPhotoAlbum) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.recordButton addTarget:self action:@selector(tl_openRecord) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.captureButton addTarget:self action:@selector(tl_capturePhoto) forControlEvents:UIControlEventTouchUpInside];
+  [[TLWLocationManager shared] requestLocationPermission];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -318,92 +319,26 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
     return;
   }
 
-  AGChatRequest *request = [[AGChatRequest alloc] init];
-  request.text = [self tl_identifyPrompt];
-  request.imageUrl = [NSString stringWithFormat:@"data:image/jpeg;base64,%@",
-                      [imageData base64EncodedStringWithOptions:0]];
-  request.useSingleModel = @(NO);
+  NSLog(@"AI识别：开始诊断，payload=%lu bytes", (unsigned long)imageData.length);
+  [self tl_requestDiagnosisResultsWithImageData:imageData completion:^(NSArray<NSDictionary *> *parsedResults) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
 
-  TLWSDKManager *manager = [TLWSDKManager shared];
-  NSString *currentToken = [AGDefaultConfiguration sharedConfig].accessToken;
-  NSLog(@"AI识别：开始识别，payload=%lu bytes，token=%@",
-        (unsigned long)imageData.length,
-        currentToken.length > 0 ? @"有" : @"无（未登录？）");
-  __block void (^performCloudIdentify)(BOOL);
-  performCloudIdentify = ^(BOOL didRetryAuth) {
-    [manager.api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *chatOutput, NSError *chatError) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) {
-          return;
-        }
+    if (parsedResults.count == 0) {
+      waitingForLocalFallback = YES;
+      presentLocalFallbackIfNeeded();
+      return;
+    }
 
-        if (!didRetryAuth
-            && [manager.sessionManager handleAuthFailureForCode:chatOutput.code
-                                                       message:chatOutput.message
-                                                    retryBlock:^{
-          performCloudIdentify(YES);
-        }]) {
-          return;
-        }
-
-        if (chatError || !chatOutput || chatOutput.code.integerValue != 200 || chatOutput.data.answer.length == 0) {
-          NSLog(@"========== [云端] AI识别失败 ==========");
-          if (chatError) {
-            NSLog(@"[云端] NSError domain=%@ code=%ld msg=%@",
-                  chatError.domain, (long)chatError.code, chatError.localizedDescription);
-            NSLog(@"[云端] NSError userInfo=%@", chatError.userInfo);
-          } else {
-            NSLog(@"[云端] NSError=nil");
-          }
-          if (!chatOutput) {
-            NSLog(@"[云端] chatOutput=nil（响应体解析失败或无响应）");
-          } else {
-            NSLog(@"[云端] code=%@, message=%@", chatOutput.code, chatOutput.message);
-            NSLog(@"[云端] answer=%@", chatOutput.data.answer);
-          }
-          NSLog(@"============================================");
-          waitingForLocalFallback = YES;
-          presentLocalFallbackIfNeeded();
-          return;
-        }
-
-        NSLog(@"========== [云端] AI识别成功 ==========");
-        NSLog(@"[云端] 原始返回: %@", chatOutput.data.answer);
-        if (chatOutput.data.profile) {
-          NSLog(@"[云端] profile: singleModel=%@, imageType=%@, imageLength=%@, totalMs=%@",
-                chatOutput.data.profile.singleModel,
-                chatOutput.data.profile.imageUrlType,
-                chatOutput.data.profile.imageUrlLength,
-                chatOutput.data.profile.totalMs);
-        }
-
-        NSArray<NSDictionary *> *parsedResults = [strongSelf tl_normalizedIdentifyResultsForDisplay:
-                                                  [strongSelf tl_parseIdentifyResultsFromJSONString:chatOutput.data.answer]];
-        if (parsedResults.count == 0) {
-          NSLog(@"[云端] 结构化结果解析失败，回退本地识别");
-          waitingForLocalFallback = YES;
-          presentLocalFallbackIfNeeded();
-          return;
-        }
-
-        for (NSInteger i = 0; i < parsedResults.count; i++) {
-          NSDictionary *r = parsedResults[i];
-          NSLog(@"[云端] Top%ld: %@ | 置信度: %@ | 依据: %@", (long)(i + 1), r[@"name"], r[@"confidence"], r[@"reason"]);
-        }
-        NSLog(@"============================================");
-
-        [strongSelf tl_stopLoadingIndicator];
-        TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
-        vc.image = strongSelf.capturedImage;
-        vc.identifyResults = parsedResults;
-        vc.hidesBottomBarWhenPushed = YES;
-        [strongSelf.navigationController pushViewController:vc animated:YES];
-      });
-    }];
-  };
-
-  performCloudIdentify(NO);
+    [strongSelf tl_stopLoadingIndicator];
+    TLWIdentifyResultController *vc = [[TLWIdentifyResultController alloc] init];
+    vc.image = strongSelf.capturedImage;
+    vc.identifyResults = parsedResults;
+    vc.hidesBottomBarWhenPushed = YES;
+    [strongSelf.navigationController pushViewController:vc animated:YES];
+  }];
 }
 
 #pragma mark - 本地识别兜底
@@ -510,6 +445,146 @@ static NSInteger const TLWIdentifyDisplayResultCount = 3;
          "严格返回 JSON，不要输出任何额外文字。"
          "格式为：{\"results\":[{\"title\":\"结果一\",\"name\":\"结论名称\",\"confidence\":\"百分比\",\"reason\":\"只写图像中可见依据\",\"advice\":\"给出简短处理建议\"}]}"
          "。results 按置信度从高到低返回 1 到 3 项。";
+}
+
+- (NSString *)tl_diagnosisPrompt {
+  return @"图中发生了什么病害";
+}
+
+- (void)tl_requestDiagnosisResultsWithImageData:(NSData *)imageData
+                                     completion:(void (^)(NSArray<NSDictionary *> *results))completion {
+  TLWLocationManager *locationManager = [TLWLocationManager shared];
+  void (^sendDiagnosisRequest)(NSDictionary * _Nullable) = ^(NSDictionary * _Nullable weatherInfo) {
+    AGChatRequest *request = [self tl_diagnosisRequestWithImageData:imageData
+                                                      locationInfo:locationManager
+                                                        weatherInfo:weatherInfo];
+    [[TLWSDKManager shared] chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *output, NSError *error) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        NSLog(@"11%ld", output.data.count);
+        if (error || !output || output.code.integerValue != 200 || output.data.count == 0) {
+          NSLog(@"========== [云端] 诊断失败 ==========");
+          if (error) {
+            NSLog(@"[云端] NSError domain=%@ code=%ld msg=%@",
+                  error.domain, (long)error.code, error.localizedDescription);
+            NSLog(@"[云端] NSError userInfo=%@", error.userInfo);
+          } else if (output) {
+            NSLog(@"[云端] code=%@, message=%@", output.code, output.message);
+          } else {
+            NSLog(@"[云端] output=nil");
+          }
+          NSLog(@"============================================");
+          if (completion) {
+            completion(@[]);
+          }
+          return;
+        }
+
+        NSLog(@"========== [云端] 诊断成功 ==========");
+        NSArray<NSDictionary *> *results = [self tl_normalizedIdentifyResultsForDisplay:
+                                            [self tl_identifyResultsFromDiagnosisItems:output.data]];
+        for (NSInteger i = 0; i < results.count; i++) {
+          NSDictionary *result = results[i];
+          NSLog(@"[云端] Top%ld: %@ | 置信度: %@ | 方案: %@",
+                (long)(i + 1),
+                result[@"name"],
+                result[@"confidence"],
+                result[@"advice"]);
+        }
+        NSLog(@"============================================");
+
+        if (completion) {
+          completion(results);
+        }
+      });
+    }];
+  };
+
+  if (locationManager.hasLocation) {
+    [[TLWSDKManager shared] getCurrentWeatherWithLatitude:locationManager.latitude
+                                                longitude:locationManager.longitude
+                                               completion:^(NSDictionary * _Nullable weatherInfo, NSError * _Nullable error) {
+      if (error) {
+        NSLog(@"[云端] 天气信息获取失败，继续发起诊断: %@", error.localizedDescription);
+      }
+      sendDiagnosisRequest(weatherInfo);
+    }];
+    return;
+  }
+
+  sendDiagnosisRequest(nil);
+}
+
+- (AGChatRequest *)tl_diagnosisRequestWithImageData:(NSData *)imageData
+                                      locationInfo:(TLWLocationManager *)locationManager
+                                        weatherInfo:(NSDictionary * _Nullable)weatherInfo {
+  AGChatRequest *request = [[AGChatRequest alloc] init];
+  request.text = [self tl_diagnosisPrompt];
+  request.imageUrl = [NSString stringWithFormat:@"data:image/jpeg;base64,%@",
+                      [imageData base64EncodedStringWithOptions:0]];
+  request.useSingleModel = @(NO);
+  request.extraInfo = [self tl_diagnosisExtraInfoWithLocationInfo:locationManager weatherInfo:weatherInfo];
+  return request;
+}
+
+- (NSString *)tl_diagnosisExtraInfoWithLocationInfo:(TLWLocationManager *)locationManager
+                                        weatherInfo:(NSDictionary * _Nullable)weatherInfo {
+  NSMutableArray<NSString *> *parts = [NSMutableArray array];
+  if (locationManager.hasLocation) {
+    NSString *city = locationManager.cityName.length > 0 ? locationManager.cityName : @"未知位置";
+    [parts addObject:[NSString stringWithFormat:@"定位城市：%@", city]];
+    [parts addObject:[NSString stringWithFormat:@"定位坐标：%.6f, %.6f",
+                      locationManager.latitude,
+                      locationManager.longitude]];
+  }
+
+  NSString *weatherText = [weatherInfo[@"weatherText"] isKindOfClass:[NSString class]] ? weatherInfo[@"weatherText"] : nil;
+  NSString *temperature = [weatherInfo[@"temperature"] isKindOfClass:[NSString class]] ? weatherInfo[@"temperature"] : nil;
+  if (weatherText.length > 0 || temperature.length > 0) {
+    [parts addObject:[NSString stringWithFormat:@"天气：%@，温度：%@°C",
+                      weatherText.length > 0 ? weatherText : @"未知",
+                      temperature.length > 0 ? temperature : @"--"]];
+  }
+
+  return parts.count > 0 ? [parts componentsJoinedByString:@"；"] : nil;
+}
+
+- (NSArray<NSDictionary *> *)tl_identifyResultsFromDiagnosisItems:(NSArray<AGDiagnosisItem *> *)items {
+  if (items.count == 0) {
+    return @[];
+  }
+
+  NSMutableArray<NSDictionary *> *results = [NSMutableArray array];
+  NSInteger count = MIN(items.count, TLWIdentifyDisplayResultCount);
+  for (NSInteger idx = 0; idx < count; idx++) {
+    AGDiagnosisItem *item = items[idx];
+    NSString *name = item.diseaseName.length > 0 ? item.diseaseName : @"待确认";
+    NSString *confidence = [self tl_confidenceTextFromNumber:item.confidence];
+    NSString *advice = item.controlPlan.length > 0
+        ? item.controlPlan
+        : @"建议补拍叶片近景、病斑局部、叶背或虫体细节后再次识别。";
+    NSString *reason = @"综合图片、定位与天气信息生成的诊断结果。";
+    [results addObject:@{
+      @"title": [self tl_identifyTitleForIndex:idx],
+      @"name": name,
+      @"names": @[name],
+      @"confidence": confidence,
+      @"reason": reason,
+      @"advice": advice
+    }];
+  }
+  return results.copy;
+}
+
+- (NSString *)tl_confidenceTextFromNumber:(NSNumber *)confidenceNumber {
+  if (![confidenceNumber isKindOfClass:[NSNumber class]]) {
+    return @"--";
+  }
+
+  double value = confidenceNumber.doubleValue;
+  if (fabs(value - round(value)) < 0.01) {
+    return [NSString stringWithFormat:@"%.0f%%", value];
+  }
+  return [NSString stringWithFormat:@"%.1f%%", value];
 }
 
 - (NSArray<NSDictionary *> *)tl_parseIdentifyResultsFromJSONString:(NSString *)jsonString {
