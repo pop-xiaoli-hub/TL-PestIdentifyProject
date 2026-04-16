@@ -59,6 +59,9 @@ static NSUInteger const kImageKeepCount  = 20;
         NSUInteger clearEnd = self.mutableMessages.count - kImageKeepCount;
         for (NSUInteger i = 0; i < clearEnd; i++) {
             TLWAIAssistantMessage *msg = self.mutableMessages[i];
+            if (msg.previewImages.count > 0) {
+                msg.previewImages = nil;
+            }
             if (msg.localImages.count > 0) {
                 msg.localImages = nil;
             }

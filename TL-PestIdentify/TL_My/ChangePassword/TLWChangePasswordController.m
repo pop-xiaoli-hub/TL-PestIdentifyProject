@@ -35,9 +35,6 @@
     }];
     [self.view bringSubviewToFront:self.navBar];
     [self setupActions];
-    if (_currentPassword.length > 0) {
-        _myView.currentPassword = _currentPassword;
-    }
 }
 
 - (TLWChangePasswordView *)myView {

@@ -8,6 +8,7 @@
 #import "TLWAddPlantController.h"
 #import "TLWAddPlantView.h"
 #import "TLWImagePickerManager.h"
+#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 
 @interface TLWAddPlantController () <TLWImagePickerDelegate>
@@ -43,6 +44,7 @@
   [super viewWillAppear:animated];
   [self.navigationController setNavigationBarHidden:YES animated:animated];
   self.navigationController.interactivePopGestureRecognizer.delegate = nil;
+  [self tl_refreshUserAvatar];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
@@ -96,6 +98,12 @@
   self.imagePickerManager.maxCount = 1;
   self.imagePickerManager.delegate = self;
   [self.imagePickerManager openAlbumFrom:self];
+}
+
+- (void)tl_refreshUserAvatar {
+  TLWSessionManager *sessionManager = [TLWSDKManager shared].sessionManager;
+  AGUserProfileDto *profile = sessionManager.cachedProfile;
+  [self.myView updateUserAvatarWithURLString:profile.avatarUrl];
 }
 
 - (TLWImagePickerManager *)imagePickerManager {

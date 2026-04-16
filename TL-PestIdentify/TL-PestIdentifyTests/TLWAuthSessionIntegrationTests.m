@@ -16,6 +16,7 @@
 - (void)handleUnauthorizedWithRetry:(void(^)(void))retryBlock;
 - (BOOL)saveAuthResponse:(id)auth;
 - (nullable NSString *)refreshToken;
+- (BOOL)shouldAttemptTokenRefreshForCode:(NSNumber *)code;
 @property (nonatomic, assign) NSInteger userId;
 @property (nonatomic, copy, nullable) NSString *username;
 @property (nonatomic, copy, nullable, readonly) NSString *generatedPassword;
@@ -263,7 +264,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 
     XCTAssertTrue([self.manager isLoggedIn]);
     XCTAssertEqualObjects([self.manager refreshToken], @"logout_refresh");
-    XCTAssertEqualObjects(self.manager.generatedPassword, @"logout_password");
+    XCTAssertNil(self.manager.generatedPassword);
 
     [self.manager logout];
 

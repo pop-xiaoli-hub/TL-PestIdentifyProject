@@ -183,32 +183,52 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 - (void)tl_fetchAlertMessages {
   __weak typeof(self) weakSelf = self;
-  [[TLWSDKManager shared] getAlertMessagesWithPage:@0 size:@1 completionHandler:^(AGResultPageResultMessageResponseDto *output, NSError *error) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-      __strong typeof(weakSelf) strongSelf = weakSelf;
-      if (!strongSelf) return;
+  TLWSDKManager *manager = [TLWSDKManager shared];
+  __block void (^fetchAlertBlock)(BOOL);
+  fetchAlertBlock = ^(BOOL didRetryAuth) {
+    [manager getAlertMessagesWithPage:@0 size:@1 completionHandler:^(AGResultPageResultMessageResponseDto *output, NSError *error) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
 
-      if (error || output.code.integerValue != 200) {
-        strongSelf.currentWarning = nil;
-        [strongSelf tl_dismissExpandedWarningCardAnimated:NO];
+        if (!didRetryAuth
+            && [manager.sessionManager handleAuthFailureForCode:output.code
+                                                       message:output.message
+                                                    retryBlock:^{
+          fetchAlertBlock(YES);
+        }]) {
+          return;
+        }
+
+        if (didRetryAuth && [manager.sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+          [manager.sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
+          return;
+        }
+
+        if (error || output.code.integerValue != 200) {
+          strongSelf.currentWarning = nil;
+          [strongSelf tl_dismissExpandedWarningCardAnimated:NO];
+          [strongSelf.homePageView.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:0 inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
+          return;
+        }
+
+        NSArray *list = output.data.list;
+        if (list.count > 0) {
+          AGMessageResponseDto *msg = list.firstObject;
+          TLWWarningModel *model = [[TLWWarningModel alloc] init];
+          model.title = msg.title;
+          model.string = msg.content;
+          strongSelf.currentWarning = model;
+        } else {
+          strongSelf.currentWarning = nil;
+          [strongSelf tl_dismissExpandedWarningCardAnimated:NO];
+        }
         [strongSelf.homePageView.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:0 inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
-        return;
-      }
+      });
+    }];
+  };
 
-      NSArray *list = output.data.list;
-      if (list.count > 0) {
-        AGMessageResponseDto *msg = list.firstObject;
-        TLWWarningModel *model = [[TLWWarningModel alloc] init];
-        model.title = msg.title;
-        model.string = msg.content;
-        strongSelf.currentWarning = model;
-      } else {
-        strongSelf.currentWarning = nil;
-        [strongSelf tl_dismissExpandedWarningCardAnimated:NO];
-      }
-      [strongSelf.homePageView.tableView reloadRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:0 inSection:0]] withRowAnimation:UITableViewRowAnimationNone];
-    });
-  }];
+  fetchAlertBlock(NO);
 }
 
 - (void)tl_fetchHistoryRecordCount {

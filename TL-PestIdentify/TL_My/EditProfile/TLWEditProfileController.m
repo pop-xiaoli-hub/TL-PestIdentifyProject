@@ -22,6 +22,8 @@ extern NSString * const TLWProfileDidUpdateNotification;
 @property (nonatomic, strong) TLWEditProfileView *myView;
 @property (nonatomic, copy)   NSString           *nickname;
 @property (nonatomic, assign) BOOL isUploadingAvatar;
+@property (nonatomic, strong) NSURLSessionTask   *avatarUploadTask;
+@property (nonatomic, strong) NSURLSessionTask   *avatarProfileUpdateTask;
 @end
 
 @implementation TLWEditProfileController
@@ -61,6 +63,8 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)dealloc {
+    [self.avatarUploadTask cancel];
+    [self.avatarProfileUpdateTask cancel];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
@@ -128,44 +132,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
     NSString *tmpPath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"avatar_upload.jpg"];
     [imageData writeToFile:tmpPath atomically:YES];
     NSURL *fileURL = [NSURL fileURLWithPath:tmpPath];
-
-    [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:^(AGResultString *output, NSError *error) {
-        if (error || output.code.integerValue != 200) {
-            if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-                        [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:nil];
-                    }];
-                });
-                return;
-            }
-            NSLog(@"头像上传失败: %@", error.localizedDescription ?: output.message);
-            dispatch_async(dispatch_get_main_queue(), ^{ self.isUploadingAvatar = NO; [TLWToast show:@"头像同步失败，请重试"]; });
-            return;
-        }
-        // 上传成功，直接改缓存 + 发通知
-        AGProfileUpdateRequest *req = [[AGProfileUpdateRequest alloc] init];
-        req.avatarUrl = output.data;
-        [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *res, NSError *err) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (err || res.code.integerValue != 200) {
-                    if (!err && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:res.code]) {
-                        [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-                            [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:nil];
-                        }];
-                        return;
-                    }
-                    self.isUploadingAvatar = NO;
-                    [TLWToast show:@"头像同步失败，请重试"];
-                } else {
-                    self.isUploadingAvatar = NO;
-                    // 静默更新缓存，不发通知，避免闪烁
-                    [TLWSDKManager shared].sessionManager.cachedProfile.avatarUrl = output.data;
-                    [TLWToast show:@"头像修改成功"];
-                }
-            });
-        }];
-    }];
+    [self tl_uploadAvatarFile:fileURL didRetryAuth:NO];
 }
 
 - (void)onNicknameTap {
@@ -191,6 +158,71 @@ extern NSString * const TLWProfileDidUpdateNotification;
     _nickname = nickname;
     _myView.nicknameValueLabel.text = nickname;
     [TLWToast show:@"昵称修改成功"];
+}
+
+- (void)tl_uploadAvatarFile:(NSURL *)fileURL didRetryAuth:(BOOL)didRetryAuth {
+    __weak typeof(self) weakSelf = self;
+    self.avatarUploadTask = [[TLWSDKManager shared].api uploadFileWithFile:fileURL prefix:@"avatars/" completionHandler:^(AGResultString *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+            strongSelf.avatarUploadTask = nil;
+
+            if (error || output.code.integerValue != 200 || output.data.length == 0) {
+                if (!error && !didRetryAuth && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
+                        [strongSelf tl_uploadAvatarFile:fileURL didRetryAuth:YES];
+                    }];
+                    return;
+                }
+                NSLog(@"头像上传失败: %@", error.localizedDescription ?: output.message);
+                [strongSelf tl_finishAvatarUploadWithSuccess:NO avatarURL:nil];
+                return;
+            }
+
+            [strongSelf tl_updateAvatarProfileURL:output.data didRetryAuth:NO];
+        });
+    }];
+}
+
+- (void)tl_updateAvatarProfileURL:(NSString *)avatarURL didRetryAuth:(BOOL)didRetryAuth {
+    AGProfileUpdateRequest *req = [[AGProfileUpdateRequest alloc] init];
+    req.avatarUrl = avatarURL;
+
+    __weak typeof(self) weakSelf = self;
+    self.avatarProfileUpdateTask = [[TLWSDKManager shared].api updateProfileWithProfileUpdateRequest:req completionHandler:^(AGResultUserProfileDto *res, NSError *err) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+            strongSelf.avatarProfileUpdateTask = nil;
+
+            if (err || res.code.integerValue != 200) {
+                if (!err && !didRetryAuth && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:res.code]) {
+                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
+                        [strongSelf tl_updateAvatarProfileURL:avatarURL didRetryAuth:YES];
+                    }];
+                    return;
+                }
+                [strongSelf tl_finishAvatarUploadWithSuccess:NO avatarURL:nil];
+                return;
+            }
+
+            [strongSelf tl_finishAvatarUploadWithSuccess:YES avatarURL:avatarURL];
+        });
+    }];
+}
+
+- (void)tl_finishAvatarUploadWithSuccess:(BOOL)success avatarURL:(NSString *)avatarURL {
+    self.isUploadingAvatar = NO;
+    if (!success) {
+        [TLWToast show:@"头像同步失败，请重试"];
+        return;
+    }
+
+    if ([TLWSDKManager shared].sessionManager.cachedProfile && avatarURL.length > 0) {
+        [TLWSDKManager shared].sessionManager.cachedProfile.avatarUrl = avatarURL;
+    }
+    [TLWToast show:@"头像修改成功"];
 }
 
 @end

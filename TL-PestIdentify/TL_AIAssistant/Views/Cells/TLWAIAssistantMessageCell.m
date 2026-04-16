@@ -29,6 +29,7 @@ static CGFloat const kBubbleSidePad = 5.0;
 @property (nonatomic, strong) MASConstraint *messageBottomConstraint;
 @property (nonatomic, strong) MASConstraint *imageTopConstraint;
 @property (nonatomic, strong) MASConstraint *imageHeightConstraint;
+@property (nonatomic, weak)   TLWAIAssistantMessage *currentMessage;
 @end
 
 @implementation TLWAIAssistantMessageCell
@@ -59,9 +60,11 @@ static CGFloat const kBubbleSidePad = 5.0;
     self.bubbleView.layer.borderColor = [UIColor clearColor].CGColor;
     [self.bubbleBottomConstraint deactivate];
     [self.statusBottomConstraint deactivate];
+    self.currentMessage = nil;
 }
 
 - (void)configureWithMessage:(TLWAIAssistantMessage *)message {
+    self.currentMessage = message;
     BOOL isUser = (message.role == TLWAIAssistantMessageRoleUser);
 
     if (isUser) {
@@ -295,6 +298,7 @@ static CGFloat const kBubbleSidePad = 5.0;
     CGFloat x = 0;
     CGFloat thumbW = isSingleImage ? displayWidth : fallbackSize;
     CGFloat thumbH = isSingleImage ? displayHeight : fallbackSize;
+    NSInteger displayIndex = 0;
 
     for (UIImage *image in message.localImages) {
         UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(x, 0, thumbW, thumbH)];
@@ -302,8 +306,13 @@ static CGFloat const kBubbleSidePad = 5.0;
         imageView.contentMode = UIViewContentModeScaleAspectFill;
         imageView.clipsToBounds = YES;
         imageView.layer.cornerRadius = 10;
+        imageView.userInteractionEnabled = YES;
+        imageView.tag = 5000 + displayIndex;
+        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_messageImageTapped:)];
+        [imageView addGestureRecognizer:tap];
         [self.imageScrollView addSubview:imageView];
         x += thumbW + gap;
+        displayIndex += 1;
     }
 
     for (NSString *urlString in message.remoteImageURLs) {
@@ -312,15 +321,87 @@ static CGFloat const kBubbleSidePad = 5.0;
         imageView.clipsToBounds = YES;
         imageView.layer.cornerRadius = 10;
         imageView.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
+        imageView.userInteractionEnabled = YES;
+        imageView.tag = 5000 + displayIndex;
+        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_messageImageTapped:)];
+        [imageView addGestureRecognizer:tap];
         NSURL *url = [NSURL URLWithString:urlString];
         if (url) {
             [imageView sd_setImageWithURL:url];
         }
         [self.imageScrollView addSubview:imageView];
         x += thumbW + gap;
+        displayIndex += 1;
     }
 
     self.imageScrollView.contentSize = CGSizeMake(MAX(x - gap, thumbW), thumbH);
+}
+
+- (void)tl_messageImageTapped:(UITapGestureRecognizer *)tap {
+    UIImageView *imageView = (UIImageView *)tap.view;
+    if (![imageView isKindOfClass:[UIImageView class]]) return;
+    // 优先用 previewImages 的高清图，没有再回退到 cell 上展示的缩略图（远程 URL 也走这条路）
+    UIImage *image = nil;
+    NSInteger index = imageView.tag - 5000;
+    NSArray<UIImage *> *preview = self.currentMessage.previewImages;
+    if (index >= 0 && index < (NSInteger)preview.count) {
+        image = preview[index];
+    }
+    if (!image) {
+        image = imageView.image;
+    }
+    if (!image) return;
+    [self tl_presentFullscreenImage:image];
+}
+
+- (void)tl_presentFullscreenImage:(UIImage *)image {
+    UIWindow *window = [self tl_activeWindow];
+    if (!window) return;
+
+    UIView *overlay = [[UIView alloc] initWithFrame:window.bounds];
+    overlay.backgroundColor = [UIColor colorWithWhite:0 alpha:0.92];
+    overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+
+    UIImageView *fullImageView = [[UIImageView alloc] initWithImage:image];
+    fullImageView.contentMode = UIViewContentModeScaleAspectFit;
+    fullImageView.frame = CGRectInset(window.bounds, 20, 80);
+    fullImageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [overlay addSubview:fullImageView];
+
+    UITapGestureRecognizer *dismissTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_dismissFullscreenPreview:)];
+    [overlay addGestureRecognizer:dismissTap];
+
+    overlay.alpha = 0;
+    [window addSubview:overlay];
+    [UIView animateWithDuration:0.2 animations:^{
+        overlay.alpha = 1;
+    }];
+}
+
+- (void)tl_dismissFullscreenPreview:(UITapGestureRecognizer *)tap {
+    UIView *overlay = tap.view;
+    [UIView animateWithDuration:0.18 animations:^{
+        overlay.alpha = 0;
+    } completion:^(BOOL finished) {
+        [overlay removeFromSuperview];
+    }];
+}
+
+- (UIWindow *)tl_activeWindow {
+    NSSet<UIScene *> *scenes = UIApplication.sharedApplication.connectedScenes;
+    for (UIScene *scene in scenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        for (UIWindow *window in windowScene.windows) {
+            if (window.isKeyWindow) {
+                return window;
+            }
+        }
+        if (windowScene.windows.firstObject) {
+            return windowScene.windows.firstObject;
+        }
+    }
+    return UIApplication.sharedApplication.keyWindow;
 }
 
 - (NSString *)tl_statusTextForMessage:(TLWAIAssistantMessage *)message {

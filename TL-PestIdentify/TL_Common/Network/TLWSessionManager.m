@@ -156,11 +156,7 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
     } else {
         [ud removeObjectForKey:kUsernameKey];
     }
-    if (auth.generatedPassword.length > 0) {
-        [ud setObject:auth.generatedPassword forKey:kGeneratedPasswordKey];
-    } else {
-        [ud removeObjectForKey:kGeneratedPasswordKey];
-    }
+    [ud removeObjectForKey:kGeneratedPasswordKey];
 
     @synchronized (self) {
         self.authStateVersion += 1;
@@ -180,11 +176,31 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 
 - (void)tl_fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion
                          didRetryAuth:(BOOL)didRetryAuth {
+    __block NSUInteger requestVersion = 0;
+    __block NSInteger requestUserId = 0;
+    @synchronized (self) {
+        requestVersion = self.authStateVersion;
+        requestUserId = self.userId;
+    }
+
     __weak typeof(self) weakSelf = self;
     [self.api getCurrentUserProfileWithCompletionHandler:^(AGResultUserProfileDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
+
+            BOOL shouldIgnore = NO;
+            @synchronized (self) {
+                shouldIgnore = (requestVersion != self.authStateVersion || requestUserId != self.userId || requestUserId <= 0);
+            }
+            if (shouldIgnore) {
+                NSLog(@"[Profile] ignore stale callback: requestVersion=%lu currentVersion=%lu requestUserId=%ld currentUserId=%ld",
+                      (unsigned long)requestVersion,
+                      (unsigned long)self.authStateVersion,
+                      (long)requestUserId,
+                      (long)self.userId);
+                return;
+            }
 
             if (!error && output.code.integerValue == 200) {
                 NSLog(@"[Profile] fetch success: code=%@ userId=%ld data=%@",
@@ -239,7 +255,7 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 }
 
 - (nullable NSString *)generatedPassword {
-    return [[NSUserDefaults standardUserDefaults] stringForKey:kGeneratedPasswordKey];
+    return nil;
 }
 
 - (BOOL)shouldAttemptTokenRefreshForCode:(NSNumber *)code {
@@ -270,6 +286,10 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
     [self tl_showAuthToastIfNeeded:@"登录状态已失效，正在尝试恢复"];
     [self handleUnauthorizedWithRetry:retryBlock];
     return YES;
+}
+
+- (void)invalidateSessionWithMessage:(nullable NSString *)message {
+    [self tl_forceLogoutAndNotifyWithMessage:message];
 }
 
 - (NSString *)userFacingMessageForError:(NSError *)error
