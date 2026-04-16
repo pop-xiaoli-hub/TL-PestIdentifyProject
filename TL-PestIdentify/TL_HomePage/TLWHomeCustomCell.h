@@ -15,6 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, copy, nullable) void(^clickCreateButton)(void);
 @property (nonatomic, copy, nullable) void(^clickContentCard)(void);
+@property (nonatomic, copy, nullable) void(^longPressContentCard)(void);
 
 - (void)configureAsCreateCell;
 - (void)configureAsCreateCellWithLocationName:(nullable NSString *)locationName;

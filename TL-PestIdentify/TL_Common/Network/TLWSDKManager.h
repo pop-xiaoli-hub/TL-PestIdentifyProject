@@ -134,6 +134,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSURLSessionTask *)getCropDetailWithId:(NSNumber *)cropId
                         completionHandler:(void (^)(AGResultMyCropResponseDto * output, NSError * error))handler;
 
+/// 删除作物
+- (NSURLSessionTask *)deleteCropWithId:(NSNumber *)cropId
+                     completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler;
+
 /// 添加种植标签（浇水、施肥、用药、笔记）
 - (NSURLSessionTask *)addTagWithCropId:(NSNumber *)cropId
                    tagOperationRequest:(AGTagOperationRequest *)request

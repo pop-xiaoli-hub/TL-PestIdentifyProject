@@ -362,6 +362,11 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
   return [self.api getCropDetailWithId:cropId completionHandler:handler];
 }
 
+- (NSURLSessionTask *)deleteCropWithId:(NSNumber *)cropId
+                     completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
+  return [self.api deleteCropWithId:cropId completionHandler:handler];
+}
+
 - (NSURLSessionTask *)addTagWithCropId:(NSNumber *)cropId
                    tagOperationRequest:(AGTagOperationRequest *)request
                      completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
