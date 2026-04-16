@@ -18,6 +18,7 @@
 #import <AgriPestClient/AGResultChatProfileResponse.h>
 #import <AgriPestClient/AGChatProfileResponse.h>
 #import <Masonry/Masonry.h>
+#import <math.h>
 
 @interface TLWAIAssistantController () <TLWImagePickerDelegate, UIGestureRecognizerDelegate>
 @property (nonatomic, strong) TLWAIAssistantView *myView;
@@ -352,6 +353,7 @@
     // 3. 构建 SDK 请求
     AGChatRequest *request = [[AGChatRequest alloc] init];
     request.text = text;
+    request.saveHistory = @(NO);
 
     // 如果有图片，取第一张转 Base64 传给后端（SDK 只支持单张 imageUrl）
     if (imagesToSend.count > 0) {
@@ -409,6 +411,8 @@
     self.currentAIMessage = nil;
     [self.myView exitAILoadingMode];
 
+    NSLog(@"[AIAssistant] code=%@, message=%@, answer=%@", output.code, output.message, output.data.answer);
+
     if (error || !output || !output.code || output.code.integerValue != 200) {
         aiMessage.status = TLWAIAssistantMessageStatusFailed;
         NSString *serverMsg = output.message ?: @"服务异常";
@@ -419,7 +423,7 @@
         return;
     }
 
-    NSString *answer = output.data.answer;
+    NSString *answer = [self tl_controlPlanFromAnswer:output.data.answer];
     if (answer.length == 0) {
         answer = @"AI 暂时无法给出回复，请换个描述再试试。";
     }
@@ -427,6 +431,261 @@
     aiMessage.status = TLWAIAssistantMessageStatusIdle;
     [self.myView displayMessages:self.session.messages];
     [self.myView scrollMessagesToBottomAnimated:YES];
+}
+
+- (NSString *)tl_displayTextFromAnswer:(NSString *)answer {
+    NSString *trimmed = [self tl_trimmedStringFromValue:answer];
+    if (trimmed.length == 0) {
+        return @"";
+    }
+
+    NSArray<NSDictionary *> *structuredResults = [self tl_structuredResultsFromAnswerString:trimmed];
+    if (structuredResults.count == 0) {
+        return trimmed;
+    }
+
+    NSMutableArray<NSString *> *sections = [NSMutableArray array];
+    [structuredResults enumerateObjectsUsingBlock:^(NSDictionary * _Nonnull item, NSUInteger idx, BOOL * _Nonnull stop) {
+        NSString *name = [self tl_firstNonEmptyStringFromValues:@[
+            item[@"diseaseName"],
+            item[@"name"],
+            item[@"title"]
+        ] fallback:[NSString stringWithFormat:@"结果%lu", (unsigned long)(idx + 1)]];
+        NSString *confidence = [self tl_confidenceTextFromValue:item[@"confidence"]];
+        NSString *plan = [self tl_firstNonEmptyStringFromValues:@[
+            item[@"controlPlan"],
+            item[@"advice"],
+            item[@"solution"],
+            item[@"reason"],
+            item[@"message"]
+        ] fallback:@"建议补拍叶片近景、病斑局部和叶背细节后再次识别。"];
+
+        NSMutableArray<NSString *> *lines = [NSMutableArray array];
+        [lines addObject:[NSString stringWithFormat:@"%lu. %@", (unsigned long)(idx + 1), name]];
+        if (confidence.length > 0) {
+            [lines addObject:[NSString stringWithFormat:@"置信度：%@", confidence]];
+        }
+        if (plan.length > 0) {
+            [lines addObject:[NSString stringWithFormat:@"防治建议：%@", plan]];
+        }
+        [sections addObject:[lines componentsJoinedByString:@"\n"]];
+    }];
+
+    return [sections componentsJoinedByString:@"\n\n"];
+}
+
+- (NSArray<NSDictionary *> *)tl_structuredResultsFromAnswerString:(NSString *)answer {
+    id jsonObject = [self tl_JSONObjectFromPossibleJSONString:answer];
+    return [self tl_resultDictionariesFromJSONObject:jsonObject];
+}
+
+- (id)tl_JSONObjectFromPossibleJSONString:(NSString *)string {
+    if (![string isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+
+    NSString *trimmed = [self tl_trimmedStringFromValue:string];
+    if (trimmed.length == 0) {
+        return nil;
+    }
+
+    for (NSString *candidate in [self tl_JSONCandidatesFromString:trimmed]) {
+        NSData *data = [candidate dataUsingEncoding:NSUTF8StringEncoding];
+        if (!data) {
+            continue;
+        }
+
+        NSError *error = nil;
+        id jsonObject = [NSJSONSerialization JSONObjectWithData:data
+                                                       options:NSJSONReadingAllowFragments
+                                                         error:&error];
+        if (error || !jsonObject) {
+            continue;
+        }
+
+        if ([jsonObject isKindOfClass:[NSString class]] &&
+            ![(NSString *)jsonObject isEqualToString:candidate]) {
+            id nestedObject = [self tl_JSONObjectFromPossibleJSONString:(NSString *)jsonObject];
+            if (nestedObject) {
+                return nestedObject;
+            }
+        }
+        return jsonObject;
+    }
+
+    return nil;
+}
+
+- (NSArray<NSString *> *)tl_JSONCandidatesFromString:(NSString *)string {
+    NSMutableArray<NSString *> *candidates = [NSMutableArray array];
+    if (string.length == 0) {
+        return candidates.copy;
+    }
+
+    [candidates addObject:string];
+
+    NSRange firstBracketRange = [string rangeOfString:@"["];
+    NSRange lastBracketRange = [string rangeOfString:@"]" options:NSBackwardsSearch];
+    if (firstBracketRange.location != NSNotFound &&
+        lastBracketRange.location != NSNotFound &&
+        lastBracketRange.location > firstBracketRange.location) {
+        NSString *bracketCandidate = [string substringWithRange:NSMakeRange(firstBracketRange.location,
+                                                                            lastBracketRange.location - firstBracketRange.location + 1)];
+        if (![candidates containsObject:bracketCandidate]) {
+            [candidates addObject:bracketCandidate];
+        }
+    }
+
+    NSRange firstBraceRange = [string rangeOfString:@"{"];
+    NSRange lastBraceRange = [string rangeOfString:@"}" options:NSBackwardsSearch];
+    if (firstBraceRange.location != NSNotFound &&
+        lastBraceRange.location != NSNotFound &&
+        lastBraceRange.location > firstBraceRange.location) {
+        NSString *braceCandidate = [string substringWithRange:NSMakeRange(firstBraceRange.location,
+                                                                          lastBraceRange.location - firstBraceRange.location + 1)];
+        if (![candidates containsObject:braceCandidate]) {
+            [candidates addObject:braceCandidate];
+        }
+    }
+
+    return candidates.copy;
+}
+
+- (NSArray<NSDictionary *> *)tl_resultDictionariesFromJSONObject:(id)jsonObject {
+    if ([jsonObject isKindOfClass:[NSArray class]]) {
+        NSMutableArray<NSDictionary *> *results = [NSMutableArray array];
+        for (id item in (NSArray *)jsonObject) {
+            if ([item isKindOfClass:[NSDictionary class]] && [self tl_isStructuredResultDictionary:item]) {
+                [results addObject:item];
+            }
+        }
+        return results.copy;
+    }
+
+    if (![jsonObject isKindOfClass:[NSDictionary class]]) {
+        return @[];
+    }
+
+    NSDictionary *dictionary = (NSDictionary *)jsonObject;
+    if ([self tl_isStructuredResultDictionary:dictionary]) {
+        return @[dictionary];
+    }
+
+    NSArray<NSString *> *nestedKeys = @[@"results", @"data", @"result", @"response", @"content", @"message", @"answer"];
+    for (NSString *key in nestedKeys) {
+        id value = dictionary[key];
+        NSArray<NSDictionary *> *nestedResults = [self tl_resultDictionariesFromJSONObject:value];
+        if (nestedResults.count > 0) {
+            return nestedResults;
+        }
+        if ([value isKindOfClass:[NSString class]]) {
+            nestedResults = [self tl_structuredResultsFromAnswerString:(NSString *)value];
+            if (nestedResults.count > 0) {
+                return nestedResults;
+            }
+        }
+    }
+
+    return @[];
+}
+
+- (BOOL)tl_isStructuredResultDictionary:(NSDictionary *)dictionary {
+    if (![dictionary isKindOfClass:[NSDictionary class]]) {
+        return NO;
+    }
+
+    return dictionary[@"diseaseName"] != nil ||
+           dictionary[@"controlPlan"] != nil ||
+           dictionary[@"name"] != nil ||
+           dictionary[@"confidence"] != nil ||
+           dictionary[@"advice"] != nil ||
+           dictionary[@"solution"] != nil ||
+           dictionary[@"reason"] != nil;
+}
+
+- (NSString *)tl_confidenceTextFromValue:(id)value {
+    if ([value isKindOfClass:[NSNumber class]]) {
+        double number = [(NSNumber *)value doubleValue];
+        if (number <= 1.0) {
+            number *= 100.0;
+        }
+        if (fabs(number - round(number)) < 0.01) {
+            return [NSString stringWithFormat:@"%.0f%%", number];
+        }
+        return [NSString stringWithFormat:@"%.1f%%", number];
+    }
+
+    NSString *text = [self tl_trimmedStringFromValue:value];
+    if (text.length == 0) {
+        return @"";
+    }
+    if ([text containsString:@"%"] || [text containsString:@"％"]) {
+        return text;
+    }
+    double number = text.doubleValue;
+    if (number <= 0.0) {
+        return text;
+    }
+    if (number <= 1.0) {
+        number *= 100.0;
+    }
+    if (fabs(number - round(number)) < 0.01) {
+        return [NSString stringWithFormat:@"%.0f%%", number];
+    }
+    return [NSString stringWithFormat:@"%.1f%%", number];
+}
+
+- (NSString *)tl_firstNonEmptyStringFromValues:(NSArray *)values fallback:(NSString *)fallback {
+    for (id value in values) {
+        NSString *text = [self tl_trimmedStringFromValue:value];
+        if (text.length > 0) {
+            return text;
+        }
+    }
+    return fallback ?: @"";
+}
+
+- (NSString *)tl_trimmedStringFromValue:(id)value {
+    if ([value isKindOfClass:[NSString class]]) {
+        return [(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    }
+    if ([value isKindOfClass:[NSNumber class]]) {
+        return [[(NSNumber *)value stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    }
+    return @"";
+}
+
+/// 从 answer JSON 数组中提取 controlPlan，多条结果换行拼接；解析失败则返回原始字符串
+- (NSString *)tl_controlPlanFromAnswer:(NSString *)answer {
+    NSString *trimmed = [self tl_trimmedStringFromValue:answer];
+    if (trimmed.length == 0) return @"";
+
+    NSData *data = [trimmed dataUsingEncoding:NSUTF8StringEncoding];
+    if (!data) return trimmed;
+
+    NSError *error = nil;
+    id json = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&error];
+    if (error || !json) return trimmed;
+
+    NSArray *array = nil;
+    if ([json isKindOfClass:[NSArray class]]) {
+        array = json;
+    } else if ([json isKindOfClass:[NSDictionary class]]) {
+        array = @[json];
+    }
+    if (array.count == 0) return trimmed;
+
+    NSMutableArray<NSString *> *plans = [NSMutableArray array];
+    for (id item in array) {
+        if (![item isKindOfClass:[NSDictionary class]]) continue;
+        NSString *plan = [self tl_trimmedStringFromValue:item[@"controlPlan"]];
+        if (plan.length > 0) {
+            [plans addObject:plan];
+        }
+    }
+
+    if (plans.count == 0) return trimmed;
+    return [plans componentsJoinedByString:@"\n\n"];
 }
 
 /// 异步批量压缩图片，完成后回到主线程

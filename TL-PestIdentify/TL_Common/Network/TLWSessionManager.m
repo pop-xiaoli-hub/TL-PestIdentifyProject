@@ -33,6 +33,8 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 
 //  这是一个会话版本号，用于避免旧回调污染新会话
 @property (nonatomic, assign) NSUInteger authStateVersion;
+// 记录最近一次 refresh 成功后对应的会话版本，避免新 token 仍返回 403 时重复 refresh
+@property (nonatomic, assign) NSUInteger lastRefreshSucceededAuthStateVersion;
 
 - (void)tl_fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion
                          didRetryAuth:(BOOL)didRetryAuth;
@@ -99,6 +101,7 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
         _api = api;
         _pendingRetryBlocks = [NSMutableArray array];
         _authStateVersion = 0;
+        _lastRefreshSucceededAuthStateVersion = NSNotFound;
         [self tl_restoreSessionFromPersistence];
     }
     return self;
@@ -159,9 +162,12 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
         [ud removeObjectForKey:kGeneratedPasswordKey];
     }
 
-    self.userId = auth.userId.integerValue;
-    self.username = auth.username.length > 0 ? auth.username : nil;
-    self.isHandlingSessionInvalidation = NO;
+    @synchronized (self) {
+        self.authStateVersion += 1;
+        self.userId = auth.userId.integerValue;
+        self.username = auth.username.length > 0 ? auth.username : nil;
+        self.isHandlingSessionInvalidation = NO;
+    }
 
     //  重新打开数据库
     [[TLWDBManager shared] reopenForCurrentUser];
@@ -218,6 +224,7 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 - (void)logout {
     @synchronized (self) {
         self.authStateVersion += 1;
+        self.lastRefreshSucceededAuthStateVersion = NSNotFound;
         self.isRefreshing = NO;
         [self.pendingRetryBlocks removeAllObjects];
     }
@@ -237,7 +244,16 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 
 - (BOOL)shouldAttemptTokenRefreshForCode:(NSNumber *)code {
     NSInteger statusCode = code.integerValue;
-    return statusCode == 401 || statusCode == 403;
+    if (statusCode == 401) {
+        return YES;
+    }
+    if (statusCode != 403) {
+        return NO;
+    }
+
+    @synchronized (self) {
+        return self.lastRefreshSucceededAuthStateVersion != self.authStateVersion;
+    }
 }
 
 - (BOOL)handleAuthFailureForCode:(NSNumber *)code
@@ -263,10 +279,10 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
     if (error.localizedDescription.length > 0) {
         return error.localizedDescription;
     }
-    if ([self shouldAttemptTokenRefreshForCode:code]) {
+    if (code.integerValue == 401) {
         return @"登录状态异常，请重新登录";
     }
-    if (code.integerValue == 4003) {
+    if (code.integerValue == 403 || code.integerValue == 4003) {
         return serverMessage.length > 0 ? serverMessage : @"当前账号没有权限访问该内容";
     }
     if (serverMessage.length > 0) {
@@ -340,6 +356,7 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
                 if (saved) {
                     NSArray<dispatch_block_t> *blocks = nil;
                     @synchronized (self) {
+                        self.lastRefreshSucceededAuthStateVersion = self.authStateVersion;
                         blocks = [self.pendingRetryBlocks copy];
                         [self.pendingRetryBlocks removeAllObjects];
                     }
