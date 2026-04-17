@@ -30,27 +30,27 @@
     [super prepareLayout];
 
     [self.cachedAttributes removeAllObjects];
-    self.contentHeight = 0;
+    self.contentHeight = 0;//清除缓存
 
-    NSInteger itemCount = [self.collectionView numberOfItemsInSection:0];
+    NSInteger itemCount = [self.collectionView numberOfItemsInSection:0];//读取item数量
     if (itemCount == 0 || self.numberOfColumns <= 0) {
         return;
     }
 
     CGFloat contentWidth = CGRectGetWidth(self.collectionView.bounds);
     CGFloat availableWidth = contentWidth - self.sectionInset.left - self.sectionInset.right - (self.numberOfColumns - 1) * self.columnSpacing;
-    CGFloat itemWidth = floor(availableWidth / self.numberOfColumns);
+    CGFloat itemWidth = floor(availableWidth / self.numberOfColumns);//向下取整，避免边缘虚化
 
-    NSMutableArray<NSNumber *> *columnHeights = [NSMutableArray arrayWithCapacity:self.numberOfColumns];
+    NSMutableArray<NSNumber *> *columnHeights = [NSMutableArray arrayWithCapacity:self.numberOfColumns];//核心
     for (NSInteger i = 0; i < self.numberOfColumns; i++) {
         [columnHeights addObject:@(self.sectionInset.top)];
-    }
+    }//统一高度起点
 
-    for (NSInteger item = 0; item < itemCount; item++) {
+    for (NSInteger item = 0; item < itemCount; item++) {//遍历所有item
         NSIndexPath *indexPath = [NSIndexPath indexPathForItem:item inSection:0];
 
         // 选出目前总高度最低的一列
-        NSInteger targetColumn = 0;
+        NSInteger targetColumn = 0;//初始默认最低的一列是0
         CGFloat minColumnHeight = CGFLOAT_MAX;
         for (NSInteger col = 0; col < self.numberOfColumns; col++) {
             CGFloat height = columnHeights[col].doubleValue;
@@ -72,7 +72,7 @@
         }
 
         CGRect frame = CGRectMake(x, y, itemWidth, itemHeight);
-        UICollectionViewLayoutAttributes *attributes = [UICollectionViewLayoutAttributes layoutAttributesForCellWithIndexPath:indexPath];
+        UICollectionViewLayoutAttributes *attributes = [UICollectionViewLayoutAttributes layoutAttributesForCellWithIndexPath:indexPath];//每一个item一个UICollectionViewLayoutAttributes
         attributes.frame = frame;
         [self.cachedAttributes addObject:attributes];
 
@@ -83,21 +83,24 @@
     self.contentHeight += self.sectionInset.bottom;
 }
 
+//告诉系统内容区域的大小
 - (CGSize)collectionViewContentSize {
     CGFloat width = CGRectGetWidth(self.collectionView.bounds);
     return CGSizeMake(width, self.contentHeight);
 }
 
+//系统获取可见区域的attributes
 - (NSArray<UICollectionViewLayoutAttributes *> *)layoutAttributesForElementsInRect:(CGRect)rect {
     NSMutableArray<UICollectionViewLayoutAttributes *> *result = [NSMutableArray array];
     for (UICollectionViewLayoutAttributes *attr in self.cachedAttributes) {
-        if (CGRectIntersectsRect(attr.frame, rect)) {
+        if (CGRectIntersectsRect(attr.frame, rect)) {//如果有交集
             [result addObject:attr];
         }
     }
     return result;
 }
 
+//获取单个item的布局
 - (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)indexPath {
     for (UICollectionViewLayoutAttributes *attr in self.cachedAttributes) {
         if ([attr.indexPath isEqual:indexPath]) {
@@ -107,6 +110,7 @@
     return [super layoutAttributesForItemAtIndexPath:indexPath];
 }
 
+//bound变化是否重新排布
 - (BOOL)shouldInvalidateLayoutForBoundsChange:(CGRect)newBounds {
     return !CGSizeEqualToSize(newBounds.size, self.collectionView.bounds.size);
 }

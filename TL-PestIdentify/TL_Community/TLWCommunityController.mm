@@ -43,9 +43,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 @property (nonatomic, strong) NSArray<NSString *> *searchKeywordSuggestions;
 @property (nonatomic, strong) NSMutableArray<NSString *> *searchHistoryItems;
 @property (nonatomic, assign) BOOL isSearchingPosts;
-- (void)tl_cachePublishedPostFromDto:(AGPostResponseDto *)dto
-                              request:(AGPostCreateRequest *)request
-                            imageUrls:(NSArray<NSString *> *)imageUrls;
+- (void)tl_cachePublishedPostFromDto:(AGPostResponseDto *)dto request:(AGPostCreateRequest *)request imageUrls:(NSArray<NSString *> *)imageUrls;
 @end
 
 @implementation TLWCommunityController
@@ -131,7 +129,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
 
 - (void)panAction:(UIPanGestureRecognizer *)pan {
-  CGPoint translation = [pan translationInView:self.myView];
+  CGPoint translation = [pan translationInView:self.myView];//获取手指相对于self.myView的移动偏移量
   self.myView.publishButton.center = CGPointMake(self.myView.publishButton.center.x + translation.x, self.myView.publishButton.center.y + translation.y);
   [pan setTranslation:CGPointZero inView:self.myView];
   if (pan.state == UIGestureRecognizerStateEnded) {
@@ -168,13 +166,13 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   if (!self.hasMoreFeed) {
     return;
   }
-  self.tl_isFetchingFeed = YES;
+  self.tl_isFetchingFeed = YES;//更新状态，当前正在加载
   if (self.posts.count == 0 && !self.refreshControl.refreshing) {
     [TLWLoadingIndicator showInView:self.myView.collectionView];
   }
 
   TLWSDKManager *sdk = [TLWSDKManager shared];
-  NSInteger nextPage = self.currentFeedPage + 1;
+  NSInteger nextPage = self.currentFeedPage + 1;//将要申请的页
   self.feedRequestToken += 1;
   NSInteger requestToken = self.feedRequestToken;
   __weak typeof(self) weakSelf = self;
@@ -190,16 +188,12 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
     [TLWLoadingIndicator hideInView:strongSelf.myView.collectionView];
     NSLog(@"[Community] page=%ld 请求超时，保持当前帖子列表不变", (long)nextPage);
   });
-  [sdk getAllPostsWithTag:nil
-                        q:nil
-                     page:@(nextPage)
-                     size:@(kCommunityFeedPageSize)
-        completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
+  [sdk getAllPostsWithTag:nil q:nil page:@(nextPage) size:@(kCommunityFeedPageSize) completionHandler:^(AGResultPageResultPostResponseDto *output, NSError *error) {
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf) return;
 
     dispatch_async(dispatch_get_main_queue(), ^{
-      if (requestToken != strongSelf.feedRequestToken) {
+      if (requestToken != strongSelf.feedRequestToken) {//旧请求淘汰机制
         return;
       }
       strongSelf.tl_isFetchingFeed = NO;
