@@ -23,6 +23,7 @@
 @property (nonatomic, strong) UIView *plusVerticalLine;
 @property (nonatomic, strong) CAGradientLayer *createButtonGradientLayer;
 @property (nonatomic, strong) UILabel *plantTagLabel;
+@property (nonatomic, strong) UIImageView *plantTagIconView;
 @property (nonatomic, strong) UILongPressGestureRecognizer *contentCardLongPressGesture;
 
 @end
@@ -44,6 +45,7 @@
   self.longPressContentCard = nil;
   self.contentImageView.image = nil;
   self.plantTagLabel.text = nil;
+  self.plantTagIconView.hidden = YES;
 }
 
 - (void)layoutSubviews {
@@ -154,13 +156,25 @@
   UILabel *plantTagLabel = [[UILabel alloc] init];
   plantTagLabel.textColor = [UIColor whiteColor];
   plantTagLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
-  plantTagLabel.backgroundColor = [UIColor colorWithRed:0.30 green:0.92 blue:0.76 alpha:1.0];
-  plantTagLabel.textAlignment = NSTextAlignmentCenter;
-  plantTagLabel.layer.cornerRadius = 20.0;
-  plantTagLabel.layer.masksToBounds = YES;
+  plantTagLabel.backgroundColor = [UIColor clearColor];
+  plantTagLabel.textAlignment = NSTextAlignmentLeft;
   plantTagLabel.hidden = YES;
-  [cardView addSubview:plantTagLabel];
+  UIButton *plantTagButton = [UIButton buttonWithType:UIButtonTypeCustom];
+  plantTagButton.backgroundColor = [UIColor colorWithRed:0.30 green:0.92 blue:0.76 alpha:1.0];
+  plantTagButton.layer.cornerRadius = 20.0;
+  plantTagButton.layer.masksToBounds = YES;
+  plantTagButton.userInteractionEnabled = NO;
+  plantTagButton.hidden = YES;
+  [cardView addSubview:plantTagButton];
+  [plantTagButton addSubview:plantTagLabel];
   self.plantTagLabel = plantTagLabel;
+
+  UIImageView *plantTagIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_yield_leaf.png"]];
+  plantTagIconView.contentMode = UIViewContentModeScaleAspectFit;
+  plantTagIconView.hidden = YES;
+  [plantTagButton addSubview:plantTagIconView];
+  self.plantTagIconView = plantTagIconView;
+  self.plantTagLabel.superview.hidden = YES;
 
   UIButton *contentCardButton = [UIButton buttonWithType:UIButtonTypeCustom];
   contentCardButton.backgroundColor = [UIColor colorWithWhite:0.90 alpha:1.0];
@@ -233,11 +247,23 @@
     make.centerY.equalTo(createButton);
   }];
 
-  [plantTagLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+  [plantTagButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.right.equalTo(cardView).offset(-16.0);
     make.centerY.equalTo(avatarImageView);
     make.width.mas_greaterThanOrEqualTo(86.0);
     make.height.mas_equalTo(40.0);
+  }];
+
+  [plantTagIconView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(plantTagButton).offset(14.0);
+    make.centerY.equalTo(plantTagButton);
+    make.width.height.mas_equalTo(16.0);
+  }];
+
+  [plantTagLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(plantTagIconView.mas_right).offset(8.0);
+    make.centerY.equalTo(plantTagButton);
+    make.right.equalTo(plantTagButton).offset(-14.0);
   }];
 
   [contentCardButton mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -272,7 +298,9 @@
   [self tl_applyCurrentUserInfo];
   [self tl_applyLocationName:locationName];
   self.createButton.hidden = NO;
+  self.plantTagLabel.superview.hidden = YES;
   self.plantTagLabel.hidden = YES;
+  self.plantTagIconView.hidden = YES;
   self.contentImageView.hidden = YES;
   self.contentImageView.image = nil;
   self.contentCardButton.backgroundColor = [UIColor colorWithWhite:0.90 alpha:1.0];
@@ -286,8 +314,10 @@
   [self tl_applyCurrentUserInfo];
   [self tl_applyLocationName:locationName];
   self.createButton.hidden = YES;
+  self.plantTagLabel.superview.hidden = NO;
   self.plantTagLabel.hidden = NO;
-  self.plantTagLabel.text = [NSString stringWithFormat:@"  %@  ", plantModel.plantName.length > 0 ? plantModel.plantName : @"未命名植物"];
+  self.plantTagIconView.hidden = NO;
+  self.plantTagLabel.text = plantModel.plantName.length > 0 ? plantModel.plantName : @"未命名植物";
   NSString *imageURLString = plantModel.imageUrl;
   UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar.png"];
   if (plantModel.localImage) {
