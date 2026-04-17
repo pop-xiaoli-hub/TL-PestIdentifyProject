@@ -247,11 +247,17 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
     [self.myView hideVoicePanel];
     [self.myView hidePlusPanel];
     [self.myView adjustForKeyboardHeight:keyboardHeight duration:duration];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.myView scrollMessagesToBottomAnimated:NO];
+    });
 }
 
 - (void)tl_keyboardWillHide:(NSNotification *)notification {
     NSTimeInterval duration = [notification.userInfo[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
     [self.myView adjustForKeyboardHeight:0 duration:duration];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.myView scrollMessagesToBottomAnimated:NO];
+    });
 }
 
 - (void)dealloc {
@@ -419,13 +425,13 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             TLWAIStreamClient *client = [[TLWAIStreamClient alloc] init];
 
             client.onMeta = ^(NSDictionary *meta) {
-                NSLog(@"[AIAssistant][%@][stream] meta: %@", compareTag, meta);
+                NSLog(@"[AI-STREAM][%@] parsed meta: %@", compareTag, meta);
             };
 
             client.onDiseaseList = ^(NSArray *diseases) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AIAssistant][%@][stream] parsed disease list: %@", compareTag, diseases);
+                NSLog(@"[AI-STREAM][%@] parsed disease list: %@", compareTag, diseases);
                 s.diseaseHeaderText = [s tl_headerTextFromDiseaseList:diseases];
                 [s tl_refreshAIMessageText];
                 [s.myView displayMessages:s.session.messages];
@@ -435,7 +441,7 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             client.onPlanDelta = ^(NSString *delta) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AIAssistant][%@][stream] parsed plan delta: %@", compareTag, delta);
+                NSLog(@"[AI-STREAM][%@] parsed plan delta: %@", compareTag, delta);
                 [s.pendingDelta appendString:delta];
                 // 等 60ms timer 合并 flush，避免每帧刷 tableView 抖动
             };
@@ -443,7 +449,7 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             client.onPlanFinal = ^(NSString *fullText) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AIAssistant][%@][stream] parsed plan final: %@", compareTag, fullText);
+                NSLog(@"[AI-STREAM][%@] parsed plan final: %@", compareTag, fullText);
                 [s.pendingDelta setString:@""];
                 s.planAccumulated = [fullText mutableCopy];
                 [s tl_refreshAIMessageText];
@@ -454,13 +460,13 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             client.onDone = ^(NSDictionary *info) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AIAssistant][%@][stream] done info: %@", compareTag, info);
+                NSLog(@"[AI-STREAM][%@] done info: %@", compareTag, info);
                 [s tl_flushPendingDeltasIfNeeded];
                 [s tl_stopDeltaFlushTimer];
                 if (s.planAccumulated.length == 0 && s.diseaseHeaderText.length == 0) {
                     aiMessage.text = @"AI 暂时无法给出回复，请换个描述再试试。";
                 }
-                NSLog(@"[AIAssistant][%@][stream] visible text: %@", compareTag, aiMessage.text ?: @"");
+                NSLog(@"[AI-STREAM][%@] visible text: %@", compareTag, aiMessage.text ?: @"");
                 aiMessage.status = TLWAIAssistantMessageStatusIdle;
                 s.currentAIMessage = nil;
                 s.streamClient = nil;
@@ -472,7 +478,7 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             client.onError = ^(NSError *err, NSString *serverMsg) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AIAssistant][%@][stream] error: err=%@ serverMsg=%@", compareTag, err, serverMsg);
+                NSLog(@"[AI-STREAM][%@] error: err=%@ serverMsg=%@", compareTag, err, serverMsg);
                 [s tl_stopDeltaFlushTimer];
                 aiMessage.status = TLWAIAssistantMessageStatusFailed;
                 NSString *reason = serverMsg.length > 0 ? serverMsg : (err.localizedDescription ?: @"请求失败");
@@ -559,7 +565,7 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
     probeRequest.extraInfo = request.extraInfo;
     probeRequest.saveHistory = request.saveHistory;
 
-    NSLog(@"[AIAssistant][%@][compare] request payload: text=%@ imageUrl=%@ useSingleModel=%@ saveHistory=%@ extraInfo=%@",
+    NSLog(@"\n========== [AI-PROFILE] REQUEST [%@] ==========\ntext=%@\nimageUrl=%@\nuseSingleModel=%@\nsaveHistory=%@\nextraInfo=%@\n===============================================",
           tag,
           probeRequest.text ?: @"",
           probeRequest.imageUrl ?: @"",
@@ -570,23 +576,24 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
     [[[TLWSDKManager shared] api] chatProfileWithChatRequest:probeRequest completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (error) {
-                NSLog(@"[AIAssistant][%@][profile] error: %@", tag, error);
+                NSLog(@"\n========== [AI-PROFILE] ERROR [%@] ==========\n%@\n============================================", tag, error);
                 return;
             }
 
             NSString *answer = [self tl_trimmedStringFromValue:output.data.answer];
             id profileJSON = output.data.profile ? [output.data.profile toDictionary] : @{};
-            NSLog(@"[AIAssistant][%@][profile] code=%@ message=%@ answer=%@ profile=%@",
+            NSLog(@"\n========== [AI-PROFILE] RESPONSE [%@] ==========\ncode=%@\nmessage=%@\nanswer=%@\nprofile=%@\nrawOutput=%@\n================================================",
                   tag,
                   output.code,
                   output.message,
                   answer ?: @"",
-                  profileJSON ?: @{});
+                  profileJSON ?: @{},
+                  [output toDictionary] ?: @{});
         });
     }];
 }
 
-/// disease 事件 -> "病害：番茄早疫病(92%)、番茄灰霉病(68%)"。
+/// disease 事件 -> "番茄早疫病(92%)、番茄灰霉病(68%)"。
 - (NSString *)tl_headerTextFromDiseaseList:(NSArray *)list {
     if (![list isKindOfClass:[NSArray class]] || list.count == 0) return @"";
     NSMutableArray<NSString *> *parts = [NSMutableArray array];
@@ -603,7 +610,7 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
         }
     }
     if (parts.count == 0) return @"";
-    return [@"病害：" stringByAppendingString:[parts componentsJoinedByString:@"、"]];
+    return [parts componentsJoinedByString:@"、"];
 }
 
 /// 用 diseaseHeaderText + planAccumulated 重算 aiMessage.text。

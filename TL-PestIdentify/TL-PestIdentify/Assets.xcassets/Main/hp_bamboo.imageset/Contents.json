@@ -1,21 +1,21 @@
 {
-  "images": [
+  "images" : [
     {
-      "idiom": "universal",
-      "filename": "hp_bamboo.png",
-      "scale": "1x"
+      "idiom" : "universal",
+      "scale" : "1x"
     },
     {
-      "idiom": "universal",
-      "scale": "2x"
+      "idiom" : "universal",
+      "scale" : "2x"
     },
     {
-      "idiom": "universal",
-      "scale": "3x"
+      "filename" : "479a63347ab67c4c54ec5e6d5001b00c 1-2.png",
+      "idiom" : "universal",
+      "scale" : "3x"
     }
   ],
-  "info": {
-    "author": "xcode",
-    "version": 1
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
   }
 }

@@ -43,7 +43,7 @@
         [self tl_invokeErrorWithMessage:@"请求体序列化失败"];
         return nil;
     }
-    NSLog(@"[AIAssistant] stream request body: %@", body);
+    NSLog(@"\n========== [AI-STREAM] REQUEST ==========\nbody: %@\n=========================================", body);
 
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
     req.HTTPMethod = @"POST";
@@ -88,7 +88,7 @@ didReceiveResponse:(NSURLResponse *)response
  completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
     NSHTTPURLResponse *http = (NSHTTPURLResponse *)response;
     NSInteger code = http.statusCode;
-    NSLog(@"[AIAssistant] stream response status=%ld headers=%@", (long)code, http.allHeaderFields ?: @{});
+    NSLog(@"\n========== [AI-STREAM] RESPONSE ==========\nstatus: %ld\nheaders: %@\n==========================================", (long)code, http.allHeaderFields ?: @{});
     if (code == 401 || code == 403) {
         self.authFailed = YES;
         self.finished = YES;
@@ -112,7 +112,7 @@ didReceiveResponse:(NSURLResponse *)response
     didReceiveData:(NSData *)data {
     if (self.authFailed || self.finished) return;
     NSString *chunk = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    NSLog(@"[AIAssistant] stream raw chunk: %@", chunk ?: [NSString stringWithFormat:@"<non-utf8 %lu bytes>", (unsigned long)data.length]);
+    NSLog(@"\n========== [AI-STREAM] RAW CHUNK ==========\n%@\n===========================================", chunk ?: [NSString stringWithFormat:@"<non-utf8 %lu bytes>", (unsigned long)data.length]);
     [self.buffer appendData:data];
     [self tl_drainBuffer];
 }
@@ -157,7 +157,7 @@ didCompleteWithError:(NSError *)error {
 }
 
 - (void)tl_parseFrame:(NSString *)frame {
-    NSLog(@"[AIAssistant] stream raw frame: %@", frame);
+    NSLog(@"\n========== [AI-STREAM] RAW FRAME ==========\n%@\n===========================================", frame);
     NSArray<NSString *> *lines = [frame componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
     NSString *eventName = nil;
     NSMutableString *dataJoined = [NSMutableString string];
@@ -179,7 +179,7 @@ didCompleteWithError:(NSError *)error {
         // id:、retry: 等其他字段忽略
     }
     if (eventName.length == 0) return;
-    NSLog(@"[AIAssistant] stream event=%@ data=%@", eventName, dataJoined.copy ?: @"");
+    NSLog(@"\n========== [AI-STREAM] EVENT ==========\nevent: %@\ndata: %@\n=======================================", eventName, dataJoined.copy ?: @"");
     [self tl_dispatchEvent:eventName data:dataJoined.copy];
 }
 
