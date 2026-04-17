@@ -7,11 +7,6 @@
 #import "Models/TLWLocationCityModel.h"
 #import <Masonry/Masonry.h>
 
-// MARK: - TLWLocationSearchResult
-
-@implementation TLWLocationSearchResult
-@end
-
 // MARK: - TLWLocationTagGridView
 
 @interface TLWLocationTagGridView : UIView
@@ -70,8 +65,10 @@
             if (index < (NSInteger)titles.count) {
                 NSString *title = titles[index];
                 [button setTitle:title forState:UIControlStateNormal];
-                button.backgroundColor = [title isEqualToString:selectedTitle] ? [UIColor colorWithRed:0.40 green:0.76 blue:0.98 alpha:0.22] : [UIColor colorWithWhite:0.95 alpha:1.0];
-                [button setTitleColor:[title isEqualToString:selectedTitle] ? [UIColor colorWithRed:0.25 green:0.64 blue:0.90 alpha:1.0] : [UIColor colorWithRed:0.35 green:0.36 blue:0.40 alpha:1.0] forState:UIControlStateNormal];
+                BOOL isSelected = [title isEqualToString:selectedTitle];
+                button.backgroundColor = isSelected ? [UIColor colorWithRed:0.40 green:0.76 blue:0.98 alpha:0.22] : [UIColor colorWithWhite:0.95 alpha:1.0];
+                [button setTitleColor:isSelected ? [UIColor colorWithRed:0.25 green:0.64 blue:0.90 alpha:1.0] : [UIColor colorWithRed:0.35 green:0.36 blue:0.40 alpha:1.0]
+                             forState:UIControlStateNormal];
                 [button addTarget:self action:@selector(tl_handleButtonTap:) forControlEvents:UIControlEventTouchUpInside];
             } else {
                 button.hidden = YES;
@@ -91,101 +88,17 @@
 
 @end
 
-// MARK: - TLWSearchResultCell
-
-static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
-
-@interface TLWSearchResultCell : UITableViewCell
-- (void)configureWithResult:(TLWLocationSearchResult *)result keyword:(NSString *)keyword;
-@end
-
-@implementation TLWSearchResultCell {
-    UIImageView *_pinIconView;
-    UILabel *_nameLabel;
-    UILabel *_detailLabel;
-}
-
-- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
-    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
-    if (self) {
-        self.backgroundColor = [UIColor clearColor];
-        self.selectionStyle = UITableViewCellSelectionStyleGray;
-
-        _pinIconView = [[UIImageView alloc] init];
-        _pinIconView.contentMode = UIViewContentModeScaleAspectFit;
-        _pinIconView.tintColor = [UIColor colorWithRed:0.90 green:0.56 blue:0.10 alpha:1.0];
-        if (@available(iOS 13.0, *)) {
-            _pinIconView.image = [[UIImage systemImageNamed:@"mappin"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        }
-        [self.contentView addSubview:_pinIconView];
-
-        _nameLabel = [[UILabel alloc] init];
-        _nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightBold];
-        [self.contentView addSubview:_nameLabel];
-
-        _detailLabel = [[UILabel alloc] init];
-        _detailLabel.font = [UIFont systemFontOfSize:12];
-        _detailLabel.textColor = [UIColor colorWithRed:0.55 green:0.58 blue:0.63 alpha:1.0];
-        [self.contentView addSubview:_detailLabel];
-
-        [_pinIconView mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.equalTo(self.contentView).offset(16);
-            make.centerY.equalTo(self.contentView);
-            make.width.height.mas_equalTo(18);
-        }];
-        [_nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.equalTo(_pinIconView.mas_right).offset(12);
-            make.right.equalTo(self.contentView).offset(-16);
-            make.top.equalTo(self.contentView).offset(10);
-        }];
-        [_detailLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.left.right.equalTo(_nameLabel);
-            make.top.equalTo(_nameLabel.mas_bottom).offset(4);
-        }];
-    }
-    return self;
-}
-
-- (void)configureWithResult:(TLWLocationSearchResult *)result keyword:(NSString *)keyword {
-    UIColor *orangeColor = [UIColor colorWithRed:0.90 green:0.56 blue:0.10 alpha:1.0];
-    UIColor *defaultColor = [UIColor colorWithRed:0.15 green:0.16 blue:0.19 alpha:1.0];
-
-    NSMutableAttributedString *nameAttr = [[NSMutableAttributedString alloc] initWithString:result.name attributes:@{
-        NSFontAttributeName: [UIFont systemFontOfSize:16 weight:UIFontWeightBold],
-        NSForegroundColorAttributeName: defaultColor
-    }];
-
-    if (keyword.length > 0) {
-        NSString *lowerName = result.name.lowercaseString;
-        NSString *lowerKeyword = keyword.lowercaseString;
-        NSRange searchRange = NSMakeRange(0, lowerName.length);
-        while (searchRange.location < lowerName.length) {
-            NSRange matchRange = [lowerName rangeOfString:lowerKeyword options:0 range:searchRange];
-            if (matchRange.location == NSNotFound) { break; }
-            [nameAttr addAttribute:NSForegroundColorAttributeName value:orangeColor range:matchRange];
-            NSUInteger nextStart = matchRange.location + matchRange.length;
-            if (nextStart >= lowerName.length) { break; }
-            searchRange = NSMakeRange(nextStart, lowerName.length - nextStart);
-        }
-    }
-    _nameLabel.attributedText = nameAttr;
-    _detailLabel.text = [NSString stringWithFormat:@"%@   %@", result.distance, result.address];
-}
-
-@end
-
 // MARK: - TLWLocationView
 
-@interface TLWLocationView () <UITableViewDataSource, UITableViewDelegate>
+@interface TLWLocationView ()
 
 @property (nonatomic, strong) UIImageView *backgroundImageView;
 @property (nonatomic, strong) UIView *overlayView;
 
-// Top bar (outside scrollView so overlay positioning is simple)
+// Top bar (outside scrollView)
 @property (nonatomic, strong) UIView *topBarView;
 @property (nonatomic, strong) UIButton *backButton;
 @property (nonatomic, strong) UIView *searchContainerView;
-@property (nonatomic, strong) UITextField *searchField;
 
 // Main scroll content
 @property (nonatomic, strong) UIScrollView *scrollView;
@@ -197,13 +110,6 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
 @property (nonatomic, strong) NSMutableDictionary<NSString *, UIView *> *sectionAnchorViews;
 @property (nonatomic, copy) NSString *selectedLocationName;
 
-// Search results overlay
-@property (nonatomic, strong) UIView *searchResultsCard;
-@property (nonatomic, strong) UITableView *searchResultsTableView;
-@property (nonatomic, copy) NSArray<TLWLocationSearchResult *> *searchResults;
-@property (nonatomic, copy) NSString *searchKeyword;
-@property (nonatomic, strong) MASConstraint *tableHeightConstraint;
-
 @end
 
 @implementation TLWLocationView
@@ -212,8 +118,6 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
     self = [super initWithFrame:frame];
     if (self) {
         _sectionAnchorViews = [NSMutableDictionary dictionary];
-        _searchResults = @[];
-        _searchKeyword = @"";
         [self tl_setupUI];
     }
     return self;
@@ -222,7 +126,6 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
 - (void)tl_setupUI {
     self.backgroundColor = [UIColor whiteColor];
 
-    // Background
     self.backgroundImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_backView"]];
     self.backgroundImageView.contentMode = UIViewContentModeScaleAspectFill;
     [self addSubview:self.backgroundImageView];
@@ -238,10 +141,8 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
         make.edges.equalTo(self);
     }];
 
-    // Top bar (fixed, not in scrollView)
     [self tl_setupTopBar];
 
-    // ScrollView below top bar
     self.scrollView = [[UIScrollView alloc] init];
     self.scrollView.showsVerticalScrollIndicator = NO;
     self.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
@@ -274,9 +175,6 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
         make.left.right.equalTo(currentCard);
         make.bottom.equalTo(self.contentView).offset(-24);
     }];
-
-    // Search results overlay (on top of scrollView)
-    [self tl_setupSearchResultsCard];
 }
 
 - (void)tl_setupTopBar {
@@ -295,9 +193,9 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
     self.backButton.layer.borderWidth = 1.0;
     self.backButton.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.22].CGColor;
     if (@available(iOS 13.0, *)) {
-        UIImageSymbolConfiguration *configuration = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
-        UIImage *chevronImage = [[UIImage systemImageNamed:@"chevron.left" withConfiguration:configuration] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        [self.backButton setImage:chevronImage forState:UIControlStateNormal];
+        UIImageSymbolConfiguration *cfg = [UIImageSymbolConfiguration configurationWithPointSize:18 weight:UIImageSymbolWeightSemibold];
+        UIImage *img = [[UIImage systemImageNamed:@"chevron.left" withConfiguration:cfg] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        [self.backButton setImage:img forState:UIControlStateNormal];
         self.backButton.tintColor = [UIColor whiteColor];
     } else {
         [self.backButton setTitle:@"<" forState:UIControlStateNormal];
@@ -307,6 +205,7 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
     [self.backButton addTarget:self action:@selector(tl_backTapped) forControlEvents:UIControlEventTouchUpInside];
     [self.topBarView addSubview:self.backButton];
 
+    // Search bar is a display-only tappable area — editing happens on the search page
     self.searchContainerView = [[UIView alloc] init];
     self.searchContainerView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.82];
     self.searchContainerView.layer.cornerRadius = 22.0;
@@ -314,19 +213,24 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
     self.searchContainerView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.3].CGColor;
     [self.topBarView addSubview:self.searchContainerView];
 
-    self.searchField = [[UITextField alloc] init];
-    self.searchField.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-    self.searchField.textColor = [UIColor colorWithRed:0.32 green:0.35 blue:0.39 alpha:1.0];
-    self.searchField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"城市/区县/村镇等地点"
-                                                                              attributes:@{
-        NSForegroundColorAttributeName: [UIColor colorWithRed:0.70 green:0.75 blue:0.78 alpha:1.0],
-        NSFontAttributeName: [UIFont systemFontOfSize:15 weight:UIFontWeightMedium]
-    }];
-    self.searchField.clearButtonMode = UITextFieldViewModeWhileEditing;
-    [self.searchField addTarget:self action:@selector(tl_searchChanged:) forControlEvents:UIControlEventEditingChanged];
-    [self.searchContainerView addSubview:self.searchField];
+    UIImageView *searchIcon = [[UIImageView alloc] init];
+    searchIcon.contentMode = UIViewContentModeScaleAspectFit;
+    searchIcon.tintColor = [UIColor colorWithRed:0.70 green:0.75 blue:0.78 alpha:1.0];
+    if (@available(iOS 13.0, *)) {
+        searchIcon.image = [[UIImage systemImageNamed:@"magnifyingglass"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    [self.searchContainerView addSubview:searchIcon];
 
-    // Top bar constraints
+    UILabel *placeholderLabel = [[UILabel alloc] init];
+    placeholderLabel.text = @"城市/区县/村镇等地点";
+    placeholderLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+    placeholderLabel.textColor = [UIColor colorWithRed:0.70 green:0.75 blue:0.78 alpha:1.0];
+    [self.searchContainerView addSubview:placeholderLabel];
+
+    UIButton *searchTapButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [searchTapButton addTarget:self action:@selector(tl_searchBarTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.searchContainerView addSubview:searchTapButton];
+
     [self.topBarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.left.right.equalTo(self);
     }];
@@ -345,52 +249,21 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
         make.right.equalTo(self.topBarView).offset(-16);
         make.height.mas_equalTo(44);
     }];
-    [self.searchField mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.searchContainerView).offset(18);
-        make.right.equalTo(self.searchContainerView).offset(-16);
+    [searchIcon mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(self.searchContainerView).offset(14);
         make.centerY.equalTo(self.searchContainerView);
-        make.height.mas_equalTo(36);
+        make.width.height.mas_equalTo(18);
     }];
-    // topBarView bottom pinned to searchContainerView bottom + padding
+    [placeholderLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(searchIcon.mas_right).offset(8);
+        make.centerY.equalTo(self.searchContainerView);
+        make.right.equalTo(self.searchContainerView).offset(-16);
+    }];
+    [searchTapButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.searchContainerView);
+    }];
     [self.topBarView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.bottom.equalTo(self.searchContainerView.mas_bottom).offset(14);
-    }];
-}
-
-- (void)tl_setupSearchResultsCard {
-    self.searchResultsCard = [[UIView alloc] init];
-    self.searchResultsCard.backgroundColor = [UIColor colorWithRed:0.98 green:0.99 blue:1.0 alpha:1.0];
-    self.searchResultsCard.layer.cornerRadius = 18.0;
-    self.searchResultsCard.layer.shadowColor = [UIColor colorWithRed:0.0 green:0.0 blue:0.0 alpha:0.10].CGColor;
-    self.searchResultsCard.layer.shadowOpacity = 1.0;
-    self.searchResultsCard.layer.shadowRadius = 12.0;
-    self.searchResultsCard.layer.shadowOffset = CGSizeMake(0, 4);
-    self.searchResultsCard.clipsToBounds = NO;
-    self.searchResultsCard.hidden = YES;
-    [self addSubview:self.searchResultsCard];
-
-    self.searchResultsTableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
-    self.searchResultsTableView.backgroundColor = [UIColor clearColor];
-    self.searchResultsTableView.separatorInset = UIEdgeInsetsMake(0, 46, 0, 0);
-    self.searchResultsTableView.separatorColor = [UIColor colorWithRed:0.88 green:0.90 blue:0.93 alpha:1.0];
-    self.searchResultsTableView.rowHeight = 62.0;
-    self.searchResultsTableView.dataSource = self;
-    self.searchResultsTableView.delegate = self;
-    self.searchResultsTableView.layer.cornerRadius = 18.0;
-    self.searchResultsTableView.layer.masksToBounds = YES;
-    self.searchResultsTableView.bounces = YES;
-    self.searchResultsTableView.showsVerticalScrollIndicator = NO;
-    [self.searchResultsTableView registerClass:[TLWSearchResultCell class] forCellReuseIdentifier:kSearchResultCellID];
-    [self.searchResultsCard addSubview:self.searchResultsTableView];
-
-    [self.searchResultsCard mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.topBarView.mas_bottom).offset(-8);
-        make.left.equalTo(self).offset(16);
-        make.right.equalTo(self).offset(-16);
-    }];
-    [self.searchResultsTableView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.edges.equalTo(self.searchResultsCard);
-        self.tableHeightConstraint = make.height.mas_equalTo(0);
     }];
 }
 
@@ -533,51 +406,8 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
     self.selectedLocationName = selectedLocation ?: @"未选择";
     self.selectedLocationLabel.text = self.selectedLocationName;
     self.currentLocationLabel.text = currentLocation.length > 0 ? currentLocation : @"暂未获取定位";
-
     [self.recommendedGridView updateWithTitles:recommendedCities selectedTitle:selectedLocation columnCount:4];
     [self tl_reloadCitySections:citySections];
-}
-
-- (void)showSearchResults:(NSArray<TLWLocationSearchResult *> *)results forKeyword:(NSString *)keyword {
-    self.searchResults = results ?: @[];
-    self.searchKeyword = keyword ?: @"";
-
-    CGFloat rowH = self.searchResultsTableView.rowHeight;
-    CGFloat maxH = rowH * 5;
-    CGFloat tableH = MIN((CGFloat)self.searchResults.count * rowH, maxH);
-    [self.tableHeightConstraint setOffset:tableH];
-
-    [self.searchResultsTableView reloadData];
-    self.searchResultsCard.hidden = (self.searchResults.count == 0);
-    [self bringSubviewToFront:self.searchResultsCard];
-}
-
-- (void)hideSearchResults {
-    self.searchResultsCard.hidden = YES;
-    self.searchResults = @[];
-}
-
-// MARK: - UITableViewDataSource
-
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return (NSInteger)self.searchResults.count;
-}
-
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    TLWSearchResultCell *cell = [tableView dequeueReusableCellWithIdentifier:kSearchResultCellID forIndexPath:indexPath];
-    TLWLocationSearchResult *result = self.searchResults[indexPath.row];
-    [cell configureWithResult:result keyword:self.searchKeyword];
-    return cell;
-}
-
-// MARK: - UITableViewDelegate
-
-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
-    [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    TLWLocationSearchResult *result = self.searchResults[indexPath.row];
-    if (self.onSearchResultSelected) {
-        self.onSearchResultSelected(result.name);
-    }
 }
 
 // MARK: - Reload sections
@@ -610,9 +440,11 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
         for (NSString *cityName in section.cities) {
             UIButton *rowButton = [UIButton buttonWithType:UIButtonTypeCustom];
             rowButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
-            rowButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:[cityName isEqualToString:self.selectedLocationName] ? UIFontWeightBold : UIFontWeightMedium];
+            BOOL isSelected = [cityName isEqualToString:self.selectedLocationName];
+            rowButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:isSelected ? UIFontWeightBold : UIFontWeightMedium];
             [rowButton setTitle:cityName forState:UIControlStateNormal];
-            [rowButton setTitleColor:[cityName isEqualToString:self.selectedLocationName] ? [UIColor colorWithRed:0.26 green:0.68 blue:0.94 alpha:1.0] : [UIColor colorWithRed:0.36 green:0.37 blue:0.41 alpha:1.0] forState:UIControlStateNormal];
+            [rowButton setTitleColor:isSelected ? [UIColor colorWithRed:0.26 green:0.68 blue:0.94 alpha:1.0] : [UIColor colorWithRed:0.36 green:0.37 blue:0.41 alpha:1.0]
+                            forState:UIControlStateNormal];
             [rowButton addTarget:self action:@selector(tl_cityButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
             [container addSubview:rowButton];
 
@@ -656,12 +488,10 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
 // MARK: - Actions
 
 - (void)tl_backTapped {
-    [self endEditing:YES];
     if (self.onBackTapped) { self.onBackTapped(); }
 }
 
 - (void)tl_relocateTapped {
-    [self endEditing:YES];
     if (self.onRelocateTapped) { self.onRelocateTapped(); }
 }
 
@@ -670,8 +500,8 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
     if (cityName.length > 0 && self.onCitySelected) { self.onCitySelected(cityName); }
 }
 
-- (void)tl_searchChanged:(UITextField *)textField {
-    if (self.onSearchTextChanged) { self.onSearchTextChanged(textField.text ?: @""); }
+- (void)tl_searchBarTapped {
+    if (self.onSearchBarTapped) { self.onSearchBarTapped(); }
 }
 
 // MARK: - Helpers
