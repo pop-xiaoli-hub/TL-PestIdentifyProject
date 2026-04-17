@@ -8,7 +8,9 @@
 #import "AppDelegate.h"
 #import <SpeechEngineToB/SpeechEngine.h>
 #import <TargetConditionals.h>
-@interface AppDelegate ()
+#import <UserNotifications/UserNotifications.h>
+
+@interface AppDelegate () <UNUserNotificationCenterDelegate>
 
 @end
 
@@ -22,6 +24,7 @@
   if (!isRunningTests) {
     // 初始化火山引擎 Dialog 语音 SDK 环境
     [SpeechEngine prepareEnvironment];
+    [UNUserNotificationCenter currentNotificationCenter].delegate = self;
   }
   return YES;
 }
@@ -41,6 +44,23 @@
   // Called when the user discards a scene session.
   // If any sessions were discarded while the application was not running, this will be called shortly after application:didFinishLaunchingWithOptions.
   // Use this method to release any resources that were specific to the discarded scenes, as they will not return.
+}
+
+- (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
+  const unsigned char *dataBuffer = (const unsigned char *)deviceToken.bytes;
+  if (!dataBuffer || deviceToken.length == 0) {
+    return;
+  }
+
+  NSMutableString *token = [NSMutableString stringWithCapacity:(deviceToken.length * 2)];
+  for (NSInteger i = 0; i < deviceToken.length; i++) {
+    [token appendFormat:@"%02x", dataBuffer[i]];
+  }
+  NSLog(@"[Push] APNs device token: %@", token);
+}
+
+- (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
+  NSLog(@"[Push] Failed to register for remote notifications: %@", error.localizedDescription);
 }
 
 

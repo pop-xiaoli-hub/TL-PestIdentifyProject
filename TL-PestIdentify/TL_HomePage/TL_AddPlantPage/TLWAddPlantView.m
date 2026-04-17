@@ -57,7 +57,7 @@
 #pragma mark - Setup
 
 - (void)tl_setupBackground {
-  UIImage *image = [UIImage imageNamed:@"hp_backView.png"];
+  UIImage *image = [UIImage imageNamed:@"hp_backView"];
   if (image) {
     self.layer.contents = (__bridge id)image.CGImage;
     self.layer.contentsGravity = kCAGravityResizeAspectFill;
@@ -206,7 +206,7 @@
   [self.contentView addSubview:plantCardView];
   self.plantCardView = plantCardView;
 
-  UIImageView *avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_avatar.png"]];
+  UIImageView *avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_avatar"]];
   avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
   avatarImageView.clipsToBounds = YES;
   avatarImageView.layer.cornerRadius = 22.0;
@@ -219,7 +219,7 @@
   titleLabel.font = [UIFont systemFontOfSize:18.0 weight:UIFontWeightSemibold];
   [plantCardView addSubview:titleLabel];
 
-  UIImageView *locationIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_location.png"]];
+  UIImageView *locationIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_location"]];
   locationIconView.contentMode = UIViewContentModeScaleAspectFit;
   [plantCardView addSubview:locationIconView];
 
@@ -249,7 +249,7 @@
   [createButton.layer insertSublayer:createGradientLayer atIndex:0];
   self.createGradientLayer = createGradientLayer;
 
-  UIImageView *createIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_yield_leaf.png"]];
+  UIImageView *createIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_yield_leaf"]];
   createIconView.contentMode = UIViewContentModeScaleAspectFit;
   [createButton addSubview:createIconView];
 
@@ -405,7 +405,7 @@
 }
 
 - (void)updateUserAvatarWithURLString:(nullable NSString *)avatarURLString {
-  UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar.png"];
+  UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar"];
   if (avatarURLString.length > 0) {
     [self.userAvatarImageView sd_setImageWithURL:[NSURL URLWithString:avatarURLString] placeholderImage:placeholderImage];
   } else {

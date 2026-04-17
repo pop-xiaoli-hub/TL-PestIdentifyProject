@@ -136,7 +136,7 @@ static NSInteger const kResultPageCount = 3;
 }
 
 - (void)tl_setupPhotoArea {
-  UIImageView *photoView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_eg1.jpg"]];
+  UIImageView *photoView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_eg1"]];
   photoView.contentMode = UIViewContentModeScaleAspectFill;
   photoView.clipsToBounds = YES;
   photoView.backgroundColor = [UIColor colorWithWhite:0.86 alpha:1.0];
@@ -268,7 +268,7 @@ static NSInteger const kResultPageCount = 3;
 
 - (void)tl_setupFloatingActionButtons {
   UIButton *aiButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [aiButton setImage:[UIImage imageNamed:@"Ip_AI.png"] forState:UIControlStateNormal];
+  [aiButton setImage:[UIImage imageNamed:@"Ip_AI"] forState:UIControlStateNormal];
   aiButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   [self addSubview:aiButton];
 
@@ -280,16 +280,16 @@ static NSInteger const kResultPageCount = 3;
   [self addSubview:aiTextLabel];
 
   UIButton *retakeButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [retakeButton setImage:[UIImage imageNamed:@"Ip_newCap.png"] forState:UIControlStateNormal];
+  [retakeButton setImage:[UIImage imageNamed:@"Ip_newCap"] forState:UIControlStateNormal];
   retakeButton.imageView.contentMode = UIViewContentModeScaleToFill;
   [self addSubview:retakeButton];
 
-  UIImageView *aiHintBackgroundView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Ip_message.png"]];
+  UIImageView *aiHintBackgroundView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Ip_message"]];
   aiHintBackgroundView.contentMode = UIViewContentModeScaleToFill;
   aiHintBackgroundView.userInteractionEnabled = YES;
   [self addSubview:aiHintBackgroundView];
 
-  UIImageView *warnIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Ip_warn.png"]];
+  UIImageView *warnIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Ip_warn"]];
   warnIconView.contentMode = UIViewContentModeScaleAspectFit;
   [aiHintBackgroundView addSubview:warnIconView];
 

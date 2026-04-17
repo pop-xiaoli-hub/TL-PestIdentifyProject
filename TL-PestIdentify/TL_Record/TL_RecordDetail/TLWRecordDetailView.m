@@ -48,7 +48,7 @@ static CGFloat const kCardGap   = 13;
 #pragma mark - Setup
 
 - (void)tl_setupBackground {
-    self.layer.contents = (__bridge id)[UIImage imageNamed:@"hp_backView.png"].CGImage;
+    self.layer.contents = (__bridge id)[UIImage imageNamed:@"hp_backView"].CGImage;
 }
 
 - (void)tl_setupCardWithTop:(CGFloat)cardTop {
@@ -259,29 +259,30 @@ static CGFloat const kCardGap   = 13;
         make.right.equalTo(container).offset(-24);
     }];
 
-    // ── AI 助手按钮 ───────────────────────────────────────────────
-    // 橙色圆形按钮 + 下方文字，固定在左下角
+    // ── AI 助手入口 ───────────────────────────────────────────────
     UIView *aiContainer = [[UIView alloc] init];
+    aiContainer.backgroundColor = UIColor.clearColor;
     [container addSubview:aiContainer];
     [aiContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_solutionLabel.mas_bottom).offset(30);
+        make.top.equalTo(_solutionLabel.mas_bottom).offset(24);
         make.left.equalTo(container).offset(24);
+        make.width.mas_equalTo(68);
         make.bottom.equalTo(container).offset(-30); // 撑开 scrollView 内容高度
     }];
 
     _aiButton = [UIButton buttonWithType:UIButtonTypeCustom];
     _aiButton.backgroundColor = [UIColor colorWithRed:1 green:0.710 blue:0.141 alpha:1];
-    _aiButton.layer.cornerRadius = 22;
+    _aiButton.layer.cornerRadius = 24;
     _aiButton.layer.shadowColor = [UIColor colorWithRed:1 green:0.663 blue:0 alpha:1].CGColor;
-    _aiButton.layer.shadowOpacity = 0.52;
-    _aiButton.layer.shadowRadius = 5;
+    _aiButton.layer.shadowOpacity = 0.35;
+    _aiButton.layer.shadowRadius = 8;
     _aiButton.layer.shadowOffset = CGSizeMake(0, 4);
-    [_aiButton setImage:[UIImage imageNamed:@"aiAssistant"] forState:UIControlStateNormal];
+    [_aiButton setImage:[UIImage imageNamed:@"Ip_AI"] forState:UIControlStateNormal];
     _aiButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
     [aiContainer addSubview:_aiButton];
     [_aiButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.left.equalTo(aiContainer);
-        make.width.height.mas_equalTo(44);
+        make.width.height.mas_equalTo(48);
     }];
 
     UILabel *aiLabel = [[UILabel alloc] init];
@@ -291,7 +292,7 @@ static CGFloat const kCardGap   = 13;
     aiLabel.textAlignment = NSTextAlignmentCenter;
     [aiContainer addSubview:aiLabel];
     [aiLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(_aiButton.mas_bottom).offset(4);
+        make.top.equalTo(_aiButton.mas_bottom).offset(6);
         make.centerX.equalTo(_aiButton);
         make.bottom.equalTo(aiContainer);
     }];

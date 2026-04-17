@@ -174,7 +174,8 @@
     confirmLabel.userInteractionEnabled = NO;
     [_confirmButton addSubview:confirmLabel];
     [confirmLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.center.equalTo(_confirmButton);
+        make.centerX.equalTo(_confirmButton);
+        make.centerY.equalTo(_confirmButton).offset(-5);
     }];
 
     [content addSubview:_confirmButton];

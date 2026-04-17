@@ -40,7 +40,7 @@ static NSString * const kTLWRotationAnimationKey = @"tl_loading_rotate";
                                  UIViewAutoresizingFlexibleTopMargin |
                                  UIViewAutoresizingFlexibleBottomMargin;
 
-    UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+    UIImage *loadingImage = [UIImage imageNamed:@"Ip_load"];
     UIImageView *imageView = [[UIImageView alloc] initWithImage:loadingImage];
     imageView.tag = kTLWLoadingSpinnerTag;
     imageView.contentMode = UIViewContentModeScaleAspectFit;
@@ -81,7 +81,7 @@ static NSString * const kTLWRotationAnimationKey = @"tl_loading_rotate";
         return;
     }
 
-    UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+    UIImage *loadingImage = [UIImage imageNamed:@"Ip_load"];
     UIImageView *imageView = [[UIImageView alloc] initWithImage:loadingImage];
     imageView.tag = kTLWLoadingIndicatorTag;
     imageView.contentMode = UIViewContentModeScaleAspectFit;
@@ -111,7 +111,7 @@ static NSString * const kTLWRotationAnimationKey = @"tl_loading_rotate";
     container.backgroundColor = [UIColor clearColor];
 
     CGFloat size = 30;
-    UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+    UIImage *loadingImage = [UIImage imageNamed:@"Ip_load"];
     UIImageView *imageView = [[UIImageView alloc] initWithImage:loadingImage];
     imageView.tag = kTLWLoadingIndicatorTag;
     imageView.contentMode = UIViewContentModeScaleAspectFit;
@@ -137,7 +137,7 @@ static NSString * const kTLWRotationAnimationKey = @"tl_loading_rotate";
         [self _addRotationToLayer:existing.layer];
         return;
     }
-    UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+    UIImage *loadingImage = [UIImage imageNamed:@"Ip_load"];
     UIImageView *imageView = [[UIImageView alloc] initWithImage:loadingImage];
     imageView.tag = kTLWLoadingIndicatorTag;
     imageView.contentMode = UIViewContentModeScaleAspectFit;

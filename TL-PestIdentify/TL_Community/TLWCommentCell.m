@@ -42,7 +42,7 @@
   self.avatarView.clipsToBounds = YES;
   self.avatarView.layer.cornerRadius = 18.0;
   self.avatarView.backgroundColor = [UIColor colorWithWhite:0.88 alpha:1.0];
-  self.avatarView.image = [UIImage imageNamed:@"hp_avatar.png"];
+  self.avatarView.image = [UIImage imageNamed:@"hp_avatar"];
   [self.contentView addSubview:self.avatarView];
 
   // Name
@@ -65,7 +65,7 @@
   [self.contentView addSubview:self.contentLabel];
 
   // Like icon
-  self.likeIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_heart.png"]];
+  self.likeIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_heart"]];
   self.likeIcon.contentMode = UIViewContentModeScaleAspectFit;
   self.likeIcon.tintColor = [UIColor colorWithRed:1.0 green:0.35 blue:0.35 alpha:1.0];
   [self.contentView addSubview:self.likeIcon];
@@ -134,9 +134,9 @@
   //self.likeLabel.text = [NSString stringWithFormat:@"%@", comment.likeCount];
   if (comment.authorAvatar.length > 0) {
     [self.avatarView sd_setImageWithURL:[NSURL URLWithString:comment.authorAvatar]
-                       placeholderImage:[UIImage imageNamed:@"hp_avatar.png"]];
+                       placeholderImage:[UIImage imageNamed:@"hp_avatar"]];
   } else {
-    self.avatarView.image = [UIImage imageNamed:@"hp_avatar.png"];
+    self.avatarView.image = [UIImage imageNamed:@"hp_avatar"];
   }
 }
 

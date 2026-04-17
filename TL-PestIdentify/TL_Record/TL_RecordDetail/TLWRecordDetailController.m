@@ -99,7 +99,8 @@
 
 - (void)tl_openAIAssistant {
     TLWRecordResult *result = (_selectedIndex < (NSInteger)_item.results.count) ? _item.results[_selectedIndex] : nil;
-    TLWAIAssistantController *aiVC = [[TLWAIAssistantController alloc] initWithInitialQuestion:result.pestName];
+    NSString *question = result.pestName.length > 0 ? result.pestName : @"帮我分析这条识别记录";
+    TLWAIAssistantController *aiVC = [[TLWAIAssistantController alloc] initWithInitialQuestion:question];
     [self.navigationController pushViewController:aiVC animated:YES];
 }
 

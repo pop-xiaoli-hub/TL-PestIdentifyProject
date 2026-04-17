@@ -32,12 +32,14 @@
 - 发布帖子：多图选择 + 裁剪
 
 ### AI 助手
-- 多轮对话式 AI 助手（已接入 AgriPestClient chatProfile SDK）
-- 支持图片 + 文字混合输入（图片压缩后 Base64 编码传输）
+- 多轮对话式 AI 助手（SSE 流式输出，走 `/api/v1/agent/chat/stream`）
+- 自封装 `TLWAIStreamClient`：基于 `NSURLSession` + Data Delegate 逐帧解析 SSE 事件（`meta` / `disease` / `plan_delta` / `plan` / `done` / `error`）
+- 支持图片 + 文字混合输入（图片先上传换 URL，再随请求体发送，不走 Base64）
 - 消息气泡支持 markdown 渲染：标题加粗、列表转项目符号、**加粗**（iOS 15+，iOS 12-14 自动降级纯文本）
-- AI 占位消息"正在思考中..."+ 停止回复
+- 增量文本 60ms 节流合并刷新，避免 tableView 抖动
+- AI 占位消息"正在思考中..."+ 停止回复（cancel 流 + flush 已累积片段）
 - 语音通话模式（SpeechEngineToB SDK）
-- 401/403 鉴权失效自动续期重试
+- 401/403 鉴权失效一次性 refresh + 重建 stream 重试
 
 ### 我的
 - 编辑资料页（Figma 1:1 还原，独立毛玻璃卡片设计）

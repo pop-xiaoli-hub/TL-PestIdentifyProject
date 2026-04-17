@@ -11,6 +11,7 @@
 #import "TLWRecordController.h"
 #import "TLWPostDetailController.h"
 #import "TLWSDKManager.h"
+#import "TLWToast.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 #import "TLWDBManager.h"
@@ -144,7 +145,9 @@ static NSTimeInterval const kMyPublishedSyncInterval = 5 * 60;
     TLWSettingViewController *vc = [[TLWSettingViewController alloc] init];
     [self.navigationController pushViewController:vc animated:YES];
 }
-- (void)onShare { /* TODO: 分享 */ }
+- (void)onShare {
+    [TLWToast show:@"开发中..."];
+}
 - (void)onRecord {
     TLWRecordController *vc = [[TLWRecordController alloc] init];
     vc.hidesBottomBarWhenPushed = YES;

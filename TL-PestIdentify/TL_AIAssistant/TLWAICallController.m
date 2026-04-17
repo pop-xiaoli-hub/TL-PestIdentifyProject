@@ -113,7 +113,7 @@
     [self.contentView addSubview:_aiIconContainer];
     [_aiIconContainer mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self.contentView);
-        make.centerY.equalTo(self.contentView).offset(-60);
+        make.centerY.equalTo(self.contentView).offset(-112);
         make.width.height.mas_equalTo(iconContainerSize);
     }];
 
@@ -206,7 +206,12 @@
 #pragma mark - SpeechEngineDelegate
 
 - (void)onMessageWithType:(SEMessageType)type andData:(NSData *)data {
-    NSString *displayText = [self tl_extractPrimaryTextFromData:data];
+    NSString *displayText = nil;
+    if (type == SEEventASRInfo || type == SEEventASRResponse || type == SEEventChatTextQueryConfirmed) {
+        displayText = [self tl_extractASRTextFromData:data];
+    } else if (type == SEEventChatResponse || type == SEEventTTSResponse) {
+        displayText = [self tl_extractReplyTextFromData:data];
+    }
 
     dispatch_async(dispatch_get_main_queue(), ^{
         switch (type) {
@@ -401,12 +406,36 @@
         return nil;
     }
 
-    NSString *foundText = [self tl_findTextInJSONObject:jsonObject];
+    NSString *foundText = [self tl_findTextInJSONObject:jsonObject
+                                          preferredKeys:@[@"text", @"content", @"message", @"reply", @"answer"]
+                                           containerKeys:@[@"data", @"payload", @"result"]];
     if (foundText.length > 0) {
         return foundText;
     }
 
     return nil;
+}
+
+- (NSString *)tl_extractASRTextFromData:(NSData *)data {
+    id jsonObject = [self tl_JSONObjectFromData:data];
+    if (!jsonObject) {
+        return nil;
+    }
+
+    return [self tl_findTextInJSONObject:jsonObject
+                           preferredKeys:@[@"query", @"question", @"utterance", @"sentence", @"text", @"content", @"value"]
+                            containerKeys:@[@"data", @"payload", @"result", @"asr", @"query", @"recognition"]];
+}
+
+- (NSString *)tl_extractReplyTextFromData:(NSData *)data {
+    id jsonObject = [self tl_JSONObjectFromData:data];
+    if (!jsonObject) {
+        return nil;
+    }
+
+    return [self tl_findTextInJSONObject:jsonObject
+                           preferredKeys:@[@"reply", @"answer", @"message", @"content", @"text", @"sentence"]
+                            containerKeys:@[@"data", @"payload", @"result", @"chat", @"tts", @"response"]];
 }
 
 - (id)tl_JSONObjectFromData:(NSData *)data {
@@ -420,14 +449,16 @@
     return jsonObject;
 }
 
-- (NSString *)tl_findTextInJSONObject:(id)object {
+- (NSString *)tl_findTextInJSONObject:(id)object
+                        preferredKeys:(NSArray<NSString *> *)preferredKeys
+                         containerKeys:(NSArray<NSString *> *)containerKeys {
     if ([object isKindOfClass:[NSString class]]) {
         return [self tl_sanitizedText:(NSString *)object];
     }
 
     if ([object isKindOfClass:[NSArray class]]) {
         for (id item in (NSArray *)object) {
-            NSString *text = [self tl_findTextInJSONObject:item];
+            NSString *text = [self tl_findTextInJSONObject:item preferredKeys:preferredKeys containerKeys:containerKeys];
             if (text.length > 0) return text;
         }
         return nil;
@@ -438,28 +469,15 @@
     }
 
     NSDictionary *dictionary = (NSDictionary *)object;
-    NSArray<NSString *> *preferredKeys = @[
-        @"text",
-        @"content",
-        @"message",
-        @"reply",
-        @"answer",
-        @"query",
-        @"question",
-        @"prompt",
-        @"utterance",
-        @"sentence",
-        @"value"
-    ];
-
     for (NSString *key in preferredKeys) {
         id value = dictionary[key];
-        NSString *text = [self tl_findTextInJSONObject:value];
+        NSString *text = [self tl_findTextInJSONObject:value preferredKeys:preferredKeys containerKeys:containerKeys];
         if (text.length > 0) return text;
     }
 
-    for (id value in dictionary.allValues) {
-        NSString *text = [self tl_findTextInJSONObject:value];
+    for (NSString *key in containerKeys) {
+        id value = dictionary[key];
+        NSString *text = [self tl_findTextInJSONObject:value preferredKeys:preferredKeys containerKeys:containerKeys];
         if (text.length > 0) return text;
     }
 

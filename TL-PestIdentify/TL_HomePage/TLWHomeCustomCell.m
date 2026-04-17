@@ -58,7 +58,7 @@
   NSString *displayName = profile.fullName ?: profile.username ?: sessionManager.username;
   self.titleLabel.text = displayName.length > 0 ? displayName : @"用户";
 
-  UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar.png"];
+  UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar"];
   if (profile.avatarUrl.length > 0) {
     [self.avatarImageView sd_setImageWithURL:[NSURL URLWithString:profile.avatarUrl] placeholderImage:placeholderImage];
   } else {
@@ -92,7 +92,7 @@
     make.bottom.equalTo(self.contentView).offset(-8.0);
   }];
 
-  UIImageView *avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_avatar.png"]];
+  UIImageView *avatarImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_avatar"]];
   avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
   avatarImageView.clipsToBounds = YES;
   avatarImageView.layer.cornerRadius = 25.0;
@@ -106,7 +106,7 @@
   [cardView addSubview:titleLabel];
   self.titleLabel = titleLabel;
 
-  UIImageView *locationIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_location.png"]];
+  UIImageView *locationIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_location"]];
   locationIconView.contentMode = UIViewContentModeScaleAspectFit;
   [cardView addSubview:locationIconView];
   self.locationIconView = locationIconView;
@@ -141,7 +141,7 @@
   [createButton.layer insertSublayer:gradientLayer atIndex:0];
   self.createButtonGradientLayer = gradientLayer;
 
-  UIImageView *createIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_yield_leaf.png"]];
+  UIImageView *createIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_yield_leaf"]];
   createIconView.contentMode = UIViewContentModeScaleAspectFit;
   [createButton addSubview:createIconView];
 
@@ -289,7 +289,7 @@
   self.plantTagLabel.hidden = NO;
   self.plantTagLabel.text = [NSString stringWithFormat:@"  %@  ", plantModel.plantName.length > 0 ? plantModel.plantName : @"未命名植物"];
   NSString *imageURLString = plantModel.imageUrl;
-  UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar.png"];
+  UIImage *placeholderImage = [UIImage imageNamed:@"hp_avatar"];
   if (plantModel.localImage) {
     self.contentImageView.image = plantModel.localImage;
   } else if (imageURLString.length > 0) {

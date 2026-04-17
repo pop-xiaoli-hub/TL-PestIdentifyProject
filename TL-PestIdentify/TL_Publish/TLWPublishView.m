@@ -51,7 +51,7 @@ static CGFloat const kCardCornerRadius = 14.0;
 #pragma mark - Setup
 
 - (void)tl_setupBackground {
-  UIImage *image = [UIImage imageNamed:@"hp_backView.png"];
+  UIImage *image = [UIImage imageNamed:@"hp_backView"];
   if (image) {
     self.layer.contents = (__bridge id)image.CGImage;
   } else {
@@ -368,7 +368,7 @@ static CGFloat const kCardCornerRadius = 14.0;
   container.clipsToBounds = YES;
 
   // 4. 旋转 loading 图标
-  UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+  UIImage *loadingImage = [UIImage imageNamed:@"Ip_load"];
   UIImageView *loadingIV = [[UIImageView alloc] initWithImage:loadingImage];
   loadingIV.contentMode = UIViewContentModeScaleAspectFit;
   loadingIV.frame = CGRectMake(0, 0, 50, 50);

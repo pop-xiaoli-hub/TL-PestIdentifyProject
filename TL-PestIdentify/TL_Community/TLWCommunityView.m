@@ -61,7 +61,7 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
 #pragma mark - Setup UI
 
 - (void)tl_setupBackground {
-  UIImage* image = [UIImage imageNamed:@"hp_backView.png"];
+  UIImage* image = [UIImage imageNamed:@"hp_backView"];
   self.layer.contents = (__bridge id)image.CGImage;
 }
 
@@ -99,12 +99,12 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
   [container addSubview:searchFieldBackground];
   self.searchFieldBackground = searchFieldBackground;
 
-  UIImageView *searchIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_search.png"]];
+  UIImageView *searchIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_search"]];
   searchIcon.contentMode = UIViewContentModeScaleAspectFit;
   [searchFieldBackground addSubview:searchIcon];
 
   UIButton *voiceButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [voiceButton setImage:[UIImage imageNamed:@"cp_voice.png"] forState:UIControlStateNormal];
+  [voiceButton setImage:[UIImage imageNamed:@"cp_voice"] forState:UIControlStateNormal];
   voiceButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   [searchFieldBackground addSubview:voiceButton];
   self.voiceButton = voiceButton;
@@ -125,7 +125,7 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
   self.searchFieldTapGesture = searchTap;
 
   self.publishButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.publishButton setImage:[UIImage imageNamed:@"cp_publish.png"] forState:UIControlStateNormal];
+  [self.publishButton setImage:[UIImage imageNamed:@"cp_publish"] forState:UIControlStateNormal];
   self.publishButton.frame = CGRectMake(300, 400, 100, 100);
   [self addSubview:self.publishButton];
 

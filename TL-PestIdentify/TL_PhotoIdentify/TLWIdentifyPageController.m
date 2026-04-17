@@ -1048,7 +1048,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
 - (void)tl_showLoadingIndicator {
   dispatch_async(dispatch_get_main_queue(), ^{
     if (!self.loadingImageView) {
-      UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+      UIImage *loadingImage = [UIImage imageNamed:@"Ip_load"];
       self.loadingImageView = [[UIImageView alloc] initWithImage:loadingImage];
       self.loadingImageView.bounds = CGRectMake(0, 0, 130, 130);
       self.loadingImageView.center = self.myView.center;

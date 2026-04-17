@@ -41,7 +41,7 @@ static CGFloat const kCardGap    = 22;
 #pragma mark - Setup
 
 - (void)tl_setupBackground {
-    UIImage *bg = [UIImage imageNamed:@"hp_backView.png"];
+    UIImage *bg = [UIImage imageNamed:@"hp_backView"];
     self.layer.contents = (__bridge id)bg.CGImage;
 }
 

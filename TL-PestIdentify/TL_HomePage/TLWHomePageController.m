@@ -283,7 +283,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 }
 
 - (void)tl_setHomePageBackView {
-  UIImage* image = [UIImage imageNamed:@"hp_backView.png"];
+  UIImage* image = [UIImage imageNamed:@"hp_backView"];
   self.view.layer.contents = (__bridge id)image.CGImage;
 }
 
