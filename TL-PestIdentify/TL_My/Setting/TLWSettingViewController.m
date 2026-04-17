@@ -9,7 +9,150 @@
 #import "TLWPasswordLoginController.h"
 #import "TLWToast.h"
 #import <UserNotifications/UserNotifications.h>
+#import <WebKit/WebKit.h>
 #import <Masonry/Masonry.h>
+
+static NSString * const kTLWComplianceBaseURLString = @"http://115.191.67.35:8080";
+
+@interface TLWStaticWebPageController : TLWBaseViewController <WKNavigationDelegate>
+
+- (instancetype)initWithTitle:(NSString *)title
+                    urlString:(NSString *)urlString;
+
+@end
+
+@interface TLWStaticWebPageController ()
+
+@property (nonatomic, copy) NSString *pageTitle;
+@property (nonatomic, copy) NSString *urlString;
+@property (nonatomic, strong) UIVisualEffectView *cardView;
+@property (nonatomic, strong) WKWebView *webView;
+@property (nonatomic, strong) UIActivityIndicatorView *loadingView;
+@property (nonatomic, strong) UILabel *errorLabel;
+
+@end
+
+@implementation TLWStaticWebPageController
+
+- (instancetype)initWithTitle:(NSString *)title
+                    urlString:(NSString *)urlString {
+    self = [super init];
+    if (self) {
+        _pageTitle = [title copy];
+        _urlString = [urlString copy];
+        self.hidesBottomBarWhenPushed = YES;
+    }
+    return self;
+}
+
+- (NSString *)navTitle {
+    return self.pageTitle;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.layer.contents = (__bridge id)[UIImage imageNamed:@"hp_backView"].CGImage;
+    self.contentView.backgroundColor = [UIColor clearColor];
+
+    UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight];
+    self.cardView = [[UIVisualEffectView alloc] initWithEffect:blur];
+    self.cardView.layer.cornerRadius = 20.0;
+    self.cardView.layer.masksToBounds = YES;
+    [self.contentView addSubview:self.cardView];
+
+    UIView *overlay = [[UIView alloc] init];
+    overlay.backgroundColor = [UIColor colorWithRed:0.88 green:0.94 blue:0.97 alpha:0.60];
+    [self.cardView.contentView addSubview:overlay];
+
+    WKWebViewConfiguration *configuration = [[WKWebViewConfiguration alloc] init];
+    self.webView = [[WKWebView alloc] initWithFrame:CGRectZero configuration:configuration];
+    self.webView.navigationDelegate = self;
+    self.webView.backgroundColor = [UIColor whiteColor];
+    self.webView.opaque = NO;
+    if (@available(iOS 15.0, *)) {
+        self.webView.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
+    }
+    [self.cardView.contentView addSubview:self.webView];
+
+    self.loadingView = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    self.loadingView.hidesWhenStopped = YES;
+    [self.cardView.contentView addSubview:self.loadingView];
+
+    self.errorLabel = [[UILabel alloc] init];
+    self.errorLabel.hidden = YES;
+    self.errorLabel.numberOfLines = 0;
+    self.errorLabel.textAlignment = NSTextAlignmentCenter;
+    self.errorLabel.textColor = [UIColor colorWithRed:0.45 green:0.47 blue:0.52 alpha:1.0];
+    self.errorLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+    [self.cardView.contentView addSubview:self.errorLabel];
+
+    [self.cardView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self.contentView).offset(16);
+        make.left.right.equalTo(self.contentView);
+        make.bottom.equalTo(self.contentView.mas_safeAreaLayoutGuideBottom).offset(-16);
+    }];
+    [overlay mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.cardView.contentView);
+    }];
+    [self.webView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.edges.equalTo(self.cardView.contentView);
+    }];
+    [self.loadingView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(self.cardView.contentView);
+    }];
+    [self.errorLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.center.equalTo(self.cardView.contentView);
+        make.left.equalTo(self.cardView.contentView).offset(32);
+        make.right.equalTo(self.cardView.contentView).offset(-32);
+    }];
+
+    [self tl_loadPage];
+}
+
+- (void)tl_loadPage {
+    NSURL *url = [NSURL URLWithString:self.urlString];
+    if (!url) {
+        [self tl_showError:@"页面地址无效"];
+        return;
+    }
+
+    self.errorLabel.hidden = YES;
+    [self.loadingView startAnimating];
+    [self.webView loadRequest:[NSURLRequest requestWithURL:url]];
+}
+
+- (void)tl_showError:(NSString *)message {
+    [self.loadingView stopAnimating];
+    self.errorLabel.text = message;
+    self.errorLabel.hidden = NO;
+}
+
+#pragma mark - WKNavigationDelegate
+
+- (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation {
+    self.errorLabel.hidden = YES;
+    [self.loadingView startAnimating];
+}
+
+- (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+    [self.loadingView stopAnimating];
+}
+
+- (void)webView:(WKWebView *)webView didFailNavigation:(WKNavigation *)navigation withError:(NSError *)error {
+    if (error.code == NSURLErrorCancelled) {
+        return;
+    }
+    [self tl_showError:@"页面加载失败，请确认静态页服务可访问"];
+}
+
+- (void)webView:(WKWebView *)webView didFailProvisionalNavigation:(WKNavigation *)navigation withError:(NSError *)error {
+    if (error.code == NSURLErrorCancelled) {
+        return;
+    }
+    [self tl_showError:@"页面加载失败，请确认静态页服务可访问"];
+}
+
+@end
 
 @interface TLWSettingViewController ()
 @property (nonatomic, strong) TLWSettingView *myView;
@@ -70,11 +213,11 @@
     }
 }
 
-- (void)onAbout       { [TLWToast show:@"开发中..."]; }
-- (void)onFeedback    { [TLWToast show:@"开发中..."]; }
-- (void)onPermission  { [TLWToast show:@"开发中..."]; }
-- (void)onAgreement   { [TLWToast show:@"开发中..."]; }
-- (void)onPrivacy     { [TLWToast show:@"开发中..."]; }
+- (void)onAbout      { [self tl_openStaticPageWithTitle:@"关于我们" path:@"about-us.html"]; }
+- (void)onFeedback   { [self tl_openStaticPageWithTitle:@"我要反馈" path:@"feedback.html"]; }
+- (void)onPermission { [self tl_openStaticPageWithTitle:@"系统权限" path:@"permissions.html"]; }
+- (void)onAgreement  { [self tl_openStaticPageWithTitle:@"用户协议" path:@"terms.html"]; }
+- (void)onPrivacy    { [self tl_openStaticPageWithTitle:@"隐私政策" path:@"privacy.html"]; }
 
 - (void)onLogout {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"退出登录"
@@ -191,6 +334,12 @@
         }
     }]];
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)tl_openStaticPageWithTitle:(NSString *)title path:(NSString *)path {
+    NSString *urlString = [NSString stringWithFormat:@"%@/%@", kTLWComplianceBaseURLString, path];
+    TLWStaticWebPageController *controller = [[TLWStaticWebPageController alloc] initWithTitle:title urlString:urlString];
+    [self.navigationController pushViewController:controller animated:YES];
 }
 
 #pragma mark - Lazy
