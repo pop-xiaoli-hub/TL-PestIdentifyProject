@@ -10,29 +10,41 @@
 #import "TLWAIAssistantMessage.h"
 #import "TLWAIAssistantSession.h"
 #import "TLWAIAssistantView.h"
+#import "TLWAIStreamClient.h"
 #import "TLWIdentifyPageController.h"
 #import "TLWImagePickerManager.h"
 #import "TWLSpeechManager.h"
 #import "TLWToast.h"
 #import "TLWSDKManager.h"
 #import <AgriPestClient/AGChatRequest.h>
+#import <AgriPestClient/AGDefaultConfiguration.h>
 #import <AgriPestClient/AGResultChatProfileResponse.h>
-#import <AgriPestClient/AGChatProfileResponse.h>
 #import <Masonry/Masonry.h>
 #import <math.h>
+
+static NSTimeInterval const kAIAssistantTypingFlushInterval = 0.09;
+static NSUInteger const kAIAssistantTypingCharactersPerFlush = 2;
+static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
 
 @interface TLWAIAssistantController () <TLWImagePickerDelegate, UIGestureRecognizerDelegate>
 @property (nonatomic, strong) TLWAIAssistantView *myView;
 @property (nonatomic, copy)   NSString           *initialQuestion;
-@property (nonatomic, assign) BOOL                showVoicePanelAfterKeyboardHide;
-@property (nonatomic, assign) BOOL                showPlusPanelAfterKeyboardHide;
 @property (nonatomic, assign) BOOL                didSendInitialQuestion;
 // 草稿态图片先留在 controller，真正发送后再固化成 message 进入 session。
 @property (nonatomic, strong) NSMutableArray<UIImage *> *pendingImages;
 @property (nonatomic, strong) TLWAIAssistantSession *session;
 @property (nonatomic, weak)   TLWAIAssistantMessage *currentAIMessage;
 @property (nonatomic, strong) NSURLSessionTask *currentUploadTask;
-@property (nonatomic, strong) NSURLSessionTask *currentChatTask;
+/// 当前活跃的流式客户端；tl_send 重建，tl_stopAI/onDone/onError 清理。
+@property (nonatomic, strong) TLWAIStreamClient *streamClient;
+/// 未 flush 的增量文本缓冲，由定时器分批追加到 planAccumulated，避免每帧刷 tableView 抖动。
+@property (nonatomic, strong) NSMutableString *pendingDelta;
+/// 本轮对话累积的完整方案文本。onPlanFinal 触发时整体替换。
+@property (nonatomic, strong) NSMutableString *planAccumulated;
+/// 病害头部（例 "病害：番茄早疫病(92%)"），来自 disease 事件，渲染在气泡开头。
+@property (nonatomic, copy)   NSString *diseaseHeaderText;
+/// 打字机节流定时器，分批合并 plan_delta 的 UI 刷新。
+@property (nonatomic, strong) dispatch_source_t deltaFlushTimer;
 @end
 
 @implementation TLWAIAssistantController
@@ -159,7 +171,8 @@
 - (void)tl_mic {
     // 键盘和语音面板互斥，避免两个输入态同时出现。
     if (self.myView.inputTextField.isFirstResponder) {
-        self.showVoicePanelAfterKeyboardHide = YES;
+        // 先挂上语音面板，再让键盘同步退场，避免先缩到底再弹出的断层感。
+        [self.myView showVoicePanel];
         [self.myView endEditing:YES];
     } else {
         [self.myView showVoicePanel];
@@ -192,9 +205,9 @@
     if (self.myView.isPlusPanelVisible) {
         [self.myView hidePlusPanel];
     } else {
-        // 键盘和 plus 面板互斥：先收键盘，等键盘动画结束再展开
+        // 先挂上 plus 面板，再让键盘同步退场，切换更接近无缝。
         if (self.myView.inputTextField.isFirstResponder) {
-            self.showPlusPanelAfterKeyboardHide = YES;
+            [self.myView showPlusPanel];
             [self.myView endEditing:YES];
         } else {
             [self.myView showPlusPanel];
@@ -239,25 +252,12 @@
 - (void)tl_keyboardWillHide:(NSNotification *)notification {
     NSTimeInterval duration = [notification.userInfo[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
     [self.myView adjustForKeyboardHeight:0 duration:duration];
-    if (self.showVoicePanelAfterKeyboardHide) {
-        self.showVoicePanelAfterKeyboardHide = NO;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(duration * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            [self.myView showVoicePanel];
-        });
-    }
-    if (self.showPlusPanelAfterKeyboardHide) {
-        self.showPlusPanelAfterKeyboardHide = NO;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(duration * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            [self.myView showPlusPanel];
-        });
-    }
 }
 
 - (void)dealloc {
     [self.currentUploadTask cancel];
-    [self.currentChatTask cancel];
+    [self.streamClient cancel];
+    [self tl_stopDeltaFlushTimer];
     [[TWLSpeechManager sharedManager] stopRecording];
     [TWLSpeechManager sharedManager].resultHandler = nil;
     [TWLSpeechManager sharedManager].errorHandler = nil;
@@ -269,13 +269,15 @@
     if (!aiMessage) return;
 
     [self.currentUploadTask cancel];
-    [self.currentChatTask cancel];
     self.currentUploadTask = nil;
-    self.currentChatTask = nil;
+    [self.streamClient cancel];
+    self.streamClient = nil;
+    // 停流前先把已经累积的增量落到气泡里，用户看到的内容不丢。
+    [self tl_flushPendingDeltasIfNeeded];
+    [self tl_stopDeltaFlushTimer];
 
-    // 标记已停止
     aiMessage.status = TLWAIAssistantMessageStatusIdle;
-    if ([aiMessage.text isEqualToString:@"正在思考中..."]) {
+    if (aiMessage.text.length == 0 || [aiMessage.text isEqualToString:@"正在思考中..."]) {
         aiMessage.text = @"已停止回复";
     }
     self.currentAIMessage = nil;
@@ -379,60 +381,138 @@
     [self.pendingImages removeAllObjects];
     [self.myView hideSelectedImage];
 
-    // 3. 构建 SDK 请求（图片先上传拿 URL，避免大 body 走 base64）
+    // 3. 构建流式对话请求（图片先上传拿 URL，避免大 body 走 base64）
+    AGChatRequest *request = [[AGChatRequest alloc] init];
+    request.text = text;
+    request.saveHistory = @(NO);
+    request.useSingleModel = @(YES);
+
+    // 初始化本次流式状态：三段缓冲 + 头部
+    self.diseaseHeaderText = @"";
+    self.planAccumulated = [NSMutableString string];
+    self.pendingDelta = [NSMutableString string];
+
     __weak typeof(self) weakSelf = self;
-    void (^sendChatWithImageURL)(NSString *) = ^(NSString *imageURL) {
-        AGChatRequest *request = [[AGChatRequest alloc] init];
-        request.text = text;
-        request.saveHistory = @(NO);
-        request.useSingleModel = @(YES);
-        if (imageURL.length > 0) {
-            request.imageUrl = imageURL;
+    __block void (^streamOnce)(BOOL didRetryAuth) = nil;
+    NSString *compareTag = [self tl_compareDebugTag];
+    void (^startStream)(NSString *imageURL) = ^(NSString *imageURL) {
+        if (imageURL.length > 0) request.imageUrl = imageURL;
+        if (kAIAssistantEnableInterfaceCompareDebug) {
+            [weakSelf tl_startProfileComparisonDebugWithRequest:request tag:compareTag];
         }
 
-        __block void (^sendChatRequest)(BOOL);
-        sendChatRequest = ^(BOOL didRetryAuth) {
-            self.currentChatTask = [[TLWSDKManager shared].api chatProfileWithChatRequest:request completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    __strong typeof(weakSelf) strongSelf = weakSelf;
-                    if (!strongSelf) return;
-                    strongSelf.currentChatTask = nil;
+        streamOnce = ^(BOOL didRetryAuth) {
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+            if (strongSelf.currentAIMessage != aiMessage) return;
 
-                    // 用户已手动停止，忽略回调
-                    if (strongSelf.currentAIMessage != aiMessage) return;
+            NSString *token = [AGDefaultConfiguration sharedConfig].accessToken;
+            if (token.length == 0) {
+                aiMessage.status = TLWAIAssistantMessageStatusFailed;
+                aiMessage.text = @"登录已失效，请重新登录";
+                strongSelf.currentAIMessage = nil;
+                [strongSelf.myView exitAILoadingMode];
+                [strongSelf.myView displayMessages:strongSelf.session.messages];
+                return;
+            }
 
-                    if (error) {
-                        strongSelf.currentAIMessage = nil;
-                        [strongSelf.myView exitAILoadingMode];
-                        aiMessage.status = TLWAIAssistantMessageStatusFailed;
-                        aiMessage.text = @"网络请求失败，请稍后重试";
-                        aiMessage.errorMessage = error.localizedDescription;
-                        [strongSelf.myView displayMessages:strongSelf.session.messages];
-                        [TLWToast show:@"请求失败，请检查网络"];
-                        return;
-                    }
+            TLWAIStreamClient *client = [[TLWAIStreamClient alloc] init];
 
-                    TLWSessionManager *sessionManager = [TLWSDKManager shared].sessionManager;
-                    if (!didRetryAuth
-                        && [sessionManager handleAuthFailureForCode:output.code
-                                                            message:output.message
-                                                         retryBlock:^{
-                        sendChatRequest(YES);
-                    }]) {
-                        return;
-                    }
+            client.onMeta = ^(NSDictionary *meta) {
+                NSLog(@"[AIAssistant][%@][stream] meta: %@", compareTag, meta);
+            };
 
-                    if (didRetryAuth && [sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-                        [sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
-                        return;
-                    }
+            client.onDiseaseList = ^(NSArray *diseases) {
+                __strong typeof(weakSelf) s = weakSelf;
+                if (!s || s.currentAIMessage != aiMessage) return;
+                NSLog(@"[AIAssistant][%@][stream] parsed disease list: %@", compareTag, diseases);
+                s.diseaseHeaderText = [s tl_headerTextFromDiseaseList:diseases];
+                [s tl_refreshAIMessageText];
+                [s.myView displayMessages:s.session.messages];
+                [s.myView scrollMessagesToBottomAnimated:NO];
+            };
 
-                    [strongSelf tl_handleChatResponse:output error:nil forMessage:aiMessage];
-                });
-            }];
+            client.onPlanDelta = ^(NSString *delta) {
+                __strong typeof(weakSelf) s = weakSelf;
+                if (!s || s.currentAIMessage != aiMessage) return;
+                NSLog(@"[AIAssistant][%@][stream] parsed plan delta: %@", compareTag, delta);
+                [s.pendingDelta appendString:delta];
+                // 等 60ms timer 合并 flush，避免每帧刷 tableView 抖动
+            };
+
+            client.onPlanFinal = ^(NSString *fullText) {
+                __strong typeof(weakSelf) s = weakSelf;
+                if (!s || s.currentAIMessage != aiMessage) return;
+                NSLog(@"[AIAssistant][%@][stream] parsed plan final: %@", compareTag, fullText);
+                [s.pendingDelta setString:@""];
+                s.planAccumulated = [fullText mutableCopy];
+                [s tl_refreshAIMessageText];
+                [s.myView displayMessages:s.session.messages];
+                [s.myView scrollMessagesToBottomAnimated:NO];
+            };
+
+            client.onDone = ^(NSDictionary *info) {
+                __strong typeof(weakSelf) s = weakSelf;
+                if (!s || s.currentAIMessage != aiMessage) return;
+                NSLog(@"[AIAssistant][%@][stream] done info: %@", compareTag, info);
+                [s tl_flushPendingDeltasIfNeeded];
+                [s tl_stopDeltaFlushTimer];
+                if (s.planAccumulated.length == 0 && s.diseaseHeaderText.length == 0) {
+                    aiMessage.text = @"AI 暂时无法给出回复，请换个描述再试试。";
+                }
+                NSLog(@"[AIAssistant][%@][stream] visible text: %@", compareTag, aiMessage.text ?: @"");
+                aiMessage.status = TLWAIAssistantMessageStatusIdle;
+                s.currentAIMessage = nil;
+                s.streamClient = nil;
+                [s.myView exitAILoadingMode];
+                [s.myView displayMessages:s.session.messages];
+                [s.myView scrollMessagesToBottomAnimated:YES];
+            };
+
+            client.onError = ^(NSError *err, NSString *serverMsg) {
+                __strong typeof(weakSelf) s = weakSelf;
+                if (!s || s.currentAIMessage != aiMessage) return;
+                NSLog(@"[AIAssistant][%@][stream] error: err=%@ serverMsg=%@", compareTag, err, serverMsg);
+                [s tl_stopDeltaFlushTimer];
+                aiMessage.status = TLWAIAssistantMessageStatusFailed;
+                NSString *reason = serverMsg.length > 0 ? serverMsg : (err.localizedDescription ?: @"请求失败");
+                aiMessage.text = [NSString stringWithFormat:@"请求失败：%@", reason];
+                aiMessage.errorMessage = err.localizedDescription ?: serverMsg;
+                s.currentAIMessage = nil;
+                s.streamClient = nil;
+                [s.myView exitAILoadingMode];
+                [s.myView displayMessages:s.session.messages];
+                [TLWToast show:@"AI 回复失败，请重试"];
+            };
+
+            client.onAuthFailure = ^{
+                __strong typeof(weakSelf) s = weakSelf;
+                if (!s || s.currentAIMessage != aiMessage) return;
+                TLWSessionManager *sessionManager = [TLWSDKManager shared].sessionManager;
+                if (didRetryAuth) {
+                    // 续期成功后第二次又 401：按既有约定走登出，避免死循环
+                    [s tl_stopDeltaFlushTimer];
+                    [sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，请重新登录"];
+                    aiMessage.status = TLWAIAssistantMessageStatusFailed;
+                    aiMessage.text = @"登录已失效，请重新登录";
+                    s.currentAIMessage = nil;
+                    s.streamClient = nil;
+                    [s.myView exitAILoadingMode];
+                    [s.myView displayMessages:s.session.messages];
+                    return;
+                }
+                // 首次 401：走统一续期，成功后用新 token 重建一次 stream
+                [sessionManager handleUnauthorizedWithRetry:^{
+                    if (streamOnce) streamOnce(YES);
+                }];
+            };
+
+            strongSelf.streamClient = client;
+            [strongSelf tl_startDeltaFlushTimer];
+            [client streamChatWithRequest:request accessToken:token];
         };
 
-        sendChatRequest(NO);
+        streamOnce(NO);
     };
 
     // 4. 如果有图片，先上传拿 URL；没有图片直接发
@@ -455,214 +535,131 @@
                 [TLWToast show:@"图片上传失败"];
                 return;
             }
-            sendChatWithImageURL(urls.firstObject);
+            startStream(urls.firstObject);
         }];
     } else {
-        sendChatWithImageURL(nil);
+        startStream(nil);
     }
 }
 
 /// 统一处理 AI 对话响应
-- (void)tl_handleChatResponse:(AGResultChatProfileResponse *)output
-                         error:(NSError *)error
-                    forMessage:(TLWAIAssistantMessage *)aiMessage {
-    // 退出 AI 加载态
-    self.currentUploadTask = nil;
-    self.currentChatTask = nil;
-    self.currentAIMessage = nil;
-    [self.myView exitAILoadingMode];
+#pragma mark - 流式 UI 合并
 
-    NSLog(@"[AIAssistant] code=%@, message=%@, answer=%@", output.code, output.message, output.data.answer);
-
-    if (error || !output || !output.code || output.code.integerValue != 200) {
-        aiMessage.status = TLWAIAssistantMessageStatusFailed;
-        NSString *serverMsg = output.message ?: @"服务异常";
-        aiMessage.text = [NSString stringWithFormat:@"请求失败：%@", serverMsg];
-        aiMessage.errorMessage = error.localizedDescription ?: serverMsg;
-        [self.myView displayMessages:self.session.messages];
-        [TLWToast show:@"AI 回复失败，请重试"];
-        return;
-    }
-
-    NSString *answer = [self tl_controlPlanFromAnswer:output.data.answer];
-    if (answer.length == 0) {
-        answer = @"AI 暂时无法给出回复，请换个描述再试试。";
-    }
-    aiMessage.text = answer;
-    aiMessage.status = TLWAIAssistantMessageStatusIdle;
-    [self.myView displayMessages:self.session.messages];
-    [self.myView scrollMessagesToBottomAnimated:YES];
+- (NSString *)tl_compareDebugTag {
+    return NSUUID.UUID.UUIDString.lowercaseString;
 }
 
-- (NSString *)tl_displayTextFromAnswer:(NSString *)answer {
-    NSString *trimmed = [self tl_trimmedStringFromValue:answer];
-    if (trimmed.length == 0) {
-        return @"";
-    }
+- (void)tl_startProfileComparisonDebugWithRequest:(AGChatRequest *)request tag:(NSString *)tag {
+    if (!request || tag.length == 0) return;
 
-    NSArray<NSDictionary *> *structuredResults = [self tl_structuredResultsFromAnswerString:trimmed];
-    if (structuredResults.count == 0) {
-        return trimmed;
-    }
+    AGChatRequest *probeRequest = [[AGChatRequest alloc] init];
+    probeRequest.text = request.text;
+    probeRequest.imageUrl = request.imageUrl;
+    probeRequest.useSingleModel = request.useSingleModel;
+    probeRequest.extraInfo = request.extraInfo;
+    probeRequest.saveHistory = request.saveHistory;
 
-    NSMutableArray<NSString *> *sections = [NSMutableArray array];
-    [structuredResults enumerateObjectsUsingBlock:^(NSDictionary * _Nonnull item, NSUInteger idx, BOOL * _Nonnull stop) {
-        NSString *name = [self tl_firstNonEmptyStringFromValues:@[
-            item[@"diseaseName"],
-            item[@"name"],
-            item[@"title"]
-        ] fallback:[NSString stringWithFormat:@"结果%lu", (unsigned long)(idx + 1)]];
-        NSString *confidence = [self tl_confidenceTextFromValue:item[@"confidence"]];
-        NSString *plan = [self tl_firstNonEmptyStringFromValues:@[
-            item[@"controlPlan"],
-            item[@"advice"],
-            item[@"solution"],
-            item[@"reason"],
-            item[@"message"]
-        ] fallback:@"建议补拍叶片近景、病斑局部和叶背细节后再次识别。"];
+    NSLog(@"[AIAssistant][%@][compare] request payload: text=%@ imageUrl=%@ useSingleModel=%@ saveHistory=%@ extraInfo=%@",
+          tag,
+          probeRequest.text ?: @"",
+          probeRequest.imageUrl ?: @"",
+          probeRequest.useSingleModel ?: @NO,
+          probeRequest.saveHistory ?: @NO,
+          probeRequest.extraInfo ?: @"");
 
-        NSMutableArray<NSString *> *lines = [NSMutableArray array];
-        [lines addObject:[NSString stringWithFormat:@"%lu. %@", (unsigned long)(idx + 1), name]];
-        if (confidence.length > 0) {
-            [lines addObject:[NSString stringWithFormat:@"置信度：%@", confidence]];
-        }
-        if (plan.length > 0) {
-            [lines addObject:[NSString stringWithFormat:@"防治建议：%@", plan]];
-        }
-        [sections addObject:[lines componentsJoinedByString:@"\n"]];
+    [[[TLWSDKManager shared] api] chatProfileWithChatRequest:probeRequest completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error) {
+                NSLog(@"[AIAssistant][%@][profile] error: %@", tag, error);
+                return;
+            }
+
+            NSString *answer = [self tl_trimmedStringFromValue:output.data.answer];
+            id profileJSON = output.data.profile ? [output.data.profile toDictionary] : @{};
+            NSLog(@"[AIAssistant][%@][profile] code=%@ message=%@ answer=%@ profile=%@",
+                  tag,
+                  output.code,
+                  output.message,
+                  answer ?: @"",
+                  profileJSON ?: @{});
+        });
     }];
-
-    return [sections componentsJoinedByString:@"\n\n"];
 }
 
-- (NSArray<NSDictionary *> *)tl_structuredResultsFromAnswerString:(NSString *)answer {
-    id jsonObject = [self tl_JSONObjectFromPossibleJSONString:answer];
-    return [self tl_resultDictionariesFromJSONObject:jsonObject];
+/// disease 事件 -> "病害：番茄早疫病(92%)、番茄灰霉病(68%)"。
+- (NSString *)tl_headerTextFromDiseaseList:(NSArray *)list {
+    if (![list isKindOfClass:[NSArray class]] || list.count == 0) return @"";
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    for (id item in list) {
+        if (![item isKindOfClass:[NSDictionary class]]) continue;
+        NSDictionary *d = item;
+        NSString *name = [self tl_trimmedStringFromValue:(d[@"diseaseName"] ?: d[@"name"] ?: d[@"title"])];
+        if (name.length == 0) continue;
+        NSString *conf = [self tl_confidenceTextFromValue:d[@"confidence"]];
+        if (conf.length > 0) {
+            [parts addObject:[NSString stringWithFormat:@"%@(%@)", name, conf]];
+        } else {
+            [parts addObject:name];
+        }
+    }
+    if (parts.count == 0) return @"";
+    return [@"病害：" stringByAppendingString:[parts componentsJoinedByString:@"、"]];
 }
 
-- (id)tl_JSONObjectFromPossibleJSONString:(NSString *)string {
-    if (![string isKindOfClass:[NSString class]]) {
-        return nil;
+/// 用 diseaseHeaderText + planAccumulated 重算 aiMessage.text。
+- (void)tl_refreshAIMessageText {
+    TLWAIAssistantMessage *aiMessage = self.currentAIMessage;
+    if (!aiMessage) return;
+    NSMutableString *composed = [NSMutableString string];
+    if (self.diseaseHeaderText.length > 0) {
+        [composed appendString:self.diseaseHeaderText];
     }
-
-    NSString *trimmed = [self tl_trimmedStringFromValue:string];
-    if (trimmed.length == 0) {
-        return nil;
+    if (self.planAccumulated.length > 0) {
+        if (composed.length > 0) [composed appendString:@"\n\n"];
+        [composed appendString:self.planAccumulated];
     }
-
-    for (NSString *candidate in [self tl_JSONCandidatesFromString:trimmed]) {
-        NSData *data = [candidate dataUsingEncoding:NSUTF8StringEncoding];
-        if (!data) {
-            continue;
-        }
-
-        NSError *error = nil;
-        id jsonObject = [NSJSONSerialization JSONObjectWithData:data
-                                                       options:NSJSONReadingAllowFragments
-                                                         error:&error];
-        if (error || !jsonObject) {
-            continue;
-        }
-
-        if ([jsonObject isKindOfClass:[NSString class]] &&
-            ![(NSString *)jsonObject isEqualToString:candidate]) {
-            id nestedObject = [self tl_JSONObjectFromPossibleJSONString:(NSString *)jsonObject];
-            if (nestedObject) {
-                return nestedObject;
-            }
-        }
-        return jsonObject;
+    if (composed.length == 0) {
+        [composed appendString:@"正在生成方案..."];
     }
-
-    return nil;
+    aiMessage.text = composed.copy;
 }
 
-- (NSArray<NSString *> *)tl_JSONCandidatesFromString:(NSString *)string {
-    NSMutableArray<NSString *> *candidates = [NSMutableArray array];
-    if (string.length == 0) {
-        return candidates.copy;
-    }
-
-    [candidates addObject:string];
-
-    NSRange firstBracketRange = [string rangeOfString:@"["];
-    NSRange lastBracketRange = [string rangeOfString:@"]" options:NSBackwardsSearch];
-    if (firstBracketRange.location != NSNotFound &&
-        lastBracketRange.location != NSNotFound &&
-        lastBracketRange.location > firstBracketRange.location) {
-        NSString *bracketCandidate = [string substringWithRange:NSMakeRange(firstBracketRange.location,
-                                                                            lastBracketRange.location - firstBracketRange.location + 1)];
-        if (![candidates containsObject:bracketCandidate]) {
-            [candidates addObject:bracketCandidate];
-        }
-    }
-
-    NSRange firstBraceRange = [string rangeOfString:@"{"];
-    NSRange lastBraceRange = [string rangeOfString:@"}" options:NSBackwardsSearch];
-    if (firstBraceRange.location != NSNotFound &&
-        lastBraceRange.location != NSNotFound &&
-        lastBraceRange.location > firstBraceRange.location) {
-        NSString *braceCandidate = [string substringWithRange:NSMakeRange(firstBraceRange.location,
-                                                                          lastBraceRange.location - firstBraceRange.location + 1)];
-        if (![candidates containsObject:braceCandidate]) {
-            [candidates addObject:braceCandidate];
-        }
-    }
-
-    return candidates.copy;
+/// 把 pendingDelta 分批累加到 planAccumulated 并刷新气泡。timer 定时触发，done/final 时手动兜底调用。
+- (void)tl_flushPendingDeltasIfNeeded {
+    if (!self.currentAIMessage) return;
+    if (self.pendingDelta.length == 0) return;
+    NSUInteger chunkLength = MIN(self.pendingDelta.length, kAIAssistantTypingCharactersPerFlush);
+    NSString *chunk = [self.pendingDelta substringToIndex:chunkLength];
+    [self.planAccumulated appendString:chunk];
+    [self.pendingDelta deleteCharactersInRange:NSMakeRange(0, chunkLength)];
+    [self tl_refreshAIMessageText];
+    [self.myView displayMessages:self.session.messages];
+    [self.myView scrollMessagesToBottomAnimated:NO];
 }
 
-- (NSArray<NSDictionary *> *)tl_resultDictionariesFromJSONObject:(id)jsonObject {
-    if ([jsonObject isKindOfClass:[NSArray class]]) {
-        NSMutableArray<NSDictionary *> *results = [NSMutableArray array];
-        for (id item in (NSArray *)jsonObject) {
-            if ([item isKindOfClass:[NSDictionary class]] && [self tl_isStructuredResultDictionary:item]) {
-                [results addObject:item];
-            }
-        }
-        return results.copy;
-    }
-
-    if (![jsonObject isKindOfClass:[NSDictionary class]]) {
-        return @[];
-    }
-
-    NSDictionary *dictionary = (NSDictionary *)jsonObject;
-    if ([self tl_isStructuredResultDictionary:dictionary]) {
-        return @[dictionary];
-    }
-
-    NSArray<NSString *> *nestedKeys = @[@"results", @"data", @"result", @"response", @"content", @"message", @"answer"];
-    for (NSString *key in nestedKeys) {
-        id value = dictionary[key];
-        NSArray<NSDictionary *> *nestedResults = [self tl_resultDictionariesFromJSONObject:value];
-        if (nestedResults.count > 0) {
-            return nestedResults;
-        }
-        if ([value isKindOfClass:[NSString class]]) {
-            nestedResults = [self tl_structuredResultsFromAnswerString:(NSString *)value];
-            if (nestedResults.count > 0) {
-                return nestedResults;
-            }
-        }
-    }
-
-    return @[];
+- (void)tl_startDeltaFlushTimer {
+    if (self.deltaFlushTimer) return;
+    dispatch_source_t t = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    dispatch_source_set_timer(t,
+                              dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kAIAssistantTypingFlushInterval * NSEC_PER_SEC)),
+                              (uint64_t)(kAIAssistantTypingFlushInterval * NSEC_PER_SEC),
+                              (uint64_t)(20 * NSEC_PER_MSEC));
+    __weak typeof(self) weakSelf = self;
+    dispatch_source_set_event_handler(t, ^{
+        [weakSelf tl_flushPendingDeltasIfNeeded];
+    });
+    dispatch_resume(t);
+    self.deltaFlushTimer = t;
 }
 
-- (BOOL)tl_isStructuredResultDictionary:(NSDictionary *)dictionary {
-    if (![dictionary isKindOfClass:[NSDictionary class]]) {
-        return NO;
+- (void)tl_stopDeltaFlushTimer {
+    if (self.deltaFlushTimer) {
+        dispatch_source_cancel(self.deltaFlushTimer);
+        self.deltaFlushTimer = nil;
     }
-
-    return dictionary[@"diseaseName"] != nil ||
-           dictionary[@"controlPlan"] != nil ||
-           dictionary[@"name"] != nil ||
-           dictionary[@"confidence"] != nil ||
-           dictionary[@"advice"] != nil ||
-           dictionary[@"solution"] != nil ||
-           dictionary[@"reason"] != nil;
 }
+
+#pragma mark - Helpers
 
 - (NSString *)tl_confidenceTextFromValue:(id)value {
     if ([value isKindOfClass:[NSNumber class]]) {
@@ -696,16 +693,6 @@
     return [NSString stringWithFormat:@"%.1f%%", number];
 }
 
-- (NSString *)tl_firstNonEmptyStringFromValues:(NSArray *)values fallback:(NSString *)fallback {
-    for (id value in values) {
-        NSString *text = [self tl_trimmedStringFromValue:value];
-        if (text.length > 0) {
-            return text;
-        }
-    }
-    return fallback ?: @"";
-}
-
 - (NSString *)tl_trimmedStringFromValue:(id)value {
     if ([value isKindOfClass:[NSString class]]) {
         return [(NSString *)value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -714,39 +701,6 @@
         return [[(NSNumber *)value stringValue] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     }
     return @"";
-}
-
-/// 从 answer JSON 数组中提取 controlPlan，多条结果换行拼接；解析失败则返回原始字符串
-- (NSString *)tl_controlPlanFromAnswer:(NSString *)answer {
-    NSString *trimmed = [self tl_trimmedStringFromValue:answer];
-    if (trimmed.length == 0) return @"";
-
-    NSData *data = [trimmed dataUsingEncoding:NSUTF8StringEncoding];
-    if (!data) return trimmed;
-
-    NSError *error = nil;
-    id json = [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingAllowFragments error:&error];
-    if (error || !json) return trimmed;
-
-    NSArray *array = nil;
-    if ([json isKindOfClass:[NSArray class]]) {
-        array = json;
-    } else if ([json isKindOfClass:[NSDictionary class]]) {
-        array = @[json];
-    }
-    if (array.count == 0) return trimmed;
-
-    NSMutableArray<NSString *> *plans = [NSMutableArray array];
-    for (id item in array) {
-        if (![item isKindOfClass:[NSDictionary class]]) continue;
-        NSString *plan = [self tl_trimmedStringFromValue:item[@"controlPlan"]];
-        if (plan.length > 0) {
-            [plans addObject:plan];
-        }
-    }
-
-    if (plans.count == 0) return trimmed;
-    return [plans componentsJoinedByString:@"\n\n"];
 }
 
 /// 异步批量压缩图片，完成后回到主线程

@@ -14,6 +14,7 @@ static CGFloat const kTextViewBaseHeight = 34.0;
 static CGFloat const kPreviewAreaHeight = 96.0;
 static CGFloat const kVoicePanelHeight = 180.0;
 static CGFloat const kPlusPanelHeight = 120.0;
+static NSTimeInterval const kPanelTransitionDuration = 0.18;
 
 @interface TLWAIAssistantComposerView () <UITextViewDelegate>
 @property (nonatomic, strong, readwrite) UITextView *inputTextField;
@@ -357,7 +358,7 @@ static CGFloat const kPlusPanelHeight = 120.0;
     [self.roundContainerCenterYConstraint deactivate];
     [self.roundContainerTopConstraint activate];
     [self tl_updateInputBarHeight];
-    [UIView animateWithDuration:0.25 animations:^{
+    [UIView animateWithDuration:kPanelTransitionDuration animations:^{
         [self layoutIfNeeded];
     }];
 }
@@ -367,7 +368,7 @@ static CGFloat const kPlusPanelHeight = 120.0;
     [self.roundContainerTopConstraint deactivate];
     [self.roundContainerCenterYConstraint activate];
     [self tl_updateInputBarHeight];
-    [UIView animateWithDuration:0.25 animations:^{
+    [UIView animateWithDuration:kPanelTransitionDuration animations:^{
         [self layoutIfNeeded];
     }];
 }
@@ -381,7 +382,7 @@ static CGFloat const kPlusPanelHeight = 120.0;
     [self.roundContainerCenterYConstraint deactivate];
     [self.roundContainerTopConstraint activate];
     [self tl_updateInputBarHeight];
-    [UIView animateWithDuration:0.25 animations:^{
+    [UIView animateWithDuration:kPanelTransitionDuration animations:^{
         [self layoutIfNeeded];
     }];
 }
@@ -391,7 +392,7 @@ static CGFloat const kPlusPanelHeight = 120.0;
     [self.roundContainerTopConstraint deactivate];
     [self.roundContainerCenterYConstraint activate];
     [self tl_updateInputBarHeight];
-    [UIView animateWithDuration:0.25 animations:^{
+    [UIView animateWithDuration:kPanelTransitionDuration animations:^{
         [self layoutIfNeeded];
     }];
 }
