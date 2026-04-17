@@ -15,6 +15,7 @@
 @interface TLWPasswordLoginController ()
 
 @property (nonatomic, strong) TLWPasswordLoginView *passwordLoginView;
+@property (nonatomic, assign) BOOL agreedToTerms;
 
 @end
 
@@ -29,6 +30,7 @@
     [super viewDidLoad];
     self.navigationController.navigationBarHidden = YES;
     self.passwordLoginView.backButton.hidden = YES;
+    self.agreedToTerms = NO;
 
     [self.passwordLoginView.loginTapButton addTarget:self
                                               action:@selector(handleLogin)
@@ -50,6 +52,10 @@
                                                action:@selector(handleSwitchToSms)
                                      forControlEvents:UIControlEventTouchUpInside];
 
+    [self.passwordLoginView.termsCheckButton addTarget:self
+                                                action:@selector(handleToggleTerms)
+                                      forControlEvents:UIControlEventTouchUpInside];
+
     // 点击空白处收起键盘
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
                                    initWithTarget:self action:@selector(dismissKeyboard)];
@@ -66,6 +72,10 @@
 #pragma mark - Actions
 
 - (void)handleLogin {
+    if (!self.agreedToTerms) {
+        [TLWToast show:@"请先阅读并同意用户协议和隐私政策"];
+        return;
+    }
     NSString *account  = self.passwordLoginView.accountField.text;
     NSString *password = self.passwordLoginView.passwordField.text;
     if (account.length == 0 || password.length == 0) {
@@ -95,6 +105,11 @@
             [self navigateAfterLogin];
         });
     }];
+}
+
+- (void)handleToggleTerms {
+    self.agreedToTerms = !self.agreedToTerms;
+    self.passwordLoginView.termsCheckButton.selected = self.agreedToTerms;
 }
 
 - (void)handleTogglePassword {

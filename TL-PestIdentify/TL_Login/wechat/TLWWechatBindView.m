@@ -15,6 +15,7 @@
 @property (nonatomic, strong, readwrite) UIButton *qqLoginButton;
 @property (nonatomic, strong, readwrite) UIButton *smsLoginButton;
 @property (nonatomic, strong, readwrite) UIButton *passwordLoginButton;
+@property (nonatomic, strong, readwrite) UIButton *termsCheckButton;
 
 @end
 
@@ -157,10 +158,15 @@
         make.height.mas_equalTo(44);
     }];
 
-    UIImageView *checkImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconCheckbox"]];
-    checkImageView.contentMode = UIViewContentModeScaleAspectFit;
-    [wrapper addSubview:checkImageView];
-    [checkImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+    _termsCheckButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    UIImage *uncheckedImg = [[UIImage imageNamed:@"iconCheckbox"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+    UIImage *checkedImg   = [[UIImage imageNamed:@"iconCheckbox"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    [_termsCheckButton setImage:uncheckedImg forState:UIControlStateNormal];
+    [_termsCheckButton setImage:checkedImg forState:UIControlStateSelected];
+    _termsCheckButton.tintColor = [UIColor colorWithRed:76/255.0 green:175/255.0 blue:80/255.0 alpha:1.0];
+    _termsCheckButton.contentMode = UIViewContentModeScaleAspectFit;
+    [wrapper addSubview:_termsCheckButton];
+    [_termsCheckButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.equalTo(wrapper);
         make.centerY.equalTo(wrapper);
         make.width.height.mas_equalTo(24);
@@ -188,7 +194,7 @@
     agreeLabel.numberOfLines  = 1;
     [wrapper addSubview:agreeLabel];
     [agreeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(checkImageView.mas_right).offset(4);
+        make.left.equalTo(_termsCheckButton.mas_right).offset(4);
         make.right.equalTo(wrapper);   // 定义 wrapper 宽度
         make.centerY.equalTo(wrapper);
     }];

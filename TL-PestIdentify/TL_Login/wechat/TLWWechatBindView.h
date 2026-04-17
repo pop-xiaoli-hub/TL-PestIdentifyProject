@@ -15,6 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIButton *qqLoginButton;
 @property (nonatomic, strong, readonly) UIButton *smsLoginButton;
 @property (nonatomic, strong, readonly) UIButton *passwordLoginButton;
+@property (nonatomic, strong, readonly) UIButton *termsCheckButton;
 
 @end
 
