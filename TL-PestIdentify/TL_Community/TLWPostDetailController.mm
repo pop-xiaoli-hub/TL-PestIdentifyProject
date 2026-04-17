@@ -88,7 +88,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 }
 
 - (void)tl_setHomePageBackView {
-  UIImage* image = [UIImage imageNamed:@"hp_backView.png"];
+  UIImage* image = [UIImage imageNamed:@"hp_backView"];
   self.view.layer.contents = (__bridge id)image.CGImage;
 }
 
@@ -142,7 +142,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   }];
 
   UIImageView* iconView = [[UIImageView alloc] init];
-  iconView.image = [[UIImage imageNamed:@"cp_post.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  iconView.image = [[UIImage imageNamed:@"cp_post"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
   [navBar addSubview:iconView];
   [iconView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(titleLbl.mas_right).offset(2);
@@ -247,7 +247,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
   // Like button
   self.likeButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.likeButton setImage:[UIImage imageNamed:@"cp_capture.png"] forState:UIControlStateNormal];
+  [self.likeButton setImage:[UIImage imageNamed:@"cp_capture"] forState:UIControlStateNormal];
   self.likeButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   [self.inputBar addSubview:self.likeButton];
   [self.likeButton mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -557,7 +557,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 - (void)applyLikedUI:(BOOL)isLiked count:(NSInteger)count {
   self.headerView.isLiked = isLiked;
-  NSString *imageName = isLiked ? @"cp_isLiked-2.png" : @"cp_isLiked-1.png";
+  NSString *imageName = isLiked ? @"cp_isLiked-2" : @"cp_isLiked-1";
   [self.headerView.likeButton setImage:[UIImage imageNamed:imageName] forState:UIControlStateNormal];
   self.headerView.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
   self.headerView.likedCountLabel.textColor = isLiked
@@ -567,7 +567,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 - (void)applyCollectedUI:(BOOL)isCollected count:(NSInteger)count {
   self.headerView.isCollected = isCollected;
-  NSString *imageName = isCollected ? @"cp_collected-2.png" : @"cp_collected-1.png";
+  NSString *imageName = isCollected ? @"cp_collected-2" : @"cp_collected-1";
   [self.headerView.collectButton setImage:[UIImage imageNamed:imageName] forState:UIControlStateNormal];
   self.headerView.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)MAX(0, count)];
   self.headerView.collectedCountLabel.textColor = isCollected

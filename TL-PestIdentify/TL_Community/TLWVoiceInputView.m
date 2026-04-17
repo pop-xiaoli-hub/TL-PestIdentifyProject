@@ -71,7 +71,7 @@ static CGFloat const kSearchButtonSpacing = 8.0;
 #pragma mark - Setup
 
 - (void)tl_setupBackground {
-  UIImage* image = [UIImage imageNamed:@"cp_backView.png"];
+  UIImage* image = [UIImage imageNamed:@"cp_backView"];
   self.layer.contents = (__bridge id)image.CGImage;
 }
 
@@ -105,7 +105,7 @@ static CGFloat const kSearchButtonSpacing = 8.0;
   [header addSubview:searchBg];
   self.searchBackgroundView = searchBg;
 
-  UIImageView *searchIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_search.png"]];
+  UIImageView *searchIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_search"]];
   searchIcon.contentMode = UIViewContentModeScaleAspectFit;
   [searchBg addSubview:searchIcon];
 
@@ -175,7 +175,7 @@ static CGFloat const kSearchButtonSpacing = 8.0;
   [self addSubview:container];
   self.centerCircleContainer = container;
 
-  UIImageView* circleBg = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_voiceload.png"]];
+  UIImageView* circleBg = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_voiceload"]];
   [container addSubview:circleBg];
 
   CAShapeLayer *ringLayer = [CAShapeLayer layer];
@@ -298,7 +298,7 @@ static CGFloat const kSearchButtonSpacing = 8.0;
 - (void)tl_setupBottomHint {
   UIButton *micBtn = [UIButton buttonWithType:UIButtonTypeCustom];
   micBtn.clipsToBounds = YES;
-  UIImage *micImg = [UIImage imageNamed:@"cp_voiceInput.png"];
+  UIImage *micImg = [UIImage imageNamed:@"cp_voiceInput"];
   if (micImg) {
     [micBtn setImage:micImg forState:UIControlStateNormal];
     micBtn.tintColor = [UIColor darkGrayColor];

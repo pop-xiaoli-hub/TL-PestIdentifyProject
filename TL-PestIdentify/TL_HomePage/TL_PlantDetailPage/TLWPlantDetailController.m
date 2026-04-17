@@ -230,9 +230,9 @@
   if (self.viewModel.plantModel.localImage) {
     self.detailView.topImageView.image = self.viewModel.plantModel.localImage;
   } else if ([self.viewModel imageURLString].length > 0) {
-    [self.detailView.topImageView sd_setImageWithURL:[NSURL URLWithString:[self.viewModel imageURLString]] placeholderImage:[UIImage imageNamed:@"hp_eg1.jpg"]];
+    [self.detailView.topImageView sd_setImageWithURL:[NSURL URLWithString:[self.viewModel imageURLString]] placeholderImage:[UIImage imageNamed:@"hp_eg1"]];
   } else {
-    self.detailView.topImageView.image = [UIImage imageNamed:@"hp_eg1.jpg"];
+    self.detailView.topImageView.image = [UIImage imageNamed:@"hp_eg1"];
   }
 
   [self.detailView configureWithViewModel:self.viewModel];

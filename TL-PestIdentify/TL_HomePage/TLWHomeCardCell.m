@@ -318,7 +318,7 @@
     make.height.equalTo(leftStack.mas_height).multipliedBy(0.48);
   }];
 
-  UIImageView *recordOuterIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_identification_1.png"]];
+  UIImageView *recordOuterIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_identification_1"]];
   recordOuterIcon.contentMode = UIViewContentModeScaleAspectFill;
   recordOuterIcon.clipsToBounds = YES;
   recordOuterIcon.layer.cornerRadius = 18.0;
@@ -379,7 +379,7 @@
     make.height.equalTo(leftStack.mas_height).multipliedBy(0.48);
   }];
 
-  UIImageView *assistantOuterIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_smartAssistant_1.png"]];
+  UIImageView *assistantOuterIcon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"hp_smartAssistant_1"]];
   assistantOuterIcon.contentMode = UIViewContentModeScaleAspectFill;
   assistantOuterIcon.clipsToBounds = YES;
   assistantOuterIcon.layer.cornerRadius = 18.0;
@@ -440,13 +440,13 @@
   rightGradient.cornerRadius = 24.0;
   [rightCard.layer insertSublayer:rightGradient atIndex:0];
 
-  UIImageView* imageView1 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_4.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
+  UIImageView* imageView1 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_4"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
   [rightCardShadow addSubview:imageView1];
   [imageView1 mas_makeConstraints:^(MASConstraintMaker *make) {
       make.left.equalTo(rightCardShadow.mas_left).offset(40);
       make.top.equalTo(rightCardShadow.mas_top).offset(40);
   }];
-  UIImageView* imageView2 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_1.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
+  UIImageView* imageView2 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_1"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
   [rightCardShadow addSubview:imageView2];
   [imageView2 mas_makeConstraints:^(MASConstraintMaker *make) {
       make.center.equalTo(rightCardShadow);
@@ -454,14 +454,14 @@
     make.height.mas_equalTo(99.98);
   }];
 
-  UIImageView* imageView3 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_2.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
+  UIImageView* imageView3 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_2"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
   [rightCardShadow addSubview:imageView3];
   [imageView3 mas_makeConstraints:^(MASConstraintMaker *make) {
     make.center.equalTo(imageView2);
     make.height.width.mas_equalTo(35);
   }];
 
-  UIImageView* imageView4 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_3.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
+  UIImageView* imageView4 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_3"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
   [rightCardShadow addSubview:imageView4];
   [imageView4 mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(imageView3.mas_right).offset(2);
@@ -469,7 +469,7 @@
     make.height.width.mas_equalTo(10);
   }];
 
-  UIImageView* imageView5 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_5.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
+  UIImageView* imageView5 = [[UIImageView alloc] initWithImage:[[UIImage imageNamed:@"hp_identify_5"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]];
   [rightCardShadow addSubview:imageView5];
   [imageView5 mas_makeConstraints:^(MASConstraintMaker *make) {
     make.bottom.equalTo(imageView2.mas_top).offset(18);

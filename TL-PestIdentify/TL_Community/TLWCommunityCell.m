@@ -110,13 +110,13 @@
   self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
   self.avatarView.clipsToBounds = YES;
   self.avatarView.layer.cornerRadius = 10.0;
-  self.avatarView.image = [UIImage imageNamed:@"hp_avatar.png"];
+  self.avatarView.image = [UIImage imageNamed:@"hp_avatar"];
 
   self.userLabel = [[UILabel alloc] init];
   self.userLabel.font = [UIFont systemFontOfSize:11];
   self.userLabel.textColor = [UIColor colorWithWhite:0.2 alpha:1.0];
 
-  self.likeIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_heart.png"]];
+  self.likeIconView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"cp_heart"]];
   self.likeIconView.contentMode = UIViewContentModeScaleAspectFit;
 
   self.likeLabel = [[UILabel alloc] init];
@@ -176,7 +176,7 @@
   }];
 
   // 遮罩上的「发布中」旋转 loading + 文字
-  UIImage *loadingImage = [UIImage imageNamed:@"Ip_load.png"];
+  UIImage *loadingImage = [UIImage imageNamed:@"Ip_load"];
   UIImageView *loadingIV = [[UIImageView alloc] initWithImage:loadingImage];
   loadingIV.contentMode = UIViewContentModeScaleAspectFit;
   [self.pendingBlurView.contentView addSubview:loadingIV];
@@ -284,23 +284,23 @@
 - (void)configureWithPost:(TLWCommunityPost *)post {
   id first = (post.images.count > 0) ? post.images.firstObject : nil;
   if (!first || first == [NSNull null]) {
-    self.photoView.image = [UIImage imageNamed:@"cp_placeholder.jpg"];
+    self.photoView.image = [UIImage imageNamed:@"cp_placeholder"];
   } else if ([first isKindOfClass:[UIImage class]]) {
     UIImage *img = (UIImage *)first;
-    self.photoView.image = img ?: [UIImage imageNamed:@"cp_placeholder.jpg"];
+    self.photoView.image = img ?: [UIImage imageNamed:@"cp_placeholder"];
   } else if ([first isKindOfClass:[NSString class]]) {
     NSString *urlStr = (NSString *)first;
     if (urlStr.length == 0) {
-      self.photoView.image = [UIImage imageNamed:@"cp_placeholder.jpg"];
+      self.photoView.image = [UIImage imageNamed:@"cp_placeholder"];
     } else {
       NSURL *url = [NSURL URLWithString:urlStr];
       // 仅加载展示，不参与瀑布流高度计算
-      [self.photoView sd_setImageWithURL:url placeholderImage:[UIImage imageNamed:@"cp_placeholder.jpg"]];
+      [self.photoView sd_setImageWithURL:url placeholderImage:[UIImage imageNamed:@"cp_placeholder"]];
     }
   } else {
-    self.photoView.image = [UIImage imageNamed:@"cp_placeholder.jpg"];
+    self.photoView.image = [UIImage imageNamed:@"cp_placeholder"];
   }
-  [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar] placeholderImage:[UIImage imageNamed:@"hp_avatar.png"]];
+  [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar] placeholderImage:[UIImage imageNamed:@"hp_avatar"]];
   self.titleLabel.text = [self tl_displayTitleTextForPost:post];
   self.userLabel.text = post.authorName;
   self.likeLabel.text = [NSString stringWithFormat:@"%@", post.likeCount];

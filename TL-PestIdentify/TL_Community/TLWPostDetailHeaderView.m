@@ -87,7 +87,7 @@ static CGFloat const kHorizontalPad = 16.0;
   self.avatarView.clipsToBounds = YES;
   self.avatarView.layer.cornerRadius = 23.0;
   self.avatarView.backgroundColor = [UIColor colorWithWhite:0.88 alpha:1.0];
-  self.avatarView.image = [UIImage imageNamed:@"hp_avatar.png"];
+  self.avatarView.image = [UIImage imageNamed:@"hp_avatar"];
   [self addSubview:self.avatarView];
 
   self.nameLabel = [[UILabel alloc] init];
@@ -103,7 +103,7 @@ static CGFloat const kHorizontalPad = 16.0;
 
   // ---- 点赞组：图标 + 数量 ----
   self.likeButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.likeButton setImage:[UIImage imageNamed:@"cp_isLiked-1.png"] forState:UIControlStateNormal];
+  [self.likeButton setImage:[UIImage imageNamed:@"cp_isLiked-1"] forState:UIControlStateNormal];
   self.likeButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
 
   [self addSubview:self.likeButton];
@@ -117,7 +117,7 @@ static CGFloat const kHorizontalPad = 16.0;
 
   // ---- 收藏组：图标 + 数量 ----
   self.collectButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.collectButton setImage:[UIImage imageNamed:@"cp_collected-1.png"] forState:UIControlStateNormal];
+  [self.collectButton setImage:[UIImage imageNamed:@"cp_collected-1"] forState:UIControlStateNormal];
   self.collectButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   [self addSubview:self.collectButton];
 
@@ -238,7 +238,7 @@ static CGFloat const kHorizontalPad = 16.0;
   self.nameLabel.text = post.authorName.length > 0 ? post.authorName : @"匿名用户";
   if (post.authorAvatar.length > 0) {
     [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar]
-                       placeholderImage:[UIImage imageNamed:@"hp_avatar.png"]];
+                       placeholderImage:[UIImage imageNamed:@"hp_avatar"]];
   }
   self.titleLabel.text = post.title.length > 0 ? post.title : @"";
   self.contentLabel.text = post.content.length > 0 ? post.content : @"";

@@ -32,7 +32,7 @@
 
 - (void)tl_setupBackground {
   self.backgroundColor = [UIColor whiteColor];
-  UIImage *image = [UIImage imageNamed:@"hp_backView.png"];
+  UIImage *image = [UIImage imageNamed:@"hp_backView"];
   self.layer.contents = (__bridge id)image.CGImage;
 }
 

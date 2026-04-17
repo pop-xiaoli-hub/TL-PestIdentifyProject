@@ -18,7 +18,7 @@
 
 - (instancetype)initWithFrame:(CGRect)frame {
   if (self = [super initWithFrame:frame]) {
-    UIImage* image = [UIImage imageNamed:@"hp_backView.png"];
+    UIImage* image = [UIImage imageNamed:@"hp_backView"];
     self.layer.contents = (__bridge id)image.CGImage;
     [self tl_setMaskView];
     [self tl_setupSubViews];
@@ -28,7 +28,7 @@
 
 - (void)tl_setupSubViews {
   self.backButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.backButton setImage:[UIImage imageNamed:@"lp_back.png"] forState:UIControlStateNormal];
+  [self.backButton setImage:[UIImage imageNamed:@"lp_back"] forState:UIControlStateNormal];
   [self.blurView.contentView addSubview:self.backButton];
   [self.backButton mas_makeConstraints:^(MASConstraintMaker *make) {
       make.left.equalTo(self.blurView.contentView.mas_left).offset(15);
@@ -46,7 +46,7 @@
       make.top.equalTo(self.backButton.mas_top).offset(10);
   }];
   self.recordButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.recordButton setImage:[UIImage imageNamed:@"lp_record.png"] forState:UIControlStateNormal];
+  [self.recordButton setImage:[UIImage imageNamed:@"lp_record"] forState:UIControlStateNormal];
   [self.blurView.contentView addSubview:self.recordButton];
   [self.recordButton mas_makeConstraints:^(MASConstraintMaker *make) {
       make.right.equalTo(self.blurView.contentView.mas_right).offset(8);
@@ -55,7 +55,7 @@
       make.width.mas_equalTo(115);
   }];
   self.captureButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.captureButton setImage:[UIImage imageNamed:@"lp_capture.png"] forState:UIControlStateNormal];
+  [self.captureButton setImage:[UIImage imageNamed:@"lp_capture"] forState:UIControlStateNormal];
   [self.blurView.contentView addSubview:self.captureButton];
   [self.captureButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self.blurView.contentView.mas_centerX);
@@ -63,7 +63,7 @@
     make.width.height.mas_equalTo(97);
   }];
   self.flashButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.flashButton setImage:[UIImage imageNamed:@"lp_ray.png"] forState:UIControlStateNormal];
+  [self.flashButton setImage:[UIImage imageNamed:@"lp_ray"] forState:UIControlStateNormal];
   [self.blurView.contentView addSubview:self.flashButton];
   [self.flashButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(self.captureButton.mas_top).offset(25);
@@ -72,7 +72,7 @@
     make.right.equalTo(self.captureButton.mas_left).offset(-60);
   }];
   self.photosButton = [UIButton buttonWithType:UIButtonTypeCustom];
-  [self.photosButton setImage:[UIImage imageNamed:@"lp_photos.png"] forState:UIControlStateNormal];
+  [self.photosButton setImage:[UIImage imageNamed:@"lp_photos"] forState:UIControlStateNormal];
   [self.blurView.contentView addSubview:self.photosButton];
   [self.photosButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(self.captureButton.mas_top).offset(25);
