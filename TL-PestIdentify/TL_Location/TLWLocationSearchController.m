@@ -5,6 +5,8 @@
 
 #import "TLWLocationSearchController.h"
 #import "Models/TLWLocationCityModel.h"
+#import "TLWLocationManager.h"
+#import <MapKit/MapKit.h>
 #import <Masonry/Masonry.h>
 
 // MARK: - Search result model
@@ -13,6 +15,7 @@
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy) NSString *distance;
 @property (nonatomic, copy) NSString *address;
+@property (nonatomic, strong, nullable) MKMapItem *mapItem;
 @end
 @implementation TLWSearchResult
 @end
@@ -35,7 +38,11 @@ static NSString *const kCellID = @"TLWLocationSearchCell";
     self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
     if (self) {
         self.backgroundColor = [UIColor clearColor];
-        self.selectionStyle = UITableViewCellSelectionStyleGray;
+        self.selectionStyle = UITableViewCellSelectionStyleDefault;
+
+        UIView *selectedBackground = [[UIView alloc] init];
+        selectedBackground.backgroundColor = [UIColor colorWithRed:0.33 green:0.73 blue:0.95 alpha:0.12];
+        self.selectedBackgroundView = selectedBackground;
 
         _pinIcon = [[UIImageView alloc] init];
         _pinIcon.contentMode = UIViewContentModeScaleAspectFit;
@@ -90,17 +97,18 @@ static NSString *const kCellID = @"TLWLocationSearchCell";
         }
     }
     _nameLabel.attributedText = attr;
-    _detailLabel.text = [NSString stringWithFormat:@"%@   %@", result.distance, result.address];
+    if (result.distance.length > 0 && result.address.length > 0) {
+        _detailLabel.text = [NSString stringWithFormat:@"%@   %@", result.distance, result.address];
+    } else if (result.address.length > 0) {
+        _detailLabel.text = result.address;
+    } else {
+        _detailLabel.text = result.distance;
+    }
 }
 
 @end
 
 // MARK: - TLWLocationSearchController
-
-static NSArray<NSString *> *TLWMockDistanceList(void) {
-    return @[@"0米", @"1.2公里", @"3.5公里", @"7.8公里", @"12.4公里",
-             @"18.0公里", @"22.6公里", @"28.0公里", @"34.1公里", @"42.3公里"];
-}
 
 @interface TLWLocationSearchController () <UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate>
 
@@ -115,6 +123,7 @@ static NSArray<NSString *> *TLWMockDistanceList(void) {
 
 @property (nonatomic, copy) NSArray<TLWSearchResult *> *results;
 @property (nonatomic, copy) NSString *currentKeyword;
+@property (nonatomic, strong, nullable) MKLocalSearch *searchTask;
 
 @end
 
@@ -169,7 +178,7 @@ static NSArray<NSString *> *TLWMockDistanceList(void) {
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.text = @"定位";
     titleLabel.textColor = [UIColor whiteColor];
-    titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
+    titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
     [self.topBarView addSubview:titleLabel];
 
     self.backButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -292,34 +301,90 @@ static NSArray<NSString *> *TLWMockDistanceList(void) {
 
 - (void)tl_searchTextChanged:(UITextField *)tf {
     NSString *raw = tf.text ?: @"";
-    NSString *keyword = [[raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lowercaseString];
+    NSString *keyword = [raw stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     self.currentKeyword = keyword;
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(tl_performSearch) object:nil];
+    [self.searchTask cancel];
+    self.searchTask = nil;
 
     if (keyword.length == 0) {
         self.results = @[];
+        self.emptyLabel.text = @"输入关键词搜索地点";
         self.emptyLabel.hidden = NO;
         [self.tableView reloadData];
         return;
     }
 
-    NSMutableArray<TLWSearchResult *> *found = [NSMutableArray array];
-    NSArray<NSString *> *distances = TLWMockDistanceList();
-    NSUInteger idx = 0;
-    for (TLWLocationCitySection *section in self.allSections) {
-        for (NSString *cityName in section.cities) {
-            if ([[cityName lowercaseString] containsString:keyword]) {
-                TLWSearchResult *r = [[TLWSearchResult alloc] init];
-                r.name = cityName;
-                r.distance = distances[idx % distances.count];
-                r.address = [NSString stringWithFormat:@"%@市", cityName];
-                [found addObject:r];
-                idx++;
-            }
-        }
-    }
-    self.results = found;
-    self.emptyLabel.hidden = (found.count > 0);
+    self.emptyLabel.text = @"正在搜索...";
+    self.emptyLabel.hidden = NO;
     [self.tableView reloadData];
+    [self performSelector:@selector(tl_performSearch) withObject:nil afterDelay:0.25];
+}
+
+- (void)tl_performSearch {
+    NSString *keyword = [self.currentKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (keyword.length == 0) {
+        return;
+    }
+
+    MKLocalSearchRequest *request = [[MKLocalSearchRequest alloc] init];
+    request.naturalLanguageQuery = keyword;
+    if (@available(iOS 13.0, *)) {
+        request.resultTypes = MKLocalSearchResultTypeAddress | MKLocalSearchResultTypePointOfInterest;
+    }
+
+    TLWLocationManager *locationManager = [TLWLocationManager shared];
+    if (locationManager.hasLocation) {
+        CLLocationCoordinate2D coordinate = CLLocationCoordinate2DMake(locationManager.latitude, locationManager.longitude);
+        request.region = MKCoordinateRegionMakeWithDistance(coordinate, 50000, 50000);
+    }
+
+    MKLocalSearch *search = [[MKLocalSearch alloc] initWithRequest:request];
+    self.searchTask = search;
+
+    __weak typeof(self) weakSelf = self;
+    [search startWithCompletionHandler:^(MKLocalSearchResponse * _Nullable response, NSError * _Nullable error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf || strongSelf.searchTask != search) {
+                return;
+            }
+            strongSelf.searchTask = nil;
+
+            NSString *latestKeyword = [strongSelf.currentKeyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (latestKeyword.length == 0 || ![latestKeyword isEqualToString:keyword]) {
+                return;
+            }
+
+            if (error) {
+                strongSelf.results = @[];
+                strongSelf.emptyLabel.text = @"搜索失败，请稍后重试";
+                strongSelf.emptyLabel.hidden = NO;
+                [strongSelf.tableView reloadData];
+                return;
+            }
+
+            NSMutableArray<TLWSearchResult *> *found = [NSMutableArray array];
+            CLLocation *currentLocation = nil;
+            if (locationManager.hasLocation) {
+                currentLocation = [[CLLocation alloc] initWithLatitude:locationManager.latitude longitude:locationManager.longitude];
+            }
+
+            for (MKMapItem *item in response.mapItems) {
+                TLWSearchResult *result = [[TLWSearchResult alloc] init];
+                result.mapItem = item;
+                result.name = item.name.length > 0 ? item.name : [strongSelf tl_displayAddressForMapItem:item];
+                result.address = [strongSelf tl_displayAddressForMapItem:item];
+                result.distance = [strongSelf tl_distanceTextForMapItem:item currentLocation:currentLocation];
+                [found addObject:result];
+            }
+
+            strongSelf.results = found;
+            strongSelf.emptyLabel.text = found.count > 0 ? @"" : @"未找到相关地点";
+            strongSelf.emptyLabel.hidden = (found.count > 0);
+            [strongSelf.tableView reloadData];
+        });
+    }];
 }
 
 // MARK: - UITableViewDataSource
@@ -338,7 +403,8 @@ static NSArray<NSString *> *TLWMockDistanceList(void) {
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    NSString *cityName = self.results[indexPath.row].name;
+    TLWSearchResult *result = self.results[indexPath.row];
+    NSString *cityName = result.name.length > 0 ? result.name : result.address;
     if (self.onCitySelected) { self.onCitySelected(cityName); }
 }
 
@@ -354,6 +420,46 @@ static NSArray<NSString *> *TLWMockDistanceList(void) {
 - (void)tl_backTapped {
     [self.view endEditing:YES];
     [self.navigationController popViewControllerAnimated:YES];
+}
+
+- (NSString *)tl_displayAddressForMapItem:(MKMapItem *)item {
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    MKPlacemark *placemark = item.placemark;
+    NSString *province = placemark.administrativeArea;
+    NSString *city = placemark.locality ?: placemark.subAdministrativeArea;
+    NSString *district = placemark.subLocality;
+    NSString *street = placemark.thoroughfare;
+    NSString *subStreet = placemark.subThoroughfare;
+
+    for (NSString *part in @[province ?: @"", city ?: @"", district ?: @"", street ?: @"", subStreet ?: @""]) {
+        if (part.length > 0) {
+            if (parts.count == 0 || ![parts.lastObject isEqualToString:part]) {
+                [parts addObject:part];
+            }
+        }
+    }
+
+    if (parts.count == 0 && placemark.title.length > 0) {
+        return placemark.title;
+    }
+    return [parts componentsJoinedByString:@""];
+}
+
+- (NSString *)tl_distanceTextForMapItem:(MKMapItem *)item currentLocation:(nullable CLLocation *)currentLocation {
+    if (!currentLocation) {
+        return @"";
+    }
+
+    CLLocation *itemLocation = item.placemark.location;
+    if (!itemLocation) {
+        return @"";
+    }
+
+    CLLocationDistance distance = [currentLocation distanceFromLocation:itemLocation];
+    if (distance < 1000.0) {
+        return [NSString stringWithFormat:@"%.0f米", distance];
+    }
+    return [NSString stringWithFormat:@"%.1f公里", distance / 1000.0];
 }
 
 @end

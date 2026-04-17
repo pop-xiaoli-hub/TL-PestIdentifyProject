@@ -184,7 +184,7 @@
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.text = @"定位";
     titleLabel.textColor = [UIColor whiteColor];
-    titleLabel.font = [UIFont systemFontOfSize:24 weight:UIFontWeightBold];
+    titleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
     [self.topBarView addSubview:titleLabel];
 
     self.backButton = [UIButton buttonWithType:UIButtonTypeCustom];
