@@ -202,9 +202,11 @@ gh api 'repos/lukecc00/AgroAiServer/commits?sha=master&per_page=20' \
 - [ ] **QQ 登录** — 接入 QQ SDK
 
 ### 设置页待实现
-- [ ] 关于我们
-- [ ] 我要反馈
-- [ ] 系统权限管理
+- [x] 关于我们
+- [x] 我要反馈
+- [x] 系统权限管理
+- [x] 用户协议
+- [x] 隐私政策
 
 ---
 
