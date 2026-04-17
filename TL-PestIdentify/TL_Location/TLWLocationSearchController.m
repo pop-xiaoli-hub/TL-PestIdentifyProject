@@ -39,10 +39,7 @@ static NSString *const kCellID = @"TLWLocationSearchCell";
 
         _pinIcon = [[UIImageView alloc] init];
         _pinIcon.contentMode = UIViewContentModeScaleAspectFit;
-        _pinIcon.tintColor = [UIColor colorWithRed:0.90 green:0.56 blue:0.10 alpha:1.0];
-        if (@available(iOS 13.0, *)) {
-            _pinIcon.image = [[UIImage systemImageNamed:@"mappin"] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        }
+        _pinIcon.image = [[UIImage imageNamed:@"locationSearch_icon"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
         [self.contentView addSubview:_pinIcon];
 
         _nameLabel = [[UILabel alloc] init];
