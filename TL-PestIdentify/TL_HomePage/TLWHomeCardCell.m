@@ -331,6 +331,8 @@
   UILabel *recordSub = [[UILabel alloc] init];
   recordSub.textColor = [UIColor colorWithWhite:0.45 alpha:1.0];
   recordSub.font = [UIFont systemFontOfSize:13.0];
+  recordSub.numberOfLines = 1;
+  recordSub.lineBreakMode = NSLineBreakByTruncatingTail;
   self.recordSubLabel = recordSub;
   [self tl_configureRecordCount:0];
 
@@ -351,6 +353,7 @@
   [recordSub mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(recordTitle);
     make.top.equalTo(recordTitle.mas_bottom).offset(6.0);
+    make.right.lessThanOrEqualTo(recordCard).offset(-20.0);
   }];
 
   return recordCard;
