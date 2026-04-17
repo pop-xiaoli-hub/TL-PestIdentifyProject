@@ -12,12 +12,16 @@ NSString * const TLWLocationDidUpdateNotification = @"TLWLocationDidUpdateNotifi
 @property (nonatomic, strong) CLLocationManager *locationManager;
 @property (nonatomic, strong) CLGeocoder *geocoder;
 @property (nonatomic, copy, readwrite) NSString *cityName;
+@property (nonatomic, copy, readwrite) NSString *currentLocationDisplayName;
+@property (nonatomic, copy, readwrite) NSString *selectedLocationName;
 @property (nonatomic, assign, readwrite) CLLocationDegrees latitude;
 @property (nonatomic, assign, readwrite) CLLocationDegrees longitude;
 @property (nonatomic, assign, readwrite) BOOL hasLocation;
 @property (nonatomic, assign, readwrite) BOOL locationDenied;
 
 @end
+
+static NSString * const kTLWSelectedLocationNameDefaultsKey = @"TLW_selected_location_name";
 
 @implementation TLWLocationManager
 
@@ -37,8 +41,19 @@ NSString * const TLWLocationDidUpdateNotification = @"TLWLocationDidUpdateNotifi
     _locationManager.delegate = self;
     _locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters;
     _geocoder = [[CLGeocoder alloc] init];
+    _selectedLocationName = [[[NSUserDefaults standardUserDefaults] stringForKey:kTLWSelectedLocationNameDefaultsKey] copy];
   }
   return self;
+}
+
+- (NSString *)displayLocationName {
+  if (self.selectedLocationName.length > 0) {
+    return self.selectedLocationName;
+  }
+  if (self.currentLocationDisplayName.length > 0) {
+    return self.currentLocationDisplayName;
+  }
+  return self.cityName;
 }
 
 - (void)requestLocationPermission {
@@ -59,6 +74,7 @@ NSString * const TLWLocationDidUpdateNotification = @"TLWLocationDidUpdateNotifi
     self.locationDenied = YES;
     self.hasLocation = NO;
     self.cityName = nil;
+    self.currentLocationDisplayName = nil;
     self.latitude = 0;
     self.longitude = 0;
     [self postNotification];
@@ -90,6 +106,7 @@ NSString * const TLWLocationDidUpdateNotification = @"TLWLocationDidUpdateNotifi
     self.locationDenied = YES;
     self.hasLocation = NO;
     self.cityName = nil;
+    self.currentLocationDisplayName = nil;
     self.latitude = 0;
     self.longitude = 0;
     [self postNotification];
@@ -108,9 +125,17 @@ NSString * const TLWLocationDidUpdateNotification = @"TLWLocationDidUpdateNotifi
       if (error || placemarks.count == 0) {
         self.hasLocation = YES;
         self.cityName = @"未知位置";
+        self.currentLocationDisplayName = self.cityName;
       } else {
         CLPlacemark *placemark = placemarks.firstObject;
-        self.cityName = placemark.locality ?: placemark.administrativeArea ?: @"未知位置";
+        NSString *cityName = placemark.locality ?: placemark.administrativeArea ?: @"未知位置";
+        NSString *districtName = placemark.subLocality ?: placemark.subAdministrativeArea;
+        self.cityName = cityName;
+        if (districtName.length > 0 && [districtName isEqualToString:cityName] == NO) {
+          self.currentLocationDisplayName = [NSString stringWithFormat:@"%@%@", cityName, districtName];
+        } else {
+          self.currentLocationDisplayName = cityName;
+        }
         self.hasLocation = YES;
       }
       self.locationDenied = NO;
@@ -124,9 +149,28 @@ NSString * const TLWLocationDidUpdateNotification = @"TLWLocationDidUpdateNotifi
     self.locationDenied = YES;
     self.hasLocation = NO;
     self.cityName = nil;
+    self.currentLocationDisplayName = nil;
     self.latitude = 0;
     self.longitude = 0;
   }
+  [self postNotification];
+}
+
+- (void)selectLocationName:(NSString *)locationName {
+  NSString *trimmedName = [[locationName stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] copy];
+  if (trimmedName.length == 0) {
+    return;
+  }
+  self.selectedLocationName = trimmedName;
+  [[NSUserDefaults standardUserDefaults] setObject:trimmedName forKey:kTLWSelectedLocationNameDefaultsKey];
+  [[NSUserDefaults standardUserDefaults] synchronize];
+  [self postNotification];
+}
+
+- (void)clearSelectedLocationName {
+  self.selectedLocationName = nil;
+  [[NSUserDefaults standardUserDefaults] removeObjectForKey:kTLWSelectedLocationNameDefaultsKey];
+  [[NSUserDefaults standardUserDefaults] synchronize];
   [self postNotification];
 }
 

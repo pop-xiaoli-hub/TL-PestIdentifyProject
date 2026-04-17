@@ -17,6 +17,15 @@ extern NSString * const TLWLocationDidUpdateNotification;
 /// 当前城市名（反向地理编码结果），无定位时为 nil
 @property (nonatomic, copy, readonly, nullable) NSString *cityName;
 
+/// 当前定位完整展示文案，优先包含区县信息
+@property (nonatomic, copy, readonly, nullable) NSString *currentLocationDisplayName;
+
+/// 用户手动选择的城市名
+@property (nonatomic, copy, readonly, nullable) NSString *selectedLocationName;
+
+/// 页面展示用定位名，优先返回手动选择结果
+@property (nonatomic, copy, readonly, nullable) NSString *displayLocationName;
+
 /// 当前定位纬度
 @property (nonatomic, assign, readonly) CLLocationDegrees latitude;
 
@@ -34,6 +43,12 @@ extern NSString * const TLWLocationDidUpdateNotification;
 
 /// 手动触发一次定位
 - (void)startUpdatingLocation;
+
+/// 选择一个手动城市
+- (void)selectLocationName:(NSString *)locationName;
+
+/// 清除手动城市，恢复展示当前定位
+- (void)clearSelectedLocationName;
 
 @end
 

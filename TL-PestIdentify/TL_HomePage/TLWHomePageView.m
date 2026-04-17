@@ -30,6 +30,7 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
 @property (nonatomic, strong) UIImageView *locationIconView;
 @property (nonatomic, strong) UILabel *locationNameLabel;
 @property (nonatomic, strong) UILabel *locationArrowLabel;
+@property (nonatomic, strong) UIButton *locationRowButton;
 
 // 底部定位 Banner
 @property (nonatomic, strong) UIView *locationBannerView;
@@ -90,6 +91,9 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
 #pragma mark - 定位行
 
 - (void)tl_setLocationRow {
+  UIButton *locationRowButton = self.locationRowButton;
+  [self.headerContainer addSubview:locationRowButton];
+
   UIImageView *iconView = self.locationIconView;
   iconView.image = [[UIImage imageNamed:@"iconLocation"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
   [self.headerContainer addSubview:iconView];
@@ -101,6 +105,13 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
   UILabel *arrowLabel = self.locationArrowLabel;
   arrowLabel.text = @"▼";
   [self.headerContainer addSubview:arrowLabel];
+
+  [locationRowButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(self.headerContainer).offset(22);
+    make.centerY.equalTo(iconView);
+    make.right.equalTo(arrowLabel.mas_right).offset(12);
+    make.height.mas_equalTo(36);
+  }];
 
   [iconView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self.headerContainer).offset(30);
@@ -218,6 +229,12 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
 - (void)tl_didTapOpenLocation {
   if (self.onOpenLocationTapped) {
     self.onOpenLocationTapped();
+  }
+}
+
+- (void)tl_didTapLocationRow {
+  if (self.onLocationRowTapped) {
+    self.onLocationRowTapped();
   }
 }
 
@@ -500,6 +517,14 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
     _userVersionButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
   }
   return _userVersionButton;
+}
+
+- (UIButton *)locationRowButton {
+  if (!_locationRowButton) {
+    _locationRowButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    [_locationRowButton addTarget:self action:@selector(tl_didTapLocationRow) forControlEvents:UIControlEventTouchUpInside];
+  }
+  return _locationRowButton;
 }
 
 - (UIImageView *)weatherCardImageView {

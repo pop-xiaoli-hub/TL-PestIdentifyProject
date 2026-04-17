@@ -15,6 +15,7 @@
 #import "TLWIdentifyPageController.h"
 #import "TLWRecordController.h"
 #import "TLWAIAssistantController.h"
+#import "TLWLocationController.h"
 #import "TLWWarningModel.h"
 #import "TLWSDKManager.h"
 #import "TLWLocationManager.h"
@@ -155,7 +156,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 - (void)tl_refreshLocationState {
   TLWLocationManager *locMgr = [TLWLocationManager shared];
-  NSString *cityName = locMgr.cityName;
+  NSString *cityName = locMgr.displayLocationName;
 
   // 更新 header 定位文字
   [self.homePageView configureWithLocationName:cityName];
@@ -319,6 +320,12 @@ extern NSString * const TLWProfileDidUpdateNotification;
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf) return;
     strongSelf.bannerDismissed = YES;
+  };
+  self.homePageView.onLocationRowTapped = ^{
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+    TLWLocationController *controller = [[TLWLocationController alloc] init];
+    [strongSelf.navigationController pushViewController:controller animated:YES];
   };
 }
 
@@ -673,7 +680,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
   // 种植物管理卡片
   TLWHomeCustomCell *cell = [tableView dequeueReusableCellWithIdentifier:@"kTLWHomeCustomCellIdentifier" forIndexPath:indexPath];
-  NSString *locationName = [TLWLocationManager shared].cityName;
+  NSString *locationName = [TLWLocationManager shared].displayLocationName;
   __weak typeof(self) weakSelf = self;
 
   if (indexPath.row == 2) {

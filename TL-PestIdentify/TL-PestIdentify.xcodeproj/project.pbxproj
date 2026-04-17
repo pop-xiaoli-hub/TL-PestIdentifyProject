@@ -51,6 +51,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		0D2B54992F922C4300D63977 /* TL_Location */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TL_Location;
+			sourceTree = "<group>";
+		};
 		0DAAA8D82F59C0B800F327DC /* TL-PestIdentify */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -157,6 +162,7 @@
 		0DAAA8CD2F59C0B800F327DC = {
 			isa = PBXGroup;
 			children = (
+				0D2B54992F922C4300D63977 /* TL_Location */,
 				0DE04CC92F68235300856C11 /* TL_Publish */,
 				4CA8A5B82F66FA3300928BBF /* TL_Notification */,
 				4CA8A58F2F66F9E100928BBF /* TL_Message */,
@@ -224,6 +230,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				0D2B54992F922C4300D63977 /* TL_Location */,
 				0DAAA8D82F59C0B800F327DC /* TL-PestIdentify */,
 				0DB0A9202F5FF6D3009E2E41 /* TL_HomePage */,
 				0DB0ACD02F610B2A009E2E41 /* TL_PhotoIdentify */,

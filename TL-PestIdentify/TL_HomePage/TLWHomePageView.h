@@ -18,6 +18,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// 底部"开启定位"Banner 的回调
 @property (nonatomic, copy, nullable) void(^onOpenLocationTapped)(void);
 @property (nonatomic, copy, nullable) void(^onCloseLocationBanner)(void);
+@property (nonatomic, copy, nullable) void(^onLocationRowTapped)(void);
 
 - (void)configureWithUserName:(NSString* )name;
 - (void)configureElderModeEnabled:(BOOL)enabled;
