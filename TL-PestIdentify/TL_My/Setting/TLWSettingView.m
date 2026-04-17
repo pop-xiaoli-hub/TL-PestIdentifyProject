@@ -115,15 +115,16 @@
     logoutLabel.userInteractionEnabled = NO;
     [_logoutButton addSubview:logoutLabel];
     [logoutLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.center.equalTo(_logoutButton);
+        make.centerX.equalTo(_logoutButton);
+        make.centerY.equalTo(_logoutButton).offset(-4);
     }];
 
     [container addSubview:_logoutButton];
     [_logoutButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(prevRow.mas_bottom).offset(20);
-        make.left.mas_equalTo(0);
-        make.right.mas_equalTo(0);
-        make.height.mas_equalTo(52);
+        make.centerX.equalTo(container);
+        make.width.mas_equalTo(348);
+        make.height.mas_equalTo(65);
     }];
 }
 

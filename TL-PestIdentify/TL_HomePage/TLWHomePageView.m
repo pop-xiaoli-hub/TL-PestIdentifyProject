@@ -8,6 +8,8 @@
 #import "TLWHomePageView.h"
 #import <Masonry.h>
 
+static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
+
 @interface TLWHomePageView ()
 
 @property (nonatomic, strong) UITableView *tableView;
@@ -230,10 +232,10 @@
 
 - (void)tl_setBambooImageView {
   UIImageView* imageView = self.bambooImageView;
-  imageView.image = [[UIImage imageNamed:@"hp_bamboo.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  imageView.image = [[UIImage imageNamed:@"hp_bamboo"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
   [self.headerContainer addSubview:imageView];
   [imageView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.right.equalTo(self.headerContainer.mas_right).offset(-15);
+    make.right.equalTo(self.headerContainer.mas_right).offset(10);
     make.bottom.equalTo(self.headerContainer.mas_bottom).offset(0);
   }];
 }
@@ -267,7 +269,7 @@
 
 - (void)tl_setWeatherCardImageView {
   UIImageView* imageView = self.weatherCardImageView;
-  imageView.image = [[UIImage imageNamed:@"hp_cloud.png"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  imageView.image = [[UIImage imageNamed:@"hp_cloud"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
   [self.headerContainer addSubview:imageView];
   [imageView mas_makeConstraints:^(MASConstraintMaker *make) {
       make.left.equalTo(self.temperatureSuffixLabel.mas_right).offset(-60);
@@ -279,7 +281,7 @@
 
 - (void)tl_setBottomNameImageView {
   UIImageView* imageView = self.bottomOfUserNameImageView;
-  imageView.image = [[UIImage imageNamed:@"hp_smile.png"]imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+  imageView.image = [[UIImage imageNamed:@"hp_smile"]imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
   [self.headerContainer addSubview:imageView];
   [imageView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self.userNameLabel.mas_centerX);
@@ -329,11 +331,15 @@
 }
 
 - (void)configureWithUserName:(NSString* )name {
-  self.userNameLabel.text = [name copy];
+  NSString *safeName = name ?: @"";
+  if (safeName.length >= 6) {
+    safeName = [[safeName substringToIndex:kTLWHomePageUserNameMaxCount] stringByAppendingString:@"..."];
+  }
+  self.userNameLabel.text = [safeName copy];
 }
 
 - (void)configureElderModeEnabled:(BOOL)enabled {
-  NSString *imageName = enabled ? @"oldMode" : @"hp_version.png";
+  NSString *imageName = enabled ? @"oldMode" : @"hp_version";
   UIImage *image = [[UIImage imageNamed:imageName] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
   [self.userVersionButton setImage:image forState:UIControlStateNormal];
   [self.userVersionButton setImage:image forState:UIControlStateHighlighted];
@@ -343,12 +349,12 @@
 - (NSString *)tl_weatherImageNameForIconCode:(NSString *)iconCode {
   NSInteger code = iconCode.integerValue;
   if ((code >= 100 && code <= 104) || code == 150 || code == 151 || code == 152 || code == 153) {
-    return @"hp_cloud.png";
+    return @"hp_cloud";
   }
   if ((code >= 300 && code <= 313) || (code >= 399 && code <= 404)) {
-    return @"hp_cloud.png";
+    return @"hp_cloud";
   }
-  return @"hp_cloud.png";
+  return @"hp_cloud";
 }
 
 - (void)configureWithTemperature:(nullable NSString *)temperature

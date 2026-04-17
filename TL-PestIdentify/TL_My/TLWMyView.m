@@ -7,6 +7,7 @@
 #import <Masonry/Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 #import "TLWLoadingIndicator.h"
+#import "TLWSDKManager.h"
 
 @interface TLWMyView () <UIScrollViewDelegate>
 
@@ -378,6 +379,8 @@
 
 - (UIView *)buildPostItemWithPost:(AGPostResponseDto *)post isFirst:(BOOL)isFirst {
     UIView *item = [UIView new];
+    AGUserProfileDto *profile = [TLWSDKManager shared].sessionManager.cachedProfile;
+    NSString *followedCropsText = profile.followedCrops.count > 0 ? [profile.followedCrops componentsJoinedByString:@"、"] : @"未设置";
 
     // 头像（第一个帖子同步到 postAvatarImageView）
     UIImageView *avatarView = [[UIImageView alloc] init];
@@ -412,6 +415,18 @@
         make.left.equalTo(avatarView.mas_right).offset(10);
     }];
 
+    UILabel *cropsLabel = [UILabel new];
+    cropsLabel.text = [NSString stringWithFormat:@"关注作物：%@", followedCropsText];
+    cropsLabel.font = [UIFont systemFontOfSize:12];
+    cropsLabel.textColor = [UIColor colorWithRed:0.55 green:0.58 blue:0.58 alpha:1.0];
+    cropsLabel.numberOfLines = 1;
+    [item addSubview:cropsLabel];
+    [cropsLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(nameLabel);
+        make.top.equalTo(nameLabel.mas_bottom).offset(4);
+        make.right.lessThanOrEqualTo(item).offset(-70);
+    }];
+
     // 时间（头像行右侧）
     UILabel *timeLabel = [UILabel new];
     timeLabel.font      = [UIFont systemFontOfSize:12];
@@ -431,7 +446,7 @@
     bodyLabel.numberOfLines = 3;
     [item addSubview:bodyLabel];
     [bodyLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(avatarView.mas_bottom).offset(10);
+        make.top.equalTo(avatarView.mas_bottom).offset(16);
         make.left.right.equalTo(item);
     }];
 
