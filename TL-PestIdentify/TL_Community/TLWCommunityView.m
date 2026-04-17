@@ -11,6 +11,12 @@
 static CGFloat const kSearchBarHeight = 64.0;
 /// 搜索区域与安全区顶部的间距
 static CGFloat const kSearchBarTopInset = 12.0;
+/// 标题与安全区顶部的间距
+static CGFloat const kTitleTopInset = 12.0;
+/// 标题与搜索栏的间距
+static CGFloat const kTitleToSearchSpacing = 16.0;
+/// 搜索栏与内容区的间距
+static CGFloat const kSearchToContentSpacing = 16.0;
 /// 瀑布流左右内边距
 static CGFloat const kHorizontalInset = 12.0;
 /// 瀑布流 item 间距
@@ -132,13 +138,13 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
   [container mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self).offset(12);
     make.right.equalTo(self).offset(-12);
-    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(kSearchBarTopInset);
+    make.top.equalTo(titleContainerView.mas_bottom).offset(kTitleToSearchSpacing);
     make.height.mas_equalTo(kSearchBarHeight);
   }];
 
   [titleContainerView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self);
-    make.bottom.equalTo(container.mas_top).offset(5);
+    make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(kTitleTopInset);
   }];
 
   [titleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -219,7 +225,7 @@ static CGFloat const kSuggestionListHorizontalInset = 12.0;
     make.bottom.equalTo(self);
     make.left.equalTo(self.mas_left).offset(10);
     make.right.equalTo(self.mas_right).offset(-10);
-    make.top.equalTo(self.searchContainer.mas_bottom).offset(0);
+    make.top.equalTo(self.searchContainer.mas_bottom).offset(kSearchToContentSpacing);
   }];
 }
 

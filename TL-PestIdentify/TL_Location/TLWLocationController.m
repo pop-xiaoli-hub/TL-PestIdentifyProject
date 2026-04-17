@@ -5,6 +5,7 @@
 
 #import "TLWLocationController.h"
 #import "TLWLocationView.h"
+#import "TLWLocationSearchController.h"
 #import "Models/TLWLocationCityModel.h"
 #import "TLWLocationManager.h"
 #import <Masonry/Masonry.h>
@@ -73,9 +74,9 @@
         __strong typeof(weakSelf) strongSelf = weakSelf;
         [strongSelf.locationView scrollToSectionTitle:title];
     };
-    self.locationView.onSearchTextChanged = ^(NSString *keyword) {
+    self.locationView.onSearchBarTapped = ^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
-        [strongSelf tl_applyFilterWithKeyword:keyword];
+        [strongSelf tl_pushSearchController];
     };
 }
 
@@ -83,31 +84,16 @@
     [self tl_refreshView];
 }
 
-- (void)tl_applyFilterWithKeyword:(NSString *)keyword {
-    NSString *trimmedKeyword = [[keyword stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] lowercaseString];
-    if (trimmedKeyword.length == 0) {
-        self.filteredSections = self.allSections;
-        [self tl_refreshView];
-        return;
-    }
-
-    NSMutableArray<TLWLocationCitySection *> *filtered = [NSMutableArray array];
-    for (TLWLocationCitySection *section in self.allSections) {
-        NSMutableArray<NSString *> *matchedCities = [NSMutableArray array];
-        for (NSString *cityName in section.cities) {
-            if ([[cityName lowercaseString] containsString:trimmedKeyword]) {
-                [matchedCities addObject:cityName];
-            }
-        }
-        if (matchedCities.count > 0 || [[section.title lowercaseString] containsString:trimmedKeyword]) {
-            TLWLocationCitySection *resultSection = [[TLWLocationCitySection alloc] init];
-            resultSection.title = section.title;
-            resultSection.cities = matchedCities.count > 0 ? matchedCities : section.cities;
-            [filtered addObject:resultSection];
-        }
-    }
-    self.filteredSections = filtered;
-    [self tl_refreshView];
+- (void)tl_pushSearchController {
+    TLWLocationSearchController *searchVC = [[TLWLocationSearchController alloc] init];
+    searchVC.allSections = self.allSections;
+    __weak typeof(self) weakSelf = self;
+    searchVC.onCitySelected = ^(NSString *cityName) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        [[TLWLocationManager shared] selectLocationName:cityName];
+        [strongSelf.navigationController popToViewController:strongSelf animated:YES];
+    };
+    [self.navigationController pushViewController:searchVC animated:YES];
 }
 
 - (void)tl_refreshView {

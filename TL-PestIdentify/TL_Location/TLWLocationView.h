@@ -15,7 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) void (^onRelocateTapped)(void);
 @property (nonatomic, copy, nullable) void (^onCitySelected)(NSString *cityName);
 @property (nonatomic, copy, nullable) void (^onAlphabetSelected)(NSString *title);
-@property (nonatomic, copy, nullable) void (^onSearchTextChanged)(NSString *keyword);
+@property (nonatomic, copy, nullable) void (^onSearchBarTapped)(void);
 
 - (void)configureWithSelectedLocation:(nullable NSString *)selectedLocation
                       currentLocation:(nullable NSString *)currentLocation
