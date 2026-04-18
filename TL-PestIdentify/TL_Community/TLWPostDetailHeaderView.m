@@ -34,6 +34,17 @@ static CGFloat const kHorizontalPad = 16.0;
 
 @implementation TLWPostDetailHeaderView
 
+- (NSString *)tl_formattedPostDateText:(nullable NSDate *)date {
+  if (!date) {
+    return @"";
+  }
+
+  NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+  formatter.locale = [NSLocale localeWithLocaleIdentifier:@"zh_CN"];
+  formatter.dateFormat = @"yyyy年MM月dd日 HH:mm";
+  return [formatter stringFromDate:date];
+}
+
 - (instancetype)initWithFrame:(CGRect)frame {
   self = [super initWithFrame:frame];
   if (self) {
@@ -262,7 +273,10 @@ static CGFloat const kHorizontalPad = 16.0;
   if (post.authorAvatar.length > 0) {
     [self.avatarView sd_setImageWithURL:[NSURL URLWithString:post.authorAvatar]
                        placeholderImage:[UIImage imageNamed:@"hp_avatar"]];
+  } else {
+    self.avatarView.image = [UIImage imageNamed:@"hp_avatar"];
   }
+  self.dateLabel.text = [self tl_formattedPostDateText:post.createdAt];
   self.titleLabel.text = post.title.length > 0 ? post.title : @"";
   self.contentLabel.text = post.content.length > 0 ? post.content : @"";
   // 同步点赞数 / 收藏数（收藏数暂用点赞数占位，后端接入后替换）

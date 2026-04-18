@@ -130,7 +130,20 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
 - (void)panAction:(UIPanGestureRecognizer *)pan {
   CGPoint translation = [pan translationInView:self.myView];//获取手指相对于self.myView的移动偏移量
-  self.myView.publishButton.center = CGPointMake(self.myView.publishButton.center.x + translation.x, self.myView.publishButton.center.y + translation.y);
+  UIButton *publishButton = self.myView.publishButton;
+  CGFloat halfWidth = CGRectGetWidth(publishButton.bounds) * 0.5;
+  CGFloat halfHeight = CGRectGetHeight(publishButton.bounds) * 0.5;
+  CGFloat safeTopInset = self.myView.safeAreaInsets.top;
+  CGFloat minX = halfWidth + 10.0;
+  CGFloat maxX = CGRectGetWidth(self.myView.bounds) - halfWidth - 10.0;
+  CGFloat minY = safeTopInset + halfHeight + 10.0;
+  CGFloat maxY = CGRectGetHeight(self.myView.bounds) - 150.0 - halfHeight;
+
+  CGPoint candidateCenter = CGPointMake(publishButton.center.x + translation.x,
+                                        publishButton.center.y + translation.y);
+  candidateCenter.x = MIN(MAX(candidateCenter.x, minX), maxX);
+  candidateCenter.y = MIN(MAX(candidateCenter.y, minY), maxY);
+  publishButton.center = candidateCenter;
   [pan setTranslation:CGPointZero inView:self.myView];
   if (pan.state == UIGestureRecognizerStateEnded) {
     [self moveToEdge];
@@ -138,15 +151,22 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 }
 
 - (void)moveToEdge {
-  CGFloat screenWidth = [UIScreen mainScreen].bounds.size.width;
+  CGFloat screenWidth = CGRectGetWidth(self.myView.bounds);
+  CGFloat screenHeight = CGRectGetHeight(self.myView.bounds);
+  CGFloat safeTopInset = self.myView.safeAreaInsets.top;
+  CGFloat halfWidth = CGRectGetWidth(self.myView.publishButton.bounds) * 0.5;
+  CGFloat halfHeight = CGRectGetHeight(self.myView.publishButton.bounds) * 0.5;
   CGFloat targetX;
   if (self.myView.publishButton.center.x <= screenWidth / 2) {
-    targetX = self.myView.publishButton.bounds.size.width / 2 + 10;
+    targetX = halfWidth + 10.0;
   } else {
-    targetX = screenWidth - self.myView.publishButton.bounds.size.width / 2 - 10;
+    targetX = screenWidth - halfWidth - 10.0;
   }
+  CGFloat minY = safeTopInset + halfHeight + 10.0;
+  CGFloat maxY = screenHeight - 150.0 - halfHeight;
+  CGFloat targetY = MIN(MAX(self.myView.publishButton.center.y, minY), maxY);
   [UIView animateWithDuration:0.3 animations:^{
-    self.myView.publishButton.center = CGPointMake(targetX, self.myView.publishButton.center.y);
+    self.myView.publishButton.center = CGPointMake(targetX, targetY);
   }];
 }
 
@@ -254,6 +274,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   post.isLiked = dto.isLiked.boolValue;
   post.isCollected = dto.isFavorited.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
+  post.createdAt = dto.createdAt;
   return post;
 }
 

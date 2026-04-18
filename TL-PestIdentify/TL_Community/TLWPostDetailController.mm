@@ -405,6 +405,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   post.isLiked = dto.isLiked.boolValue;
   post.isCollected = dto.isFavorited.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
+  post.createdAt = dto.createdAt;
   post.imageAspectRatio = self.post.imageAspectRatio > 0 ? self.post.imageAspectRatio : (4.0 / 3.0);
   return post;
 }

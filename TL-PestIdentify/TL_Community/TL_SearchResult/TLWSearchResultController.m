@@ -67,6 +67,7 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
   post.likeCount = dto.likeCount ?: @0;
   post.isLiked = dto.isLiked.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
+  post.createdAt = dto.createdAt;
   return post;
 }
 

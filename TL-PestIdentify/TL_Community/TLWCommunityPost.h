@@ -33,6 +33,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL isCollected;
 
 @property (nonatomic, strong) NSNumber *favoriteCount;
+/// 帖子发布时间
+@property (nonatomic, strong, nullable) NSDate *createdAt;
 /// 图片纵横比（高度 / 宽度），用于计算瀑布流高度
 @property (nonatomic, assign) CGFloat imageAspectRatio;
 
