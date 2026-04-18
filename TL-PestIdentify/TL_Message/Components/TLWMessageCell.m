@@ -50,7 +50,7 @@
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    self.cardShadowView.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.cardShadowView.bounds cornerRadius:22.0].CGPath;
+    self.cardShadowView.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.cardShadowView.bounds cornerRadius:18.0].CGPath;
 }
 
 - (void)setupUI {
@@ -58,7 +58,7 @@
     self.cardShadowView.backgroundColor = [UIColor clearColor];
     self.cardShadowView.layer.shadowColor = [UIColor colorWithRed:0.05 green:0.31 blue:0.28 alpha:1.0].CGColor;
     self.cardShadowView.layer.shadowOpacity = 0.18;
-    self.cardShadowView.layer.shadowRadius = 18.0;
+    self.cardShadowView.layer.shadowRadius = 14.0;
     self.cardShadowView.layer.shadowOffset = CGSizeMake(0.0, 8.0);
     [self.contentView addSubview:self.cardShadowView];
 
@@ -71,7 +71,7 @@
 
     self.cardContainerView = [[UIView alloc] init];
     self.cardContainerView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.90];
-    self.cardContainerView.layer.cornerRadius = 22.0;
+    self.cardContainerView.layer.cornerRadius = 14.0;
     self.cardContainerView.layer.masksToBounds = YES;
     self.cardContainerView.layer.borderWidth = 1.0;
     self.cardContainerView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.72].CGColor;

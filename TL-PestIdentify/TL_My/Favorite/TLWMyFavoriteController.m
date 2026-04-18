@@ -57,7 +57,26 @@ static NSTimeInterval const kFavoriteSyncInterval = 5 * 60;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    [self.navBar setRightButtonTitle:@"筛选" iconName:@"filter"];
+    [self.navBar setRightButtonTitle:@"筛选" iconName:nil];
+    UIImageSymbolConfiguration *filterConfig =
+        [UIImageSymbolConfiguration configurationWithPointSize:18.0 weight:UIImageSymbolWeightBold];
+    UIImage *filterImage = [UIImage systemImageNamed:@"line.3.horizontal.decrease.circle.fill"
+                                   withConfiguration:filterConfig];
+    UIColor *buttonColor = [UIColor colorWithWhite:0.96 alpha:0.92];
+    UIButtonConfiguration *buttonConfig = self.navBar.rightButton.configuration ?: [UIButtonConfiguration plainButtonConfiguration];
+    buttonConfig.title = @"筛选";
+    buttonConfig.image = filterImage;
+    buttonConfig.imagePlacement = NSDirectionalRectEdgeTrailing;
+    buttonConfig.imagePadding = 6.0;
+    buttonConfig.baseForegroundColor = buttonColor;
+    buttonConfig.contentInsets = NSDirectionalEdgeInsetsZero;
+    buttonConfig.titleTextAttributesTransformer = ^NSDictionary<NSAttributedStringKey,id> * _Nonnull(NSDictionary<NSAttributedStringKey,id> * _Nonnull incoming) {
+        NSMutableDictionary<NSAttributedStringKey, id> *attrs = [incoming mutableCopy];
+        attrs[NSFontAttributeName] = [UIFont systemFontOfSize:22 weight:UIFontWeightBold];
+        return attrs;
+    };
+    self.navBar.rightButton.configuration = buttonConfig;
+    self.navBar.rightButton.tintColor = buttonColor;
 
     [self.view addSubview:self.favoriteView];
     [self.favoriteView mas_makeConstraints:^(MASConstraintMaker *make) {

@@ -151,7 +151,7 @@
   UILabel *sectionTitleLabel = [[UILabel alloc] init];
   sectionTitleLabel.text = @"请输入种植物的名称";
   sectionTitleLabel.textColor = [UIColor colorWithWhite:0.18 alpha:1.0];
-  sectionTitleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightSemibold];
+  sectionTitleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightSemibold];
   [self.contentView addSubview:sectionTitleLabel];
 
   UIView *nameCardView = [self tl_cardView];

@@ -74,6 +74,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self.myView configureElderModeEnabled:[self tl_isElderModeEnabled]];
     [self applyProfile];
 }
 
@@ -98,6 +99,19 @@ extern NSString * const TLWProfileDidUpdateNotification;
 - (TLWEditProfileView *)myView {
     if (!_myView) _myView = [[TLWEditProfileView alloc] initWithFrame:CGRectZero];
     return _myView;
+}
+
+- (BOOL)tl_isElderModeEnabled {
+    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+    if ([defaults objectForKey:elderModeKey] != nil) {
+        return [defaults boolForKey:elderModeKey];
+    }
+    if ([defaults objectForKey:@"TLW_elder_mode"] != nil) {
+        return [defaults boolForKey:@"TLW_elder_mode"];
+    }
+    return NO;
 }
 
 #pragma mark - Actions
