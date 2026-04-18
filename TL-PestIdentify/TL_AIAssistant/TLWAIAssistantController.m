@@ -329,7 +329,7 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
 }
 
 - (void)tl_send {
-    // 先确认中文输入法的候选词
+    // 先确认中文输入法的候选词，还没进入搜索框的
     UITextRange *markedRange = self.myView.inputTextField.markedTextRange;
     if (markedRange) {
         UITextPosition *start = markedRange.start;
