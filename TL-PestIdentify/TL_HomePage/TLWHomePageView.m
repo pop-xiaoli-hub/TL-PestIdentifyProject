@@ -372,7 +372,7 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
 
   [self.weatherCardImageView mas_remakeConstraints:^(MASConstraintMaker *make) {
     if (self.elderModeEnabled) {
-      make.right.equalTo(self.headerContainer).offset(-50.0);
+      make.right.equalTo(self.headerContainer);
       make.bottom.equalTo(self.headerContainer);
       make.height.mas_equalTo(160.0);
       make.width.mas_equalTo(200.0);
