@@ -51,6 +51,8 @@ static NSInteger const kResultPageCount = 3;
 @property (nonatomic, strong) UIImageView *firstPageWarnIconView;
 @property (nonatomic, strong) CAGradientLayer *retakeGradientLayer;
 @property (nonatomic, strong) CAGradientLayer *backgroundGradientLayer;
+@property (nonatomic, strong) UIView *effectiveMaskView;
+@property (nonatomic, strong) CAGradientLayer *effectiveMaskGradientLayer;
 @property (nonatomic, assign) NSInteger selectedTabIndex;
 @property (nonatomic, assign) BOOL usesRecordStyleLayout;
 
@@ -103,6 +105,10 @@ static NSInteger const kResultPageCount = 3;
   [self tl_updateTabIndicatorAnimated:NO];
 
   self.backgroundGradientLayer.frame = self.bounds;
+
+  if (self.effectiveMaskGradientLayer) {
+    self.effectiveMaskGradientLayer.frame = self.effectiveMaskView.bounds;
+  }
 
   if (self.firstPageAIHintBackgroundView) {
     [self bringSubviewToFront:self.firstPageAIHintBackgroundView];
@@ -548,6 +554,9 @@ static NSInteger const kResultPageCount = 3;
 
   self.usesRecordStyleLayout = NO;
   self.backgroundGradientLayer.hidden = YES;
+  if (self.effectiveMaskView) {
+    self.effectiveMaskView.hidden = YES;
+  }
   self.headerTitleLabel.hidden = YES;
   self.backgroundColor = [UIColor blackColor];
   self.photoView.layer.cornerRadius = 0.0;
@@ -810,13 +819,13 @@ static NSInteger const kResultPageCount = 3;
   [self.retakeButton mas_remakeConstraints:^(MASConstraintMaker *make) {
     make.centerX.equalTo(self);
     make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-20.0);
-    make.width.mas_equalTo(160.0);
+    make.width.mas_equalTo(230.0);
     make.height.mas_equalTo(58.0);
   }];
 
   [self.aiButton mas_remakeConstraints:^(MASConstraintMaker *make) {
-    make.right.equalTo(self).offset(-34.0);
-    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-136.0);
+    make.right.equalTo(self).offset(-20.0);
+    make.top.equalTo(self.resultScrollView).offset(44.0);
     make.width.height.mas_equalTo(64.0);
   }];
 
@@ -825,7 +834,35 @@ static NSInteger const kResultPageCount = 3;
     make.centerX.equalTo(self.aiButton);
   }];
 
-  self.firstPageAIHintBackgroundView.hidden = YES;
+  self.firstPageAIHintBackgroundView.hidden = NO;
+  [self.firstPageAIHintBackgroundView mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(self.aiButton.mas_left).offset(-8.0);
+    make.centerY.equalTo(self.aiButton);
+    make.width.mas_equalTo(148.0);
+    make.height.mas_equalTo(78.0);
+  }];
+
+  if (!self.effectiveMaskView) {
+    UIView *maskView = [[UIView alloc] init];
+    maskView.userInteractionEnabled = NO;
+    [self insertSubview:maskView aboveSubview:self.cardView];
+    CAGradientLayer *gradLayer = [CAGradientLayer layer];
+    gradLayer.colors = @[
+      (__bridge id)[UIColor colorWithRed:0.95 green:0.98 blue:0.97 alpha:0.0].CGColor,
+      (__bridge id)[UIColor colorWithRed:0.95 green:0.98 blue:0.97 alpha:1.0].CGColor
+    ];
+    gradLayer.startPoint = CGPointMake(0, 0);
+    gradLayer.endPoint = CGPointMake(0, 1);
+    [maskView.layer addSublayer:gradLayer];
+    self.effectiveMaskView = maskView;
+    self.effectiveMaskGradientLayer = gradLayer;
+  }
+  self.effectiveMaskView.hidden = NO;
+  [self.effectiveMaskView mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.left.right.equalTo(self.cardView);
+    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-84.0);
+    make.height.mas_equalTo(90.0);
+  }];
 
   [self setNeedsLayout];
   [self layoutIfNeeded];
