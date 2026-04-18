@@ -12,11 +12,11 @@ static CGFloat const kSearchBarHeight = 64.0;
 /// 搜索区域与安全区顶部的间距
 static CGFloat const kSearchBarTopInset = 12.0;
 /// 标题与安全区顶部的间距
-static CGFloat const kTitleTopInset = 12.0;
+static CGFloat const kTitleTopInset = 8.0;
 /// 标题与搜索栏的间距
-static CGFloat const kTitleToSearchSpacing = 16.0;
+static CGFloat const kTitleToSearchSpacing = 4.0;
 /// 搜索栏与内容区的间距
-static CGFloat const kSearchToContentSpacing = 16.0;
+static CGFloat const kSearchToContentSpacing = 4.0;
 /// 瀑布流左右内边距
 static CGFloat const kHorizontalInset = 12.0;
 /// 瀑布流 item 间距
