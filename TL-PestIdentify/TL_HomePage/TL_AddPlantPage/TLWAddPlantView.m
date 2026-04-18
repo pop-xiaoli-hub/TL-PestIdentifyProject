@@ -26,6 +26,7 @@
 @property (nonatomic, strong) CAGradientLayer *confirmGradientLayer;
 @property (nonatomic, strong) UIImageView *selectedPlantImageView;
 @property (nonatomic, strong) UIImageView *userAvatarImageView;
+@property (nonatomic, strong) UILabel *locationLabel;
 @property (nonatomic, strong) UIView *plusHorizontalLine;
 @property (nonatomic, strong) UIView *plusVerticalLine;
 
@@ -224,10 +225,11 @@
   [plantCardView addSubview:locationIconView];
 
   UILabel *locationLabel = [[UILabel alloc] init];
-  locationLabel.text = @"杭州";
+  locationLabel.text = @"";
   locationLabel.textColor = [UIColor colorWithWhite:0.60 alpha:1.0];
   locationLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightMedium];
   [plantCardView addSubview:locationLabel];
+  self.locationLabel = locationLabel;
 
   UIButton *createButton = [UIButton buttonWithType:UIButtonTypeCustom];
   createButton.backgroundColor = [UIColor colorWithRed:0.30 green:0.92 blue:0.76 alpha:1.0];
@@ -411,6 +413,10 @@
   } else {
     self.userAvatarImageView.image = placeholderImage;
   }
+}
+
+- (void)updateLocationText:(nullable NSString *)locationText {
+  self.locationLabel.text = locationText.length > 0 ? locationText : @"未定位";
 }
 
 @end

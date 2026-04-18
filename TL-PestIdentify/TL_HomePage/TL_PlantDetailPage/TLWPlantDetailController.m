@@ -13,15 +13,18 @@
 #import "Views/TLWPlantDetailMedicineView.h"
 #import "Views/TLWPlantDetailNoteView.h"
 #import "Views/TLWPlantDetailWateringView.h"
+#import "TLWImagePickerManager.h"
+#import <AgriPestClient/AGMyCropUpdateRequest.h>
 #import <SDWebImage/SDWebImage.h>
 #import "TLWSDKManager.h"
 
-@interface TLWPlantDetailController () <UIGestureRecognizerDelegate>
+@interface TLWPlantDetailController () <UIGestureRecognizerDelegate, TLWImagePickerDelegate>
 
 @property (nonatomic, strong) TLWPlantDetailView *detailView;
 @property (nonatomic, strong) TLWPlantDetailViewModel *viewModel;
 @property (nonatomic, assign) BOOL tagRequestInFlight;
 @property (nonatomic, strong) UITapGestureRecognizer *dismissKeyboardTapGesture;
+@property (nonatomic, strong) TLWImagePickerManager *imagePickerManager;
 
 @end
 
@@ -56,6 +59,7 @@
 
 - (void)tl_bindActions {
   [self.detailView.backButton addTarget:self action:@selector(tl_backTapped) forControlEvents:UIControlEventTouchUpInside];
+  [self.detailView.imageTagButton addTarget:self action:@selector(tl_imageTagButtonTapped) forControlEvents:UIControlEventTouchUpInside];
 
   __weak typeof(self) weakSelf = self;
   self.detailView.segmentTabView.selectionChangedBlock = ^(NSInteger index) {
@@ -240,6 +244,171 @@
 
 - (void)tl_backTapped {
   [self.navigationController popViewControllerAnimated:YES];
+}
+
+- (void)tl_imageTagButtonTapped {
+  UIAlertController *sheet = [UIAlertController alertControllerWithTitle:nil
+                                                                 message:nil
+                                                          preferredStyle:UIAlertControllerStyleActionSheet];
+  __weak typeof(self) weakSelf = self;
+  [sheet addAction:[UIAlertAction actionWithTitle:@"拍照" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf.imagePickerManager openCameraFrom:strongSelf];
+  }]];
+  [sheet addAction:[UIAlertAction actionWithTitle:@"从相册选择" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) {
+      return;
+    }
+    [strongSelf.imagePickerManager openAlbumFrom:strongSelf];
+  }]];
+  [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+
+  UIPopoverPresentationController *popover = sheet.popoverPresentationController;
+  if (popover) {
+    popover.sourceView = self.detailView.imageTagButton;
+    popover.sourceRect = self.detailView.imageTagButton.bounds;
+    popover.permittedArrowDirections = UIPopoverArrowDirectionAny;
+  }
+
+  [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)imagePicker:(TLWImagePickerManager *)picker didSelectImage:(UIImage *)image {
+  if (![image isKindOfClass:[UIImage class]]) {
+    return;
+  }
+  self.viewModel.plantModel.localImage = image;
+  self.viewModel.plantModel.imageUrl = @"";
+  self.detailView.topImageView.image = image;
+  [self tl_uploadAndUpdatePlantImage:image];
+}
+
+- (TLWImagePickerManager *)imagePickerManager {
+  if (!_imagePickerManager) {
+    _imagePickerManager = [[TLWImagePickerManager alloc] init];
+    _imagePickerManager.maxCount = 1;
+    _imagePickerManager.delegate = self;
+  }
+  return _imagePickerManager;
+}
+
+- (void)tl_uploadAndUpdatePlantImage:(UIImage *)image {
+  NSNumber *cropId = self.viewModel.plantModel.plantId;
+  if (cropId.integerValue <= 0) {
+    return;
+  }
+
+  __weak typeof(self) weakSelf = self;
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    NSData *imageData = UIImageJPEGRepresentation(image, 0.9);
+    if (imageData.length == 0) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) {
+          return;
+        }
+        [strongSelf tl_showMessage:@"图片处理失败，请稍后重试"];
+      });
+      return;
+    }
+    NSString *fileName = [NSString stringWithFormat:@"crop_detail_%@.jpg", [[NSUUID UUID] UUIDString]];
+    NSString *tempPath = [NSTemporaryDirectory() stringByAppendingPathComponent:fileName];
+    if (![imageData writeToFile:tempPath atomically:YES]) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) {
+          return;
+        }
+        [strongSelf tl_showMessage:@"图片处理失败，请稍后重试"];
+      });
+      return;
+    }
+
+    NSURL *fileURL = [NSURL fileURLWithPath:tempPath];
+    TLWSDKManager *manager = [TLWSDKManager shared];
+    NSLog(@"1");
+    __block void (^updateCropBlock)(NSString *imageURL, BOOL didRetryAuth);
+    updateCropBlock = ^(NSString *imageURL, BOOL didRetryAuth) {
+      AGMyCropUpdateRequest *request = [[AGMyCropUpdateRequest alloc] init];
+      request.plantName = weakSelf.viewModel.plantModel.plantName;
+      request.imageUrl = imageURL;
+      request.status = weakSelf.viewModel.plantModel.plantStatus;
+      request.plantingDate = weakSelf.viewModel.plantModel.plantingDate;
+
+      [manager.api updateCropWithId:cropId myCropUpdateRequest:request completionHandler:^(AGResultMyCropResponseDto *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          NSLog(@"2");
+          __strong typeof(weakSelf) strongSelf = weakSelf;
+          if (!strongSelf) {
+            return;
+          }
+
+          if (!didRetryAuth
+              && [manager.sessionManager handleAuthFailureForCode:output.code
+                                                         message:output.message
+                                                      retryBlock:^{
+            updateCropBlock(imageURL, YES);
+          }]) {
+            return;
+          }
+
+          if (error || output.code.integerValue != 200) {
+            NSString *message = [manager.sessionManager userFacingMessageForError:error
+                                                                             code:output.code
+                                                                    serverMessage:output.message
+                                                                   defaultMessage:@"作物图片更新失败，请稍后重试"];
+            [strongSelf tl_showMessage:message];
+            return;
+          }
+          NSLog(@"3");
+          strongSelf.viewModel.plantModel.imageUrl = output.data.imageUrl.length > 0 ? output.data.imageUrl : imageURL;
+          strongSelf.viewModel.plantModel.localImage = image;
+        });
+      }];
+    };
+
+    __block void (^uploadBlock)(BOOL didRetryAuth);
+    uploadBlock = ^(BOOL didRetryAuth) {
+      [manager uploadFileWithFile:fileURL prefix:@"crop/" completionHandler:^(AGResultString *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          __strong typeof(weakSelf) strongSelf = weakSelf;
+          if (!strongSelf) {
+            [[NSFileManager defaultManager] removeItemAtPath:tempPath error:nil];
+            return;
+          }
+
+          if (!didRetryAuth
+              && [manager.sessionManager handleAuthFailureForCode:output.code
+                                                         message:output.message
+                                                      retryBlock:^{
+            uploadBlock(YES);
+          }]) {
+            return;
+          }
+
+          NSString *imageURL = [output.data isKindOfClass:[NSString class]] ? output.data : @"";
+          if (error || output.code.integerValue != 200 || imageURL.length == 0) {
+            [[NSFileManager defaultManager] removeItemAtPath:tempPath error:nil];
+            NSString *message = [manager.sessionManager userFacingMessageForError:error
+                                                                             code:output.code
+                                                                    serverMessage:output.message
+                                                                   defaultMessage:@"图片上传失败，请稍后重试"];
+            [strongSelf tl_showMessage:message];
+            return;
+          }
+
+          [[NSFileManager defaultManager] removeItemAtPath:tempPath error:nil];
+          updateCropBlock(imageURL, NO);
+        });
+      }];
+    };
+
+    uploadBlock(NO);
+  });
 }
 
 - (void)tl_showMessage:(NSString *)message {

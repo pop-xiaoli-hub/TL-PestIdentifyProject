@@ -333,7 +333,7 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
   UILabel* label = self.userNameLabel;
   label.backgroundColor = [UIColor clearColor];
   label.textColor = [UIColor whiteColor];
-  label.font = [UIFont systemFontOfSize:37 weight:UIFontWeightHeavy];
+  label.font = [UIFont systemFontOfSize:34 weight:UIFontWeightHeavy];
   UIView* headerContainer = self.headerContainer;
   [headerContainer addSubview:label];
   [label mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -373,7 +373,7 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
   [self.weatherCardImageView mas_remakeConstraints:^(MASConstraintMaker *make) {
     if (self.elderModeEnabled) {
       make.right.equalTo(self.headerContainer);
-      make.bottom.equalTo(self.headerContainer);
+      make.bottom.equalTo(self.headerContainer).offset(20);
       make.height.mas_equalTo(160.0);
       make.width.mas_equalTo(200.0);
     } else {
