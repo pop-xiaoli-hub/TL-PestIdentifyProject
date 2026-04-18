@@ -9,12 +9,14 @@
 #import "TLWPlantDetailView.h"
 #import "ViewModels/TLWPlantDetailViewModel.h"
 #import "Views/TLWPlantDetailSegmentTabView.h"
+#import "Views/TLWPlantDetailInfoCardView.h"
 #import "Views/TLWPlantDetailFertilizerView.h"
 #import "Views/TLWPlantDetailMedicineView.h"
 #import "Views/TLWPlantDetailNoteView.h"
 #import "Views/TLWPlantDetailWateringView.h"
 #import "TLWImagePickerManager.h"
 #import <AgriPestClient/AGMyCropUpdateRequest.h>
+#import <AgriPestClient/AGResultMyCropResponseDto.h>
 #import <SDWebImage/SDWebImage.h>
 #import "TLWSDKManager.h"
 
@@ -60,6 +62,8 @@
 - (void)tl_bindActions {
   [self.detailView.backButton addTarget:self action:@selector(tl_backTapped) forControlEvents:UIControlEventTouchUpInside];
   [self.detailView.imageTagButton addTarget:self action:@selector(tl_imageTagButtonTapped) forControlEvents:UIControlEventTouchUpInside];
+  UITapGestureRecognizer *healthTapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_healthInfoCardTapped)];
+  [self.detailView.healthInfoCardView addGestureRecognizer:healthTapGesture];
 
   __weak typeof(self) weakSelf = self;
   self.detailView.segmentTabView.selectionChangedBlock = ^(NSInteger index) {
@@ -244,6 +248,100 @@
 
 - (void)tl_backTapped {
   [self.navigationController popViewControllerAnimated:YES];
+}
+
+- (void)tl_healthInfoCardTapped {
+  UIAlertController *sheet = [UIAlertController alertControllerWithTitle:@"选择植物状态"
+                                                                 message:nil
+                                                          preferredStyle:UIAlertControllerStyleActionSheet];
+  __weak typeof(self) weakSelf = self;
+  NSArray<NSString *> *statusOptions = @[@"良好", @"一般", @"差"];
+  for (NSString *statusText in statusOptions) {
+    [sheet addAction:[UIAlertAction actionWithTitle:statusText style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) {
+        return;
+      }
+      [strongSelf tl_updatePlantHealthStatus:statusText];
+    }]];
+  }
+  [sheet addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+
+  UIPopoverPresentationController *popover = sheet.popoverPresentationController;
+  if (popover) {
+    popover.sourceView = self.detailView.healthInfoCardView;
+    popover.sourceRect = self.detailView.healthInfoCardView.bounds;
+    popover.permittedArrowDirections = UIPopoverArrowDirectionAny;
+  }
+
+  [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)tl_updatePlantHealthStatus:(NSString *)statusText {
+  if (statusText.length == 0) {
+    return;
+  }
+
+  NSString *previousStatus = [self.viewModel.plantModel.plantStatus copy];
+  self.viewModel.plantModel.plantStatus = statusText;
+  [self.detailView configureWithViewModel:self.viewModel];
+
+  NSNumber *cropId = self.viewModel.plantModel.plantId;
+  if (cropId.integerValue <= 0) {
+    return;
+  }
+
+  __weak typeof(self) weakSelf = self;
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    TLWSDKManager *manager = [TLWSDKManager shared];
+
+    __block void (^updateBlock)(BOOL didRetryAuth);
+    updateBlock = ^(BOOL didRetryAuth) {
+      AGMyCropUpdateRequest *request = [[AGMyCropUpdateRequest alloc] init];
+      request.plantName = weakSelf.viewModel.plantModel.plantName;
+      request.imageUrl = weakSelf.viewModel.plantModel.imageUrl;
+      request.status = statusText;
+      request.plantingDate = weakSelf.viewModel.plantModel.plantingDate;
+
+      [manager.api updateCropWithId:cropId myCropUpdateRequest:request completionHandler:^(AGResultMyCropResponseDto *output, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          __strong typeof(weakSelf) strongSelf = weakSelf;
+          if (!strongSelf) {
+            return;
+          }
+
+          if (!didRetryAuth
+              && [manager.sessionManager handleAuthFailureForCode:output.code
+                                                         message:output.message
+                                                      retryBlock:^{
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+              updateBlock(YES);
+            });
+          }]) {
+            return;
+          }
+
+          if (error || output.code.integerValue != 200) {
+            strongSelf.viewModel.plantModel.plantStatus = previousStatus;
+            [strongSelf.detailView configureWithViewModel:strongSelf.viewModel];
+            NSString *message = [manager.sessionManager userFacingMessageForError:error
+                                                                             code:output.code
+                                                                    serverMessage:output.message
+                                                                   defaultMessage:@"植物状态更新失败，请稍后重试"];
+            [strongSelf tl_showMessage:message];
+            return;
+          }
+
+          if ([output.data.status isKindOfClass:[NSString class]] && output.data.status.length > 0) {
+            strongSelf.viewModel.plantModel.plantStatus = output.data.status;
+            [strongSelf.detailView configureWithViewModel:strongSelf.viewModel];
+          }
+        });
+      }];
+    };
+
+    updateBlock(NO);
+  });
 }
 
 - (void)tl_imageTagButtonTapped {

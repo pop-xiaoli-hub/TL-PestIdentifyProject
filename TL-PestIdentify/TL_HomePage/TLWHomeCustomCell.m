@@ -24,6 +24,7 @@
 @property (nonatomic, strong) CAGradientLayer *createButtonGradientLayer;
 @property (nonatomic, strong) UILabel *plantTagLabel;
 @property (nonatomic, strong) UIImageView *plantTagIconView;
+@property (nonatomic, strong) UIButton *deleteButton;
 @property (nonatomic, strong) UILongPressGestureRecognizer *contentCardLongPressGesture;
 
 @end
@@ -46,6 +47,7 @@
   self.contentImageView.image = nil;
   self.plantTagLabel.text = nil;
   self.plantTagIconView.hidden = YES;
+  self.deleteButton.hidden = YES;
 }
 
 - (void)layoutSubviews {
@@ -207,6 +209,35 @@
   [contentCardButton addSubview:plusVerticalLine];
   self.plusVerticalLine = plusVerticalLine;
 
+  UIButton *deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
+  deleteButton.hidden = YES;
+  deleteButton.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.62];
+  deleteButton.layer.cornerRadius = 20.0;
+  deleteButton.layer.masksToBounds = YES;
+  [deleteButton addTarget:self action:@selector(tl_deleteButtonTapped) forControlEvents:UIControlEventTouchUpInside];
+  [contentCardButton addSubview:deleteButton];
+  self.deleteButton = deleteButton;
+
+  UIView *deleteIconContainer = [[UIView alloc] init];
+  deleteIconContainer.userInteractionEnabled = NO;
+  [deleteButton addSubview:deleteIconContainer];
+
+  UIImageView *deleteIconView = [[UIImageView alloc] init];
+  deleteIconView.contentMode = UIViewContentModeScaleAspectFit;
+  deleteIconView.tintColor = [UIColor whiteColor];
+  if (@available(iOS 13.0, *)) {
+    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:17.0 weight:UIImageSymbolWeightBold];
+    deleteIconView.image = [[UIImage systemImageNamed:@"trash.fill" withConfiguration:config] imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+  }
+  [deleteIconContainer addSubview:deleteIconView];
+
+  UILabel *deleteLabel = [[UILabel alloc] init];
+  deleteLabel.text = @"删除";
+  deleteLabel.textColor = [UIColor whiteColor];
+  deleteLabel.font = [UIFont systemFontOfSize:15.0 weight:UIFontWeightSemibold];
+  deleteLabel.userInteractionEnabled = NO;
+  [deleteButton addSubview:deleteLabel];
+
   [avatarImageView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(cardView).offset(16.0);
     make.top.equalTo(cardView).offset(16.0);
@@ -288,6 +319,28 @@
     make.width.mas_equalTo(8.0);
     make.height.mas_equalTo(72.0);
   }];
+
+  [deleteButton mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.right.equalTo(contentCardButton).offset(-14.0);
+    make.bottom.equalTo(contentCardButton).offset(-14.0);
+    make.width.mas_equalTo(124.0);
+    make.height.mas_equalTo(48.0);
+  }];
+
+  [deleteIconContainer mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(deleteButton).offset(18.0);
+    make.centerY.equalTo(deleteButton);
+    make.width.height.mas_equalTo(20.0);
+  }];
+
+  [deleteIconView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(deleteIconContainer);
+  }];
+
+  [deleteLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.left.equalTo(deleteIconContainer.mas_right).offset(12.0);
+    make.centerY.equalTo(deleteButton);
+  }];
 }
 
 - (void)configureAsCreateCell {
@@ -306,6 +359,7 @@
   self.contentCardButton.backgroundColor = [UIColor colorWithWhite:0.90 alpha:1.0];
   self.plusHorizontalLine.hidden = NO;
   self.plusVerticalLine.hidden = NO;
+  self.deleteButton.hidden = YES;
   self.contentCardButton.userInteractionEnabled = YES;
   self.contentCardLongPressGesture.enabled = NO;
 }
@@ -331,6 +385,7 @@
   self.contentCardButton.backgroundColor = [UIColor clearColor];
   self.plusHorizontalLine.hidden = YES;
   self.plusVerticalLine.hidden = YES;
+  self.deleteButton.hidden = NO;
   self.contentCardButton.userInteractionEnabled = YES;
   self.contentCardLongPressGesture.enabled = YES;
 }
@@ -352,6 +407,12 @@
     return;
   }
 
+  if (self.longPressContentCard) {
+    self.longPressContentCard();
+  }
+}
+
+- (void)tl_deleteButtonTapped {
   if (self.longPressContentCard) {
     self.longPressContentCard();
   }

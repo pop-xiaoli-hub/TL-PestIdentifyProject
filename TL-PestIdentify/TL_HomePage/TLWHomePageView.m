@@ -429,6 +429,9 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
   tableView.backgroundColor = [UIColor clearColor];
   tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
   tableView.showsVerticalScrollIndicator = NO;
+  UIView *footerSpacerView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 1, 90.0)];
+  footerSpacerView.backgroundColor = [UIColor clearColor];
+  tableView.tableFooterView = footerSpacerView;
   [self addSubview:tableView];
   [tableView mas_makeConstraints:^(MASConstraintMaker *make) {
       make.edges.equalTo(self);
