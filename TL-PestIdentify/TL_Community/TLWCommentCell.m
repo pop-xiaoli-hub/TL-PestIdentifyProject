@@ -21,6 +21,9 @@
 @property (nonatomic, strong) UILabel *contentLabel;
 @property (nonatomic, strong) UILabel *likeLabel;
 @property (nonatomic, strong) UIImageView *likeIcon;
+@property (nonatomic, assign) BOOL elderModeEnabled;
+@property (nonatomic, strong) MASConstraint *avatarSizeConstraint;
+@property (nonatomic, strong) MASConstraint *likeIconSizeConstraint;
 @end
 
 @implementation TLWCommentCell
@@ -85,7 +88,7 @@
   [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(self.contentView).offset(14);
     make.left.equalTo(self.contentView).offset(16);
-    make.width.height.mas_equalTo(36);
+    self.avatarSizeConstraint = make.width.height.mas_equalTo(36);
   }];
 
   [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -102,7 +105,7 @@
   [self.likeIcon mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerY.equalTo(self.avatarView);
     make.right.equalTo(self.likeLabel.mas_left).offset(-4);
-    make.width.height.mas_equalTo(15);
+    self.likeIconSizeConstraint = make.width.height.mas_equalTo(15);
   }];
 
   [self.likeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -123,6 +126,19 @@
     make.bottom.equalTo(self.contentView);
     make.height.mas_equalTo(0.5);
   }];
+
+  [self configureElderModeEnabled:NO];
+}
+
+- (void)configureElderModeEnabled:(BOOL)enabled {
+  self.elderModeEnabled = enabled;
+  self.nameLabel.font = [UIFont systemFontOfSize:(enabled ? 16 : 13) weight:UIFontWeightSemibold];
+  self.timeLabel.font = [UIFont systemFontOfSize:(enabled ? 14 : 11)];
+  self.contentLabel.font = [UIFont systemFontOfSize:(enabled ? 17 : 14)];
+  self.likeLabel.font = [UIFont systemFontOfSize:(enabled ? 14 : 11)];
+  self.avatarView.layer.cornerRadius = enabled ? 21.0 : 18.0;
+  [self.avatarSizeConstraint setOffset:(enabled ? 42.0 : 36.0)];
+  [self.likeIconSizeConstraint setOffset:(enabled ? 18.0 : 15.0)];
 }
 
 - (void)configureWithComment:(AGCommentResponseDto *)comment {

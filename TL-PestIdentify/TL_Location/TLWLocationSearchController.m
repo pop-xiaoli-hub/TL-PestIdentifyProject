@@ -110,7 +110,7 @@ static NSString *const kCellID = @"TLWLocationSearchCell";
 
 // MARK: - TLWLocationSearchController
 
-@interface TLWLocationSearchController () <UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate>
+@interface TLWLocationSearchController () <UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate, UIGestureRecognizerDelegate>
 
 @property (nonatomic, strong) UIImageView *backgroundImageView;
 @property (nonatomic, strong) UIView *topBarView;
@@ -124,6 +124,7 @@ static NSString *const kCellID = @"TLWLocationSearchCell";
 @property (nonatomic, copy) NSArray<TLWSearchResult *> *results;
 @property (nonatomic, copy) NSString *currentKeyword;
 @property (nonatomic, strong, nullable) MKLocalSearch *searchTask;
+@property (nonatomic, strong) UITapGestureRecognizer *dismissKeyboardTapGesture;
 
 @end
 
@@ -146,6 +147,7 @@ static NSString *const kCellID = @"TLWLocationSearchCell";
     [self tl_setupBackground];
     [self tl_setupTopBar];
     [self tl_setupResultsCard];
+    [self tl_setupDismissKeyboardGesture];
     [self tl_setupSwipeBack];
 }
 
@@ -297,6 +299,17 @@ static NSString *const kCellID = @"TLWLocationSearchCell";
     self.navigationController.interactivePopGestureRecognizer.delegate = nil;
 }
 
+- (void)tl_setupDismissKeyboardGesture {
+    self.dismissKeyboardTapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tl_dismissKeyboard)];
+    self.dismissKeyboardTapGesture.cancelsTouchesInView = NO;
+    self.dismissKeyboardTapGesture.delegate = self;
+    [self.view addGestureRecognizer:self.dismissKeyboardTapGesture];
+}
+
+- (void)tl_dismissKeyboard {
+    [self.view endEditing:YES];
+}
+
 // MARK: - Search logic
 
 - (void)tl_searchTextChanged:(UITextField *)tf {
@@ -412,6 +425,20 @@ static NSString *const kCellID = @"TLWLocationSearchCell";
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
     [textField resignFirstResponder];
+    return YES;
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
+    if (gestureRecognizer != self.dismissKeyboardTapGesture) {
+        return YES;
+    }
+
+    UIView *touchedView = touch.view;
+    if ([touchedView isDescendantOfView:self.searchContainerView] ||
+        [touchedView isDescendantOfView:self.tableView] ||
+        [touchedView isDescendantOfView:self.backButton]) {
+        return NO;
+    }
     return YES;
 }
 

@@ -22,6 +22,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// 第一个预警 card：点击右下角「查看详细/收起」
 @property (nonatomic, copy) void(^clickWarningDetail)(void);
 
+/// 首页适老化模式下调整预警卡字体
+- (void)tl_configureElderModeEnabled:(BOOL)enabled;
+
 /// 设置预警正文文案（有定位、有预警数据时使用）
 - (void)tl_configureWithWarning:(TLWWarningModel* )model;
 

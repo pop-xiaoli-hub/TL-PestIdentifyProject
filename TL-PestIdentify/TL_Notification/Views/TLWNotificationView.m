@@ -13,6 +13,7 @@ static CGFloat const kTLNotifNavHeight  = 48.0;
 
 @property (nonatomic, strong, readwrite) UITableView         *tableView;
 @property (nonatomic, strong, readwrite) NSArray<UIButton *> *tabButtons;
+@property (nonatomic, assign) BOOL elderModeEnabled;
 
 @end
 
@@ -104,6 +105,7 @@ static CGFloat const kTLNotifNavHeight  = 48.0;
     }
     tabScroll.contentSize = CGSizeMake(tabX - tabGap + 16, 37); // +16 right padding
     _tabButtons = [btns copy];
+    [self configureElderModeEnabled:NO];
 
     // ── Notification table view ─────────────────────────────────────
     _tableView = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
@@ -117,6 +119,14 @@ static CGFloat const kTLNotifNavHeight  = 48.0;
         make.top.equalTo(tabScroll.mas_bottom).offset(20);
         make.left.right.bottom.equalTo(blurCard.contentView);
     }];
+}
+
+- (void)configureElderModeEnabled:(BOOL)enabled {
+    self.elderModeEnabled = enabled;
+    UIFont *tabFont = [UIFont systemFontOfSize:(enabled ? 19.0 : 16.0) weight:UIFontWeightSemibold];
+    for (UIButton *button in self.tabButtons) {
+        button.titleLabel.font = tabFont;
+    }
 }
 
 @end

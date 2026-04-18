@@ -25,6 +25,7 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
 @property (nonatomic, strong) UIImageView* bottomOfUserNameImageView;
 @property (nonatomic, strong) UIImageView* bambooImageView;
 @property (nonatomic, strong) UIView* headerContainer;
+@property (nonatomic, assign) BOOL elderModeEnabled;
 
 // 定位行
 @property (nonatomic, strong) UIImageView *locationIconView;
@@ -288,12 +289,7 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
   UIImageView* imageView = self.weatherCardImageView;
   imageView.image = [[UIImage imageNamed:@"hp_cloud"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
   [self.headerContainer addSubview:imageView];
-  [imageView mas_makeConstraints:^(MASConstraintMaker *make) {
-      make.left.equalTo(self.temperatureSuffixLabel.mas_right).offset(-60);
-      make.top.equalTo(self.headerContainer).offset(55);
-    make.height.mas_equalTo(80);
-    make.width.mas_equalTo(100);
-  }];
+  [self tl_updateWeatherCardLayoutForCurrentMode];
 }
 
 - (void)tl_setBottomNameImageView {
@@ -356,11 +352,38 @@ static NSUInteger const kTLWHomePageUserNameMaxCount = 5;
 }
 
 - (void)configureElderModeEnabled:(BOOL)enabled {
+  self.elderModeEnabled = enabled;
   NSString *imageName = enabled ? @"oldMode" : @"hp_version";
   UIImage *image = [[UIImage imageNamed:imageName] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
   [self.userVersionButton setImage:image forState:UIControlStateNormal];
   [self.userVersionButton setImage:image forState:UIControlStateHighlighted];
   self.userVersionButton.selected = enabled;
+  self.calendarLabel.font = [UIFont systemFontOfSize:(enabled ? 27.0 : 25.0) weight:UIFontWeightBold];
+  self.temperatureDigitalLabel.font = [UIFont systemFontOfSize:(enabled ? 72.0 : 70.0) weight:UIFontWeightHeavy];
+  self.temperatureSuffixLabel.font = [UIFont systemFontOfSize:(enabled ? 32.0 : 30.0) weight:UIFontWeightBold];
+  self.bambooImageView.hidden = enabled;
+  [self tl_updateWeatherCardLayoutForCurrentMode];
+}
+
+- (void)tl_updateWeatherCardLayoutForCurrentMode {
+  if (!self.weatherCardImageView.superview) {
+    return;
+  }
+
+  [self.weatherCardImageView mas_remakeConstraints:^(MASConstraintMaker *make) {
+    if (self.elderModeEnabled) {
+      make.right.equalTo(self.headerContainer).offset(-50.0);
+      make.bottom.equalTo(self.headerContainer);
+      make.height.mas_equalTo(160.0);
+      make.width.mas_equalTo(200.0);
+    } else {
+      make.left.equalTo(self.temperatureSuffixLabel.mas_right).offset(-60.0);
+      make.top.equalTo(self.headerContainer).offset(55.0);
+      make.height.mas_equalTo(80.0);
+      make.width.mas_equalTo(100.0);
+    }
+   ;
+  }];
 }
 
 - (NSString *)tl_weatherImageNameForIconCode:(NSString *)iconCode {

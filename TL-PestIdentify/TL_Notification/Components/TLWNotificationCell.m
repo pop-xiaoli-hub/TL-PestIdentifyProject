@@ -17,6 +17,7 @@
 @property (nonatomic, strong) UIView      *redDot;
 @property (nonatomic, strong) UILabel     *bodyLabel;
 @property (nonatomic, strong) UIButton    *detailButton;
+@property (nonatomic, assign) BOOL elderModeEnabled;
 
 @end
 
@@ -119,6 +120,15 @@
         make.bottom.equalTo(_cardView).offset(-14);
         make.height.mas_equalTo(20);
     }];
+
+    [self configureElderModeEnabled:NO];
+}
+
+- (void)configureElderModeEnabled:(BOOL)enabled {
+    self.elderModeEnabled = enabled;
+    self.titleLabel.font = [UIFont systemFontOfSize:(enabled ? 21.0 : 18.0) weight:UIFontWeightSemibold];
+    self.bodyLabel.font = [UIFont systemFontOfSize:(enabled ? 17.0 : 14.0)];
+    self.detailButton.titleLabel.font = [UIFont systemFontOfSize:(enabled ? 16.5 : 13.5) weight:UIFontWeightMedium];
 }
 
 - (void)configureWithItem:(TLWNotificationItem *)item {
@@ -127,8 +137,9 @@
 
     NSMutableParagraphStyle *ps = [[NSMutableParagraphStyle alloc] init];
     ps.lineSpacing = 5; // brings effective line height to ~22pt at 14pt font
+    CGFloat bodyFontSize = self.elderModeEnabled ? 17.0 : 14.0;
     NSDictionary *attrs = @{
-        NSFontAttributeName:            [UIFont systemFontOfSize:14],
+        NSFontAttributeName:            [UIFont systemFontOfSize:bodyFontSize],
         NSParagraphStyleAttributeName:  ps,
         NSForegroundColorAttributeName: [UIColor blackColor],
     };

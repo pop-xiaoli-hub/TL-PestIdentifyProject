@@ -35,6 +35,7 @@ static NSInteger const kMessagePageSize = 20;
 @property (nonatomic, strong) NSNumber *systemUnreadCount;
 @property (nonatomic, strong) UIView *footerLoadingView;
 @property (nonatomic, assign) BOOL hasPerformedInitialLoad;
+@property (nonatomic, assign) BOOL elderModeEnabled;
 
 @end
 
@@ -64,6 +65,7 @@ static NSInteger const kMessagePageSize = 20;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self tl_applyElderModeState];
     // 自定义 tab 容器会手动转发生命周期，可见性要以 navigationController.view
     // 是否真正显示为准，不能只看当前 controller 的 self.view.hidden。
     if ([TLWSDKManager shared].sessionManager.isLoggedIn) {
@@ -214,6 +216,7 @@ static NSInteger const kMessagePageSize = 20;
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     TLWMessageCell *cell = [tableView dequeueReusableCellWithIdentifier:kMessageCellID forIndexPath:indexPath];
     TLWMessageItem *item = self.items[indexPath.row];
+    [cell configureElderModeEnabled:self.elderModeEnabled];
     [cell configureWithItem:item];
     return cell;
 }
@@ -221,7 +224,7 @@ static NSInteger const kMessagePageSize = 20;
 #pragma mark - UITableViewDelegate
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 72;
+    return self.elderModeEnabled ? 122.0 : 72.0;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -259,6 +262,28 @@ static NSInteger const kMessagePageSize = 20;
     refreshControl.tintColor = [UIColor clearColor]; // 隐藏系统菊花
     [refreshControl addTarget:self action:@selector(tl_refreshMessages) forControlEvents:UIControlEventValueChanged];
     return refreshControl;
+}
+
+- (BOOL)tl_isElderModeEnabled {
+    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+    if ([defaults objectForKey:elderModeKey] != nil) {
+        return [defaults boolForKey:elderModeKey];
+    }
+    if ([defaults objectForKey:@"TLW_elder_mode"] != nil) {
+        return [defaults boolForKey:@"TLW_elder_mode"];
+    }
+    return NO;
+}
+
+- (void)tl_applyElderModeState {
+    BOOL elderModeEnabled = [self tl_isElderModeEnabled];
+    if (self.elderModeEnabled == elderModeEnabled && [self.myView.tableView numberOfRowsInSection:0] > 0) {
+        return;
+    }
+    self.elderModeEnabled = elderModeEnabled;
+    [self.myView.tableView reloadData];
 }
 
 - (void)tl_refreshMessages {

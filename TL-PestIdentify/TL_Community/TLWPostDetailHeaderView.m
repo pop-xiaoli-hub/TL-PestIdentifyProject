@@ -17,6 +17,7 @@ static CGFloat const kHorizontalPad = 16.0;
 @property (nonatomic, strong) NSTimer       *autoScrollTimer;
 @property (nonatomic, assign) NSInteger      currentPage;
 @property (nonatomic, strong) NSArray       *images;
+@property (nonatomic, strong) NSArray<NSString *> *currentTags;
 @property (nonatomic, strong) UIImageView   *avatarView;
 @property (nonatomic, strong) UILabel       *nameLabel;
 @property (nonatomic, strong) UILabel       *dateLabel;
@@ -25,6 +26,10 @@ static CGFloat const kHorizontalPad = 16.0;
 @property (nonatomic, strong) UIScrollView  *tagScrollView;
 @property (nonatomic, strong) UIView        *divider;
 @property (nonatomic, strong) UILabel       *commentSectionLabel;
+@property (nonatomic, assign) BOOL elderModeEnabled;
+@property (nonatomic, strong) MASConstraint *avatarSizeConstraint;
+@property (nonatomic, strong) MASConstraint *likeButtonSizeConstraint;
+@property (nonatomic, strong) MASConstraint *collectButtonSizeConstraint;
 @end
 
 @implementation TLWPostDetailHeaderView
@@ -132,7 +137,7 @@ static CGFloat const kHorizontalPad = 16.0;
   [self.avatarView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self).offset(kHorizontalPad);
     make.top.equalTo(self.bannerScrollView.mas_bottom).offset(14);
-    make.width.height.mas_equalTo(46);
+    self.avatarSizeConstraint = make.width.height.mas_equalTo(46);
   }];
   // 用户名
   [self.nameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -154,7 +159,7 @@ static CGFloat const kHorizontalPad = 16.0;
   [self.likeButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerY.equalTo(self.avatarView);
     make.right.equalTo(self.likedCountLabel.mas_left).offset(-4);
-    make.width.height.mas_equalTo(28);
+    self.likeButtonSizeConstraint = make.width.height.mas_equalTo(28);
   }];
   // 收藏数字
   [self.collectedCountLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -165,7 +170,7 @@ static CGFloat const kHorizontalPad = 16.0;
   [self.collectButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.centerY.equalTo(self.avatarView);
     make.right.equalTo(self.collectedCountLabel.mas_left).offset(-4);
-    make.width.height.mas_equalTo(28);
+    self.collectButtonSizeConstraint = make.width.height.mas_equalTo(28);
   }];
 }
 
@@ -230,6 +235,24 @@ static CGFloat const kHorizontalPad = 16.0;
     make.left.equalTo(self).offset(kHorizontalPad);
     make.bottom.equalTo(self).offset(-14);
   }];
+
+  [self configureElderModeEnabled:NO];
+}
+
+- (void)configureElderModeEnabled:(BOOL)enabled {
+  self.elderModeEnabled = enabled;
+  self.nameLabel.font = [UIFont systemFontOfSize:(enabled ? 19 : 16) weight:UIFontWeightSemibold];
+  self.dateLabel.font = [UIFont systemFontOfSize:(enabled ? 15 : 12)];
+  self.likedCountLabel.font = [UIFont systemFontOfSize:(enabled ? 16 : 13) weight:UIFontWeightMedium];
+  self.collectedCountLabel.font = [UIFont systemFontOfSize:(enabled ? 16 : 13) weight:UIFontWeightMedium];
+  self.titleLabel.font = [UIFont systemFontOfSize:(enabled ? 21 : 18) weight:UIFontWeightBold];
+  self.contentLabel.font = [UIFont systemFontOfSize:(enabled ? 18 : 15)];
+  self.commentSectionLabel.font = [UIFont systemFontOfSize:(enabled ? 18 : 15) weight:UIFontWeightSemibold];
+  self.avatarView.layer.cornerRadius = enabled ? 26.0 : 23.0;
+  [self.avatarSizeConstraint setOffset:(enabled ? 52.0 : 46.0)];
+  [self.likeButtonSizeConstraint setOffset:(enabled ? 32.0 : 28.0)];
+  [self.collectButtonSizeConstraint setOffset:(enabled ? 32.0 : 28.0)];
+  [self reloadTags:self.currentTags ?: @[]];
 }
 
 #pragma mark - Configure
@@ -248,8 +271,9 @@ static CGFloat const kHorizontalPad = 16.0;
   self.likedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)likeCount];
   self.collectedCountLabel.text = [NSString stringWithFormat:@"%ld", (long)favCount];
   self.images = post.images ?: @[];
+  self.currentTags = post.tags ?: @[];
   [self reloadBannerImages];
-  [self reloadTags:post.tags];
+  [self reloadTags:self.currentTags];
   [self setNeedsLayout];
   [self layoutIfNeeded];
 }
@@ -337,7 +361,7 @@ static CGFloat const kHorizontalPad = 16.0;
   for (NSString *tag in tags) {
     UILabel *pill = [[UILabel alloc] init];
     pill.text = [NSString stringWithFormat:@"# %@", tag];
-    pill.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
+    pill.font = [UIFont systemFontOfSize:(self.elderModeEnabled ? 15 : 12) weight:UIFontWeightMedium];
     pill.textColor = [UIColor colorWithRed:0.10 green:0.58 blue:0.38 alpha:1.0];
     pill.backgroundColor = [UIColor colorWithRed:0.10 green:0.58 blue:0.38 alpha:0.10];
     pill.layer.cornerRadius = tagH / 2.0;
@@ -366,26 +390,31 @@ static CGFloat const kHorizontalPad = 16.0;
 #pragma mark - Height calculation
 
 + (CGFloat)heightForPost:(TLWCommunityPost *)post {
+  return [self heightForPost:post elderModeEnabled:NO];
+}
+
++ (CGFloat)heightForPost:(TLWCommunityPost *)post elderModeEnabled:(BOOL)elderModeEnabled {
   CGFloat screenW = [UIScreen mainScreen].bounds.size.width;
   CGFloat availW = screenW - kHorizontalPad * 2;
   CGFloat h = kBannerHeight;   // banner
-  h += 14 + 36 + 14;           // author bar
+  CGFloat authorAvatarHeight = elderModeEnabled ? 52.0 : 46.0;
+  h += 14 + authorAvatarHeight + 14; // author bar
   if (post.title.length > 0) {
     CGSize ts = [post.title boundingRectWithSize:CGSizeMake(availW, CGFLOAT_MAX)
                                          options:NSStringDrawingUsesLineFragmentOrigin
-                                      attributes:@{NSFontAttributeName:[UIFont systemFontOfSize:18 weight:UIFontWeightBold]}
+                                      attributes:@{NSFontAttributeName:[UIFont systemFontOfSize:(elderModeEnabled ? 21 : 18) weight:UIFontWeightBold]}
                                          context:nil].size;
     h += ceil(ts.height) + 10;
   }
   if (post.content.length > 0) {
     CGSize cs = [post.content boundingRectWithSize:CGSizeMake(availW, CGFLOAT_MAX)
                                            options:NSStringDrawingUsesLineFragmentOrigin
-                                        attributes:@{NSFontAttributeName:[UIFont systemFontOfSize:15]}
+                                        attributes:@{NSFontAttributeName:[UIFont systemFontOfSize:(elderModeEnabled ? 18 : 15)]}
                                            context:nil].size;
     h += ceil(cs.height);
   }
-  h += 12 + 32;          // tag row
-  h += 16 + 8 + 14 + 22 + 14; // divider + "全部评论"
+  h += 12 + (elderModeEnabled ? 36.0 : 32.0);          // tag row
+  h += 16 + 8 + 14 + (elderModeEnabled ? 26.0 : 22.0) + 14; // divider + "全部评论"
   return h;
 }
 

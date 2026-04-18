@@ -18,6 +18,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, weak, nullable) id<TLWNotificationCellDelegate> delegate;
 
+- (void)configureElderModeEnabled:(BOOL)enabled;
 - (void)configureWithItem:(TLWNotificationItem *)item;
 
 @end
