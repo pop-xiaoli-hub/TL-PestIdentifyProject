@@ -5,6 +5,18 @@
 
 #import "TLWSettingView.h"
 #import <Masonry/Masonry.h>
+#import <objc/runtime.h>
+
+static CGFloat const kSettingRowHeight = 60.0;
+static CGFloat const kSettingRowGap = 8.0;
+static CGFloat const kSettingLogoutHeight = 65.0;
+static CGFloat const kSettingLogoutTop = 20.0;
+static CGFloat const kSettingElderRowHeight = 76.0;
+static CGFloat const kSettingElderRowGap = 12.0;
+static CGFloat const kSettingElderLogoutHeight = 78.0;
+static CGFloat const kSettingElderLogoutTop = 24.0;
+static CGFloat const kSettingElderFontDelta = 4.0;
+static const void *kTLWSettingBaseFontKey = &kTLWSettingBaseFontKey;
 
 @interface TLWSettingView ()
 
@@ -15,6 +27,11 @@
 @property (nonatomic, strong, readwrite) UIButton *agreementRowButton;
 @property (nonatomic, strong, readwrite) UIButton *privacyRowButton;
 @property (nonatomic, strong, readwrite) UIButton *logoutButton;
+@property (nonatomic, assign) BOOL elderModeEnabled;
+@property (nonatomic, strong) NSMutableArray<MASConstraint *> *rowHeightConstraints;
+@property (nonatomic, strong) NSMutableArray<MASConstraint *> *rowGapConstraints;
+@property (nonatomic, strong) MASConstraint *logoutHeightConstraint;
+@property (nonatomic, strong) MASConstraint *logoutTopConstraint;
 
 @end
 
@@ -22,7 +39,11 @@
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
-    if (self) [self setupUI];
+    if (self) {
+        _rowHeightConstraints = [NSMutableArray array];
+        _rowGapConstraints = [NSMutableArray array];
+        [self setupUI];
+    }
     return self;
 }
 
@@ -35,6 +56,7 @@
 
     CGFloat cardTop = navTop + 44 + 12;
     [self setupCardAtTop:cardTop];
+    [self configureElderModeEnabled:NO];
 }
 
 #pragma mark - Card
@@ -71,7 +93,7 @@
         make.top.mas_equalTo(16);
         make.left.mas_equalTo(16);
         make.right.mas_equalTo(-16);
-        make.height.mas_equalTo(60);
+        [self.rowHeightConstraints addObject:make.height.mas_equalTo(kSettingRowHeight)];
     }];
 
     // 其余行
@@ -83,10 +105,10 @@
         UIButton *row = [self buildChevronRowWithTitle:title];
         [container addSubview:row];
         [row mas_makeConstraints:^(MASConstraintMaker *make) {
-            make.top.equalTo(prevRow.mas_bottom).offset(8);
+            [self.rowGapConstraints addObject:make.top.equalTo(prevRow.mas_bottom).offset(kSettingRowGap)];
             make.left.mas_equalTo(16);
             make.right.mas_equalTo(-16);
-            make.height.mas_equalTo(60);
+            [self.rowHeightConstraints addObject:make.height.mas_equalTo(kSettingRowHeight)];
         }];
         [rowButtons addObject:row];
         prevRow = row;
@@ -121,10 +143,10 @@
 
     [container addSubview:_logoutButton];
     [_logoutButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(prevRow.mas_bottom).offset(20);
+        self.logoutTopConstraint = make.top.equalTo(prevRow.mas_bottom).offset(kSettingLogoutTop);
         make.centerX.equalTo(container);
         make.width.mas_equalTo(348);
-        make.height.mas_equalTo(65);
+        self.logoutHeightConstraint = make.height.mas_equalTo(kSettingLogoutHeight);
     }];
 }
 
@@ -140,6 +162,7 @@
     label.text      = title;
     label.font      = [UIFont systemFontOfSize:16];
     label.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1.0];
+    label.numberOfLines = 1;
     [row addSubview:label];
     [label mas_makeConstraints:^(MASConstraintMaker *make) {
         make.left.mas_equalTo(16);
@@ -164,17 +187,6 @@
     row.layer.cornerRadius = 14;
     row.layer.masksToBounds = YES;
 
-    UILabel *label = [UILabel new];
-    label.text      = title;
-    label.font      = [UIFont systemFontOfSize:16];
-    label.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1.0];
-    label.userInteractionEnabled = NO;
-    [row addSubview:label];
-    [label mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.mas_equalTo(16);
-        make.centerY.equalTo(row);
-    }];
-
     UIImageView *chevron = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right"]];
     chevron.tintColor = [UIColor colorWithWhite:0.6 alpha:1.0];
     chevron.userInteractionEnabled = NO;
@@ -186,7 +198,68 @@
         make.height.mas_equalTo(14);
     }];
 
+    UILabel *label = [UILabel new];
+    label.text      = title;
+    label.font      = [UIFont systemFontOfSize:16];
+    label.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1.0];
+    label.userInteractionEnabled = NO;
+    label.numberOfLines = 1;
+    [row addSubview:label];
+    [label mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.mas_equalTo(16);
+        make.centerY.equalTo(row);
+        make.right.lessThanOrEqualTo(chevron.mas_left).offset(-12);
+    }];
+
     return row;
+}
+
+- (void)configureElderModeEnabled:(BOOL)enabled {
+    self.elderModeEnabled = enabled;
+
+    for (MASConstraint *constraint in self.rowHeightConstraints) {
+        [constraint setOffset:(enabled ? kSettingElderRowHeight : kSettingRowHeight)];
+    }
+    for (MASConstraint *constraint in self.rowGapConstraints) {
+        [constraint setOffset:(enabled ? kSettingElderRowGap : kSettingRowGap)];
+    }
+    [self.logoutTopConstraint setOffset:(enabled ? kSettingElderLogoutTop : kSettingLogoutTop)];
+    [self.logoutHeightConstraint setOffset:(enabled ? kSettingElderLogoutHeight : kSettingLogoutHeight)];
+
+    CGFloat switchScale = enabled ? 1.15 : 1.0;
+    self.notificationSwitch.transform = CGAffineTransformMakeScale(switchScale, switchScale);
+    [self tl_applyFontScaleRecursivelyInView:self];
+}
+
+- (void)tl_applyFontScaleRecursivelyInView:(UIView *)view {
+    [self tl_applyFontScaleToView:view];
+    for (UIView *subview in view.subviews) {
+        [self tl_applyFontScaleRecursivelyInView:subview];
+    }
+}
+
+- (void)tl_applyFontScaleToView:(UIView *)view {
+    if ([view isKindOfClass:[UILabel class]]) {
+        UILabel *label = (UILabel *)view;
+        UIFont *baseFont = objc_getAssociatedObject(label, kTLWSettingBaseFontKey);
+        if (!baseFont) {
+            baseFont = label.font;
+            objc_setAssociatedObject(label, kTLWSettingBaseFontKey, baseFont, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        label.font = [UIFont fontWithDescriptor:baseFont.fontDescriptor
+                                           size:(baseFont.pointSize + (self.elderModeEnabled ? kSettingElderFontDelta : 0.0))];
+    } else if ([view isKindOfClass:[UIButton class]]) {
+        UIButton *button = (UIButton *)view;
+        UIFont *baseFont = objc_getAssociatedObject(button.titleLabel, kTLWSettingBaseFontKey);
+        if (!baseFont && button.titleLabel.font) {
+            baseFont = button.titleLabel.font;
+            objc_setAssociatedObject(button.titleLabel, kTLWSettingBaseFontKey, baseFont, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (baseFont) {
+            button.titleLabel.font = [UIFont fontWithDescriptor:baseFont.fontDescriptor
+                                                           size:(baseFont.pointSize + (self.elderModeEnabled ? kSettingElderFontDelta : 0.0))];
+        }
+    }
 }
 
 @end

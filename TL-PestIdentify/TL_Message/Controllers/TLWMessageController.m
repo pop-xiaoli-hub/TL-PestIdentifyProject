@@ -59,6 +59,7 @@ static NSInteger const kMessagePageSize = 20;
     self.currentPage = 0;
     self.hasMoreMessages = YES;
     self.myView.tableView.refreshControl = [self tl_buildRefreshControl];
+    self.myView.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
 
     [self tl_buildStaticItems];
 }
@@ -224,7 +225,7 @@ static NSInteger const kMessagePageSize = 20;
 #pragma mark - UITableViewDelegate
 
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return self.elderModeEnabled ? 122.0 : 72.0;
+    return self.elderModeEnabled ? 122.0 : 76.0;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {

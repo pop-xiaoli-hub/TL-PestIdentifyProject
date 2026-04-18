@@ -184,6 +184,11 @@ static NSString * const kTLWComplianceBaseURLString = @"http://115.191.67.35:808
                                                object:nil];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self.myView configureElderModeEnabled:[self tl_isElderModeEnabled]];
+}
+
 #pragma mark - Actions
 
 - (void)setupActions {
@@ -347,6 +352,19 @@ static NSString * const kTLWComplianceBaseURLString = @"http://115.191.67.35:808
 - (TLWSettingView *)myView {
     if (!_myView) _myView = [[TLWSettingView alloc] initWithFrame:CGRectZero];
     return _myView;
+}
+
+- (BOOL)tl_isElderModeEnabled {
+    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+    if ([defaults objectForKey:elderModeKey] != nil) {
+        return [defaults boolForKey:elderModeKey];
+    }
+    if ([defaults objectForKey:@"TLW_elder_mode"] != nil) {
+        return [defaults boolForKey:@"TLW_elder_mode"];
+    }
+    return NO;
 }
 
 @end

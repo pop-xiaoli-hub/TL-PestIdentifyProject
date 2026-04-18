@@ -33,6 +33,7 @@ static const void *kTLWMyViewBaseFontKey = &kTLWMyViewBaseFontKey;
 @property (nonatomic, assign) BOOL                            elderModeEnabled;
 @property (nonatomic, strong) MASConstraint                   *statsRowHeightConstraint;
 @property (nonatomic, strong) MASConstraint                   *editProfileButtonHeightConstraint;
+@property (nonatomic, strong) MASConstraint                   *editProfileButtonWidthConstraint;
 
 @end
 
@@ -140,8 +141,8 @@ static const void *kTLWMyViewBaseFontKey = &kTLWMyViewBaseFontKey;
     [_editProfileButton mas_makeConstraints:^(MASConstraintMaker *make) {
         make.right.equalTo(statsRow);
         make.centerY.equalTo(statsRow);
-        make.width.mas_equalTo(93);
-        self.editProfileButtonHeightConstraint = make.height.mas_equalTo(50);
+        self.editProfileButtonWidthConstraint = make.width.mas_equalTo(108);
+        self.editProfileButtonHeightConstraint = make.height.mas_equalTo(54);
     }];
 
     return statsRow;
@@ -538,8 +539,9 @@ static const void *kTLWMyViewBaseFontKey = &kTLWMyViewBaseFontKey;
 
 - (void)configureElderModeEnabled:(BOOL)enabled {
     self.elderModeEnabled = enabled;
-    [self.statsRowHeightConstraint setOffset:(enabled ? 58.0 : 50.0)];
-    [self.editProfileButtonHeightConstraint setOffset:(enabled ? 58.0 : 50.0)];
+    [self.statsRowHeightConstraint setOffset:(enabled ? 62.0 : 54.0)];
+    [self.editProfileButtonWidthConstraint setOffset:(enabled ? 118.0 : 108.0)];
+    [self.editProfileButtonHeightConstraint setOffset:(enabled ? 62.0 : 54.0)];
     [self tl_applyFontScaleRecursivelyInView:self];
 }
 

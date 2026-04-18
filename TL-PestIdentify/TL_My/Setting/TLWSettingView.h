@@ -15,4 +15,6 @@
 @property (nonatomic, strong, readonly) UIButton *privacyRowButton;
 @property (nonatomic, strong, readonly) UIButton *logoutButton;
 
+- (void)configureElderModeEnabled:(BOOL)enabled;
+
 @end

@@ -5,11 +5,16 @@
 
 #import "TLWEditProfileView.h"
 #import <Masonry/Masonry.h>
+#import <objc/runtime.h>
 
 static CGFloat const kCardH      = 58.0;
 static CGFloat const kCardRadius = 17.0;
 static CGFloat const kCardGap    = 8.0;
 static CGFloat const kSidePad    = 23.0;
+static CGFloat const kElderCardH = 74.0;
+static CGFloat const kElderCardGap = 12.0;
+static CGFloat const kElderFontDelta = 4.0;
+static const void *kTLWEditProfileBaseFontKey = &kTLWEditProfileBaseFontKey;
 
 @interface TLWEditProfileView ()
 @property (nonatomic, strong, readwrite) UIButton    *avatarRowButton;
@@ -20,13 +25,23 @@ static CGFloat const kSidePad    = 23.0;
 @property (nonatomic, strong, readwrite) UILabel     *phoneValueLabel;
 @property (nonatomic, strong, readwrite) UIButton    *passwordRowButton;
 @property (nonatomic, strong, readwrite) UILabel     *cropValueLabel;
+@property (nonatomic, assign) BOOL elderModeEnabled;
+@property (nonatomic, strong) NSMutableArray<MASConstraint *> *cardHeightConstraints;
+@property (nonatomic, strong) NSMutableArray<MASConstraint *> *cardGapConstraints;
+@property (nonatomic, strong) MASConstraint *panelTopConstraint;
+@property (nonatomic, strong) MASConstraint *firstCardTopConstraint;
+@property (nonatomic, strong) MASConstraint *avatarSizeConstraint;
 @end
 
 @implementation TLWEditProfileView
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
-    if (self) [self setupUI];
+    if (self) {
+        _cardHeightConstraints = [NSMutableArray array];
+        _cardGapConstraints = [NSMutableArray array];
+        [self setupUI];
+    }
     return self;
 }
 
@@ -41,6 +56,7 @@ static CGFloat const kSidePad    = 23.0;
 
     [self setupPanel];
     [self setupCards];
+    [self configureElderModeEnabled:NO];
 }
 
 #pragma mark - Panel (大蒙版底板)
@@ -55,7 +71,7 @@ static CGFloat const kSidePad    = 23.0;
     panelBlur.layer.masksToBounds = YES;
     [self addSubview:panelBlur];
     [panelBlur mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(62);
+        self.panelTopConstraint = make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(62);
         make.left.right.bottom.equalTo(self);
     }];
 
@@ -83,11 +99,11 @@ static CGFloat const kSidePad    = 23.0;
         [card mas_makeConstraints:^(MASConstraintMaker *make) {
             make.left.equalTo(self).offset(kSidePad);
             make.right.equalTo(self).offset(-kSidePad);
-            make.height.mas_equalTo(kCardH);
+            [self.cardHeightConstraints addObject:make.height.mas_equalTo(kCardH)];
             if (prev) {
-                make.top.equalTo(prev.mas_bottom).offset(kCardGap);
+                [self.cardGapConstraints addObject:make.top.equalTo(prev.mas_bottom).offset(kCardGap)];
             } else {
-                make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(68);
+                self.firstCardTopConstraint = make.top.equalTo(self.mas_safeAreaLayoutGuideTop).offset(78);
             }
         }];
         prev = card;
@@ -121,7 +137,7 @@ static CGFloat const kSidePad    = 23.0;
     [_avatarImageView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.right.equalTo(chev.mas_left).offset(-10);
         make.centerY.equalTo(card);
-        make.width.height.mas_equalTo(46);
+        self.avatarSizeConstraint = make.width.height.mas_equalTo(46);
     }];
 
     _avatarRowButton = [self overlayButtonOn:card];
@@ -148,6 +164,7 @@ static CGFloat const kSidePad    = 23.0;
     _nicknameValueLabel = [self valueLabelText:nil];
     [card addSubview:_nicknameValueLabel];
     [_nicknameValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.greaterThanOrEqualTo(lbl.mas_right).offset(12);
         make.right.equalTo(chev.mas_left).offset(-8);
         make.centerY.equalTo(card);
     }];
@@ -169,6 +186,7 @@ static CGFloat const kSidePad    = 23.0;
     _phoneValueLabel = [self valueLabelText:nil];
     [card addSubview:_phoneValueLabel];
     [_phoneValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.greaterThanOrEqualTo(lbl.mas_right).offset(12);
         make.right.equalTo(card).offset(-16);
         make.centerY.equalTo(card);
     }];
@@ -211,6 +229,7 @@ static CGFloat const kSidePad    = 23.0;
     _cropValueLabel = [self valueLabelText:nil];
     [card addSubview:_cropValueLabel];
     [_cropValueLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.greaterThanOrEqualTo(lbl.mas_right).offset(12);
         make.right.equalTo(card).offset(-16);
         make.centerY.equalTo(card);
     }];
@@ -278,6 +297,8 @@ static CGFloat const kSidePad    = 23.0;
     lbl.text      = text;
     lbl.font      = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
     lbl.textColor = [UIColor colorWithRed:0.42 green:0.42 blue:0.42 alpha:1];
+    lbl.textAlignment = NSTextAlignmentRight;
+    lbl.lineBreakMode = NSLineBreakByTruncatingTail;
     return lbl;
 }
 
@@ -297,6 +318,56 @@ static CGFloat const kSidePad    = 23.0;
         make.edges.equalTo(view);
     }];
     return btn;
+}
+
+- (void)configureElderModeEnabled:(BOOL)enabled {
+    self.elderModeEnabled = enabled;
+
+    CGFloat cardHeight = enabled ? kElderCardH : kCardH;
+    CGFloat cardGap = enabled ? kElderCardGap : kCardGap;
+    [self.panelTopConstraint setOffset:(enabled ? 70.0 : 62.0)];
+    [self.firstCardTopConstraint setOffset:(enabled ? 86.0 : 78.0)];
+    for (MASConstraint *constraint in self.cardHeightConstraints) {
+        [constraint setOffset:cardHeight];
+    }
+    for (MASConstraint *constraint in self.cardGapConstraints) {
+        [constraint setOffset:cardGap];
+    }
+    [self.avatarSizeConstraint setOffset:(enabled ? 58.0 : 46.0)];
+    self.avatarImageView.layer.cornerRadius = enabled ? 29.0 : 23.0;
+
+    [self tl_applyFontScaleRecursivelyInView:self];
+}
+
+- (void)tl_applyFontScaleRecursivelyInView:(UIView *)view {
+    [self tl_applyFontScaleToView:view];
+    for (UIView *subview in view.subviews) {
+        [self tl_applyFontScaleRecursivelyInView:subview];
+    }
+}
+
+- (void)tl_applyFontScaleToView:(UIView *)view {
+    if ([view isKindOfClass:[UILabel class]]) {
+        UILabel *label = (UILabel *)view;
+        UIFont *baseFont = objc_getAssociatedObject(label, kTLWEditProfileBaseFontKey);
+        if (!baseFont) {
+            baseFont = label.font;
+            objc_setAssociatedObject(label, kTLWEditProfileBaseFontKey, baseFont, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        label.font = [UIFont fontWithDescriptor:baseFont.fontDescriptor
+                                           size:(baseFont.pointSize + (self.elderModeEnabled ? kElderFontDelta : 0.0))];
+    } else if ([view isKindOfClass:[UIButton class]]) {
+        UIButton *button = (UIButton *)view;
+        UIFont *baseFont = objc_getAssociatedObject(button.titleLabel, kTLWEditProfileBaseFontKey);
+        if (!baseFont && button.titleLabel.font) {
+            baseFont = button.titleLabel.font;
+            objc_setAssociatedObject(button.titleLabel, kTLWEditProfileBaseFontKey, baseFont, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (baseFont) {
+            button.titleLabel.font = [UIFont fontWithDescriptor:baseFont.fontDescriptor
+                                                           size:(baseFont.pointSize + (self.elderModeEnabled ? kElderFontDelta : 0.0))];
+        }
+    }
 }
 
 @end
