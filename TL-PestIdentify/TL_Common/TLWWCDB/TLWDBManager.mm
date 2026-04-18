@@ -64,6 +64,7 @@
         BOOL success = NO;
         if (existingModel) {
             model.localId = existingModel.localId;
+            model.collectedAt = existingModel.collectedAt > 0 ? existingModel.collectedAt : model.collectedAt;
             success = [self.collectedTable insertOrReplaceObject:model];
         } else {
             model.localId = [self generateNextLocalId];
@@ -93,6 +94,7 @@
                 TLWDBCollectedModel *existingModel = [self fetchCollectedPostByPostId_unlocked:dto._id];
                 if (existingModel) {
                     model.localId = existingModel.localId;
+                    model.collectedAt = existingModel.collectedAt > 0 ? existingModel.collectedAt : model.collectedAt;
                     [replaceModels addObject:model];
                 } else {
                     model.localId = [self generateNextLocalId];

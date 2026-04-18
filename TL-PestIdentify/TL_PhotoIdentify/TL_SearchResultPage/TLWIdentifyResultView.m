@@ -332,7 +332,7 @@ static NSInteger const kResultPageCount = 3;
   [self addSubview:retakeButton];
 
   [aiActionContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(self).offset(14.0);
+    make.left.equalTo(self).offset(30.0);
     make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-48.0);
     make.width.mas_equalTo(64.0);
     make.height.mas_equalTo(82.0);
@@ -344,7 +344,7 @@ static NSInteger const kResultPageCount = 3;
   }];
 
   [aiTextLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(aiButton.mas_bottom).offset(-6.0);
+    make.top.equalTo(aiButton.mas_bottom).offset(1.0);
     make.left.right.bottom.equalTo(aiActionContainer);
   }];
 
@@ -352,7 +352,7 @@ static NSInteger const kResultPageCount = 3;
     make.centerY.equalTo(aiActionContainer).offset(-6.0);
     make.right.equalTo(self).offset(-20.0);
     make.width.mas_equalTo(160.0);
-    make.height.mas_equalTo(72.0);
+    make.height.mas_equalTo(62.0);
   }];
 
   self.aiButton = aiButton;
@@ -633,14 +633,18 @@ static NSInteger const kResultPageCount = 3;
     make.right.equalTo(self).offset(-20.0);
     make.bottom.equalTo(self).offset(-28.0);
     make.width.mas_equalTo(160.0);
-    make.height.mas_equalTo(72.0);
+    make.height.mas_equalTo(62.0);
   }];
 
   [self.aiActionContainer mas_remakeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(self).offset(14.0);
-    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-48.0);
+    make.left.equalTo(self).offset(30.0);
+    make.top.equalTo(self).offset(740.0);
     make.width.mas_equalTo(64.0);
     make.height.mas_equalTo(82.0);
+  }];
+
+  [self.aiTextLabel mas_updateConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.aiButton.mas_bottom).offset(1.0);
   }];
 
   [self.pageSolutionLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
@@ -863,7 +867,7 @@ static NSInteger const kResultPageCount = 3;
   }];
 
   [self.aiActionContainer mas_remakeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(self).offset(15);
+    make.left.equalTo(self).offset(15.0);
     make.top.equalTo(self).offset(740.0);
     make.width.mas_equalTo(84.0);
     make.height.mas_equalTo(96.0);
@@ -871,6 +875,10 @@ static NSInteger const kResultPageCount = 3;
 
   [self.aiButton mas_updateConstraints:^(MASConstraintMaker *make) {
     make.width.height.mas_equalTo(64.0);
+  }];
+
+  [self.aiTextLabel mas_updateConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.aiButton.mas_bottom).offset(-9.0);
   }];
 
   [self setNeedsLayout];
