@@ -401,6 +401,7 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
     __weak typeof(self) weakSelf = self;
     __block void (^streamOnce)(BOOL didRetryAuth) = nil;
     NSString *compareTag = [self tl_compareDebugTag];
+    //  startStream是一个更外层的启动器，
     void (^startStream)(NSString *imageURL) = ^(NSString *imageURL) {
         if (imageURL.length > 0) request.imageUrl = imageURL;
         if (kAIAssistantEnableInterfaceCompareDebug) {
@@ -423,7 +424,6 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             }
 
             TLWAIStreamClient *client = [[TLWAIStreamClient alloc] init];
-
             client.onMeta = ^(NSDictionary *meta) {
                 NSLog(@"[AI-STREAM][%@] parsed meta: %@", compareTag, meta);
             };

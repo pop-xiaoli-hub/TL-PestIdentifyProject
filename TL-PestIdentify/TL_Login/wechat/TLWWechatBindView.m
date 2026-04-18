@@ -155,7 +155,8 @@
     [wrapper mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_wechatAuthButton.mas_bottom).offset(14);
         make.centerX.equalTo(self);
-        make.height.mas_equalTo(44);
+        make.width.equalTo(_wechatAuthButton).offset(-40);
+        make.height.mas_equalTo(36);
     }];
 
     _termsCheckButton = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -167,36 +168,19 @@
     _termsCheckButton.contentMode = UIViewContentModeScaleAspectFit;
     [wrapper addSubview:_termsCheckButton];
     [_termsCheckButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(wrapper);
+        make.left.equalTo(wrapper).offset(40);
         make.centerY.equalTo(wrapper);
-        make.width.height.mas_equalTo(24);
+        make.width.height.mas_equalTo(20);
     }];
 
-    NSMutableAttributedString *attr = [[NSMutableAttributedString alloc] initWithString:@"我已阅读并同意 " attributes:@{
-        NSForegroundColorAttributeName: [UIColor colorWithWhite:0 alpha:0.6],
-        NSFontAttributeName:            [UIFont systemFontOfSize:13],
-    }];
-    [attr appendAttributedString:[[NSAttributedString alloc] initWithString:@"用户协议" attributes:@{
-        NSForegroundColorAttributeName: [UIColor colorWithRed:0.0 green:0.6 blue:1.0 alpha:1.0],
-        NSFontAttributeName:            [UIFont systemFontOfSize:13],
-    }]];
-    [attr appendAttributedString:[[NSAttributedString alloc] initWithString:@" 和 " attributes:@{
-        NSForegroundColorAttributeName: [UIColor colorWithWhite:0 alpha:0.6],
-        NSFontAttributeName:            [UIFont systemFontOfSize:13],
-    }]];
-    [attr appendAttributedString:[[NSAttributedString alloc] initWithString:@"隐私政策" attributes:@{
-        NSForegroundColorAttributeName: [UIColor colorWithRed:0.0 green:0.6 blue:1.0 alpha:1.0],
-        NSFontAttributeName:            [UIFont systemFontOfSize:13],
-    }]];
-
-    UILabel *agreeLabel = [[UILabel alloc] init];
-    agreeLabel.attributedText = attr;
-    agreeLabel.numberOfLines  = 1;
-    [wrapper addSubview:agreeLabel];
-    [agreeLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(_termsCheckButton.mas_right).offset(4);
-        make.right.equalTo(wrapper);   // 定义 wrapper 宽度
+    UIImageView *agreeImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"labelTermsPhone"]];
+    agreeImageView.contentMode = UIViewContentModeScaleAspectFit;
+    [wrapper addSubview:agreeImageView];
+    [agreeImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(_termsCheckButton.mas_right).offset(-7);
+        make.right.equalTo(wrapper);
         make.centerY.equalTo(wrapper);
+        make.height.mas_equalTo(32);
     }];
 }
 

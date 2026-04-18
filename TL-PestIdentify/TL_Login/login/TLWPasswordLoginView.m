@@ -269,7 +269,8 @@
     [self addSubview:wrapper];
     [wrapper mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(_loginTapButton.mas_bottom).offset(14);
-        make.left.equalTo(_loginTapButton).offset(20);
+        make.centerX.equalTo(self);
+        make.width.equalTo(_loginTapButton).offset(-40);
         make.height.mas_equalTo(36);
     }];
 
@@ -282,7 +283,7 @@
     _termsCheckButton.contentMode = UIViewContentModeScaleAspectFit;
     [wrapper addSubview:_termsCheckButton];
     [_termsCheckButton mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(wrapper);
+        make.left.equalTo(wrapper).offset(40);
         make.centerY.equalTo(wrapper);
         make.width.height.mas_equalTo(20);
     }];
