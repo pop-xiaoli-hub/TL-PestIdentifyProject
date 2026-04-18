@@ -17,6 +17,7 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface TLWCommentCell : UITableViewCell
+- (void)configureElderModeEnabled:(BOOL)enabled;
 - (void)configureWithComment:(AGCommentResponseDto *)comment;
 @end
 

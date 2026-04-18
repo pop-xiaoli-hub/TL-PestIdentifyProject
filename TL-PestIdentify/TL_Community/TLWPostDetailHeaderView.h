@@ -16,10 +16,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL isLiked;
 @property (nonatomic, strong) UILabel* collectedCountLabel;
 @property (nonatomic, strong) UILabel* likedCountLabel;
+- (void)configureElderModeEnabled:(BOOL)enabled;
 - (void)configureWithPost:(TLWCommunityPost *)post;
 
 /// 计算并返回 header 的合适高度（根据图片数量+内容）
 + (CGFloat)heightForPost:(TLWCommunityPost *)post;
++ (CGFloat)heightForPost:(TLWCommunityPost *)post elderModeEnabled:(BOOL)elderModeEnabled;
 
 @end
 

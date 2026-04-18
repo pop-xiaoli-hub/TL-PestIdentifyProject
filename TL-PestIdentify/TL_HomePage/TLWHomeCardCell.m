@@ -22,6 +22,7 @@
 @property (nonatomic, strong) CAGradientLayer *shineGradientLayer;
 @property (nonatomic, strong) CAGradientLayer *topShineGradientLayer;
 @property (nonatomic, assign) BOOL warningExpanded;
+@property (nonatomic, assign) BOOL elderModeEnabled;
 
 @end
 
@@ -52,24 +53,36 @@
     self.bodyLabel.text = nil;
     self.bodyLabel.textAlignment = NSTextAlignmentLeft;
     self.bodyLabel.textColor = [UIColor colorWithWhite:0.15 alpha:0.9];
-    self.bodyLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightRegular];
+    self.bodyLabel.font = [UIFont systemFontOfSize:(self.elderModeEnabled ? 18.0 : 16.0) weight:UIFontWeightRegular];
     self.bodyLabel.numberOfLines = 3;
     self.bodyLabel.lineBreakMode = NSLineBreakByTruncatingTail;
   }
+}
+
+- (void)tl_configureElderModeEnabled:(BOOL)enabled {
+  self.elderModeEnabled = enabled;
+
+  if (!self.leadingIconView) {
+    return;
+  }
+
+  self.titleLabel.font = [UIFont systemFontOfSize:(enabled ? 22.0 : 20.0) weight:UIFontWeightHeavy];
+  self.bodyLabel.font = [UIFont systemFontOfSize:(enabled ? 18.0 : 16.0) weight:UIFontWeightRegular];
+  self.detailLabel.font = [UIFont systemFontOfSize:(enabled ? 16.0 : 14.0) weight:UIFontWeightMedium];
 }
 
 - (void)tl_configureWithWarning:(TLWWarningModel* )model {
   self.leadingIconView.hidden = NO;
   self.titleLabel.hidden = NO;
   self.titleLabel.textColor = [UIColor colorWithWhite:0.1 alpha:1.0];
-  self.titleLabel.font = [UIFont systemFontOfSize:20.0 weight:UIFontWeightHeavy];
+  self.titleLabel.font = [UIFont systemFontOfSize:(self.elderModeEnabled ? 22.0 : 20.0) weight:UIFontWeightHeavy];
   self.bodyLabel.textAlignment = NSTextAlignmentLeft;
   self.bodyLabel.textColor = [UIColor colorWithWhite:0.15 alpha:0.9];
-  self.bodyLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightRegular];
+  self.bodyLabel.font = [UIFont systemFontOfSize:(self.elderModeEnabled ? 18.0 : 16.0) weight:UIFontWeightRegular];
   self.bodyLabel.numberOfLines = 3;
   self.bodyLabel.lineBreakMode = NSLineBreakByTruncatingTail;
   self.detailLabel.textColor = [UIColor colorWithWhite:0.25 alpha:1.0];
-  self.detailLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightMedium];
+  self.detailLabel.font = [UIFont systemFontOfSize:(self.elderModeEnabled ? 16.0 : 14.0) weight:UIFontWeightMedium];
   self.titleLabel.text = model.title.length > 0 ? model.title : @"【预警通知】";
   self.bodyLabel.text = [model.string copy];
 
@@ -98,7 +111,7 @@
   self.bodyLabel.text = @"暂无预警信息，请开启定位功能";
   self.bodyLabel.textAlignment = NSTextAlignmentCenter;
   self.bodyLabel.numberOfLines = 1;
-  self.bodyLabel.font = [UIFont systemFontOfSize:18.0 weight:UIFontWeightMedium];
+  self.bodyLabel.font = [UIFont systemFontOfSize:(self.elderModeEnabled ? 20.0 : 18.0) weight:UIFontWeightMedium];
   self.bodyLabel.textColor = [UIColor colorWithWhite:0.13 alpha:1.0];
 
   // 居中布局

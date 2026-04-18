@@ -352,6 +352,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 - (void)tl_applyElderModeState {
   self.elderModeEnabled = [self tl_isElderModeEnabled];
   [self.homePageView configureElderModeEnabled:self.elderModeEnabled];
+  [self.homePageView.tableView reloadData];
 }
 
 - (void)tl_toggleElderMode {
@@ -367,6 +368,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 
   self.elderModeEnabled = elderModeEnabled;
   [self.homePageView configureElderModeEnabled:elderModeEnabled];
+  [self.homePageView.tableView reloadData];
   [TLWToast show:(elderModeEnabled ? @"已切换为老年版" : @"已切换为青年版")];
 }
 
@@ -630,6 +632,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
   if (indexPath.row == 0) {
     TLWHomeCardCell *cell = [tableView dequeueReusableCellWithIdentifier:@"kTLWHomeCardCellIdentifier1" forIndexPath:indexPath];
+    [cell tl_configureElderModeEnabled:self.elderModeEnabled];
     TLWLocationManager *locMgr = [TLWLocationManager shared];
 
     if (!locMgr.hasLocation) {

@@ -22,6 +22,7 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
 @property (nonatomic, strong) NSArray<TLWNotificationItem *> *filteredItems;
 @property (nonatomic, assign) NSInteger                       selectedTabIndex;
 @property (nonatomic, assign) NSInteger                       initialTab;
+@property (nonatomic, assign) BOOL                            elderModeEnabled;
 
 @end
 
@@ -63,6 +64,11 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
 
     [self tl_applyTabColor];
     [self fetchMessages];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self tl_applyElderModeState];
 }
 
 #pragma mark - Fetch
@@ -151,6 +157,7 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     TLWNotificationCell *cell = [tableView dequeueReusableCellWithIdentifier:kNotifCellID forIndexPath:indexPath];
     cell.delegate = self;
+    [cell configureElderModeEnabled:self.elderModeEnabled];
     [cell configureWithItem:self.filteredItems[indexPath.row]];
     return cell;
 }
@@ -224,6 +231,29 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
         _myView = [[TLWNotificationView alloc] initWithFrame:CGRectZero];
     }
     return _myView;
+}
+
+- (BOOL)tl_isElderModeEnabled {
+    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+    if ([defaults objectForKey:elderModeKey] != nil) {
+        return [defaults boolForKey:elderModeKey];
+    }
+    if ([defaults objectForKey:@"TLW_elder_mode"] != nil) {
+        return [defaults boolForKey:@"TLW_elder_mode"];
+    }
+    return NO;
+}
+
+- (void)tl_applyElderModeState {
+    BOOL elderModeEnabled = [self tl_isElderModeEnabled];
+    if (self.elderModeEnabled == elderModeEnabled && [self.myView.tableView numberOfRowsInSection:0] > 0) {
+        return;
+    }
+    self.elderModeEnabled = elderModeEnabled;
+    [self.myView configureElderModeEnabled:elderModeEnabled];
+    [self.myView.tableView reloadData];
 }
 
 @end

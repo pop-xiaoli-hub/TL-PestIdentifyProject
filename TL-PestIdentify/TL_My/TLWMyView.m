@@ -8,6 +8,9 @@
 #import <SDWebImage/SDWebImage.h>
 #import "TLWLoadingIndicator.h"
 #import "TLWSDKManager.h"
+#import <objc/runtime.h>
+
+static const void *kTLWMyViewBaseFontKey = &kTLWMyViewBaseFontKey;
 
 @interface TLWMyView () <UIScrollViewDelegate>
 
@@ -27,6 +30,9 @@
 @property (nonatomic, strong) UIView                          *postListContent;
 @property (nonatomic, strong) NSArray<AGPostResponseDto *>    *cachedPosts;
 @property (nonatomic, strong) UILabel                         *postsStatusLabel;
+@property (nonatomic, assign) BOOL                            elderModeEnabled;
+@property (nonatomic, strong) MASConstraint                   *statsRowHeightConstraint;
+@property (nonatomic, strong) MASConstraint                   *editProfileButtonHeightConstraint;
 
 @end
 
@@ -102,7 +108,7 @@
         make.top.equalTo(_userNameLabel.mas_bottom).offset(16);
         make.left.equalTo(self).offset(16);
         make.right.equalTo(self).offset(-16);
-        make.height.mas_equalTo(50);
+        self.statsRowHeightConstraint = make.height.mas_equalTo(50);
     }];
 
     UILabel *l1, *l2;
@@ -135,7 +141,7 @@
         make.right.equalTo(statsRow);
         make.centerY.equalTo(statsRow);
         make.width.mas_equalTo(93);
-        make.height.mas_equalTo(50);
+        self.editProfileButtonHeightConstraint = make.height.mas_equalTo(50);
     }];
 
     return statsRow;
@@ -253,6 +259,7 @@
         make.centerX.equalTo(_postListContent);
         make.bottom.equalTo(_postListContent).offset(-20);
     }];
+    [self tl_applyFontScaleToView:_postsStatusLabel];
 }
 
 - (void)showPostsStatusText:(NSString *)text {
@@ -273,6 +280,7 @@
         make.centerX.equalTo(_postListContent);
         make.bottom.equalTo(_postListContent).offset(-40);
     }];
+    [self tl_applyFontScaleToView:_postsStatusLabel];
 }
 
 - (void)reloadPosts:(NSArray<AGPostResponseDto *> *)posts {
@@ -291,6 +299,7 @@
             make.centerX.equalTo(_postListContent);
             make.bottom.equalTo(_postListContent).offset(-40);
         }];
+        [self tl_applyFontScaleToView:empty];
         return;
     }
 
@@ -331,6 +340,7 @@
         }];
         prev = item;
     }
+    [self tl_applyFontScaleRecursivelyInView:_postListContent];
 }
 
 - (void)tl_resetPostListContent {
@@ -524,6 +534,43 @@
     NSDateFormatter *fmt = [[NSDateFormatter alloc] init];
     fmt.dateFormat = @"MM-dd";
     return [fmt stringFromDate:date];
+}
+
+- (void)configureElderModeEnabled:(BOOL)enabled {
+    self.elderModeEnabled = enabled;
+    [self.statsRowHeightConstraint setOffset:(enabled ? 58.0 : 50.0)];
+    [self.editProfileButtonHeightConstraint setOffset:(enabled ? 58.0 : 50.0)];
+    [self tl_applyFontScaleRecursivelyInView:self];
+}
+
+- (void)tl_applyFontScaleRecursivelyInView:(UIView *)view {
+    [self tl_applyFontScaleToView:view];
+    for (UIView *subview in view.subviews) {
+        [self tl_applyFontScaleRecursivelyInView:subview];
+    }
+}
+
+- (void)tl_applyFontScaleToView:(UIView *)view {
+    if ([view isKindOfClass:[UILabel class]]) {
+        UILabel *label = (UILabel *)view;
+        UIFont *baseFont = objc_getAssociatedObject(label, kTLWMyViewBaseFontKey);
+        if (!baseFont) {
+            baseFont = label.font;
+            objc_setAssociatedObject(label, kTLWMyViewBaseFontKey, baseFont, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        label.font = [UIFont fontWithDescriptor:baseFont.fontDescriptor
+                                           size:(baseFont.pointSize + (self.elderModeEnabled ? 3.0 : 0.0))];
+    } else if ([view isKindOfClass:[UIButton class]]) {
+        UIButton *button = (UIButton *)view;
+        UIFont *baseFont = objc_getAssociatedObject(button.titleLabel, kTLWMyViewBaseFontKey);
+        if (!baseFont && button.titleLabel.font) {
+            baseFont = button.titleLabel.font;
+            objc_setAssociatedObject(button.titleLabel, kTLWMyViewBaseFontKey, baseFont, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (baseFont) {
+            button.titleLabel.font = [UIFont fontWithDescriptor:baseFont.fontDescriptor size:(baseFont.pointSize + (self.elderModeEnabled ? 3.0 : 0.0))];
+        }
+    }
 }
 
 @end

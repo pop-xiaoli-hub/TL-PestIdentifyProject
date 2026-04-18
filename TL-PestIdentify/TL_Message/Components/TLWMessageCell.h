@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface TLWMessageCell : UITableViewCell
 
+- (void)configureElderModeEnabled:(BOOL)enabled;
 - (void)configureWithItem:(TLWMessageItem *)item;
 
 @end

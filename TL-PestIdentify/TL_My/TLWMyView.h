@@ -31,6 +31,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// 上拉加载更多"我的帖子"时触发
 @property (nonatomic, copy, nullable) void (^onLoadMorePosts)(void);
 
+- (void)configureElderModeEnabled:(BOOL)enabled;
+
 /// 用真实帖子数据刷新"我的帖子"区域
 - (void)reloadPosts:(NSArray<AGPostResponseDto *> *)posts;
 
