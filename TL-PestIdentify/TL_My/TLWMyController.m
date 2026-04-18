@@ -33,6 +33,7 @@ static NSTimeInterval const kMyPublishedSyncInterval = 5 * 60;
 @property (nonatomic, strong) NSDate *lastMyPostsSyncDate;
 @property (nonatomic, strong) NSURLSessionTask *myPostsTask;
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *remoteSyncedMyPostIds;
+@property (nonatomic, assign) BOOL elderModeEnabled;
 
 @end
 
@@ -76,6 +77,7 @@ static NSTimeInterval const kMyPublishedSyncInterval = 5 * 60;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self tl_applyElderModeState];
     if (![TLWSDKManager shared].sessionManager.isLoggedIn) {
         return;
     }
@@ -133,6 +135,24 @@ static NSTimeInterval const kMyPublishedSyncInterval = 5 * 60;
         _myView = [[TLWMyView alloc] initWithFrame:CGRectZero];
     }
     return _myView;
+}
+
+- (BOOL)tl_isElderModeEnabled {
+    NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+    if ([defaults objectForKey:elderModeKey] != nil) {
+        return [defaults boolForKey:elderModeKey];
+    }
+    if ([defaults objectForKey:@"TLW_elder_mode"] != nil) {
+        return [defaults boolForKey:@"TLW_elder_mode"];
+    }
+    return NO;
+}
+
+- (void)tl_applyElderModeState {
+    self.elderModeEnabled = [self tl_isElderModeEnabled];
+    [self.myView configureElderModeEnabled:self.elderModeEnabled];
 }
 
 #pragma mark - Actions

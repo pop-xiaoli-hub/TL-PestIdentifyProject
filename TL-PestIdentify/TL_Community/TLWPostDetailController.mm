@@ -26,6 +26,9 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 // Nav bar reference
 @property (nonatomic, strong) UIView *navBarView;
+@property (nonatomic, strong) UIButton *backButton;
+@property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UIImageView *titleIconView;
 
 // Bottom input bar
 @property (nonatomic, strong) UIView *inputBar;
@@ -43,6 +46,10 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 @property (nonatomic, assign) BOOL isLoadingComments;
 @property (nonatomic, assign) BOOL hasMoreComments;
 @property (nonatomic, strong) UIView *footerLoadingView;
+@property (nonatomic, assign) BOOL elderModeEnabled;
+@property (nonatomic, strong) MASConstraint *backButtonSizeConstraint;
+@property (nonatomic, strong) MASConstraint *titleIconSizeConstraint;
+@property (nonatomic, strong) MASConstraint *bottomLikeButtonSizeConstraint;
 
 - (void)submitCollectTargetState:(BOOL)shouldCollect
                      previousState:(BOOL)previousState
@@ -99,6 +106,11 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [self updateTableHeaderLayoutIfNeeded];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self tl_applyElderModeState];
+}
+
 - (void)viewWillDisappear:(BOOL)animated {
   [super viewWillDisappear:animated];
   // 返回时保持隐藏，由社区页自行管理（社区页也使用自定义导航栏）
@@ -128,8 +140,9 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [backBtn mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(navBar).offset(12);
     make.bottom.equalTo(navBar).offset(-8);
-    make.width.height.mas_equalTo(45);
+    self.backButtonSizeConstraint = make.width.height.mas_equalTo(45);
   }];
+  self.backButton = backBtn;
 
   UILabel *titleLbl = [[UILabel alloc] init];
   titleLbl.text = @"帖子";
@@ -140,6 +153,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
     make.centerX.equalTo(navBar).offset(-10);
     make.centerY.equalTo(backBtn).offset(-5);
   }];
+  self.titleLabel = titleLbl;
 
   UIImageView* iconView = [[UIImageView alloc] init];
   iconView.image = [[UIImage imageNamed:@"cp_post"] imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
@@ -147,8 +161,9 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [iconView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(titleLbl.mas_right).offset(2);
     make.centerY.equalTo(titleLbl.mas_centerY);
-    make.height.width.mas_equalTo(17);
+    self.titleIconSizeConstraint = make.height.width.mas_equalTo(17);
   }];
+  self.titleIconView = iconView;
 
   UIView *line = [[UIView alloc] init];
   line.backgroundColor = [UIColor colorWithWhite:0.92 alpha:1.0];
@@ -184,6 +199,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   if (self.post) {
     [self.headerView configureWithPost:self.post];
   }
+  [self.headerView configureElderModeEnabled:self.elderModeEnabled];
   [self updateTableHeaderLayoutIfNeeded];
 }
 
@@ -215,7 +231,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   if (tableWidth <= 32.0) return;
 
   TLWCommunityPost *postForHeight = self.post ?: [TLWCommunityPost new];
-  CGFloat headerHeight = [TLWPostDetailHeaderView heightForPost:postForHeight];
+  CGFloat headerHeight = [TLWPostDetailHeaderView heightForPost:postForHeight elderModeEnabled:self.elderModeEnabled];
   CGRect targetFrame = CGRectMake(0, 0, tableWidth, headerHeight);
 
   BOOL sizeChanged = fabs(self.headerView.frame.size.width - targetFrame.size.width) > 0.5
@@ -253,7 +269,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   [self.likeButton mas_makeConstraints:^(MASConstraintMaker *make) {
     make.left.equalTo(self.inputBar).offset(14);
     make.centerY.equalTo(self.inputBar);
-    make.width.height.mas_equalTo(32);
+    self.bottomLikeButtonSizeConstraint = make.width.height.mas_equalTo(32);
   }];
 
 
@@ -443,6 +459,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
   TLWCommentCell *cell = [tableView dequeueReusableCellWithIdentifier:kCommentCellID forIndexPath:indexPath];
+  [cell configureElderModeEnabled:self.elderModeEnabled];
   [cell configureWithComment:self.comments[indexPath.row]];
   return cell;
 }
@@ -759,6 +776,32 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   dto.authorAvatar = self.post.authorAvatar ?: @"";
   dto.favoriteCount = @(MAX(0, favoriteCount));
   return dto;
+}
+
+- (BOOL)tl_isElderModeEnabled {
+  NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+  if ([defaults objectForKey:elderModeKey] != nil) {
+    return [defaults boolForKey:elderModeKey];
+  }
+  if ([defaults objectForKey:@"TLW_elder_mode"] != nil) {
+    return [defaults boolForKey:@"TLW_elder_mode"];
+  }
+  return NO;
+}
+
+- (void)tl_applyElderModeState {
+  self.elderModeEnabled = [self tl_isElderModeEnabled];
+  self.titleLabel.font = [UIFont systemFontOfSize:(self.elderModeEnabled ? 20.0 : 17.0) weight:UIFontWeightSemibold];
+  self.commentTextField.font = [UIFont systemFontOfSize:(self.elderModeEnabled ? 17.0 : 14.0)];
+  self.sendButton.titleLabel.font = [UIFont systemFontOfSize:(self.elderModeEnabled ? 17.0 : 14.0) weight:UIFontWeightMedium];
+  [self.backButtonSizeConstraint setOffset:(self.elderModeEnabled ? 50.0 : 45.0)];
+  [self.titleIconSizeConstraint setOffset:(self.elderModeEnabled ? 20.0 : 17.0)];
+  [self.bottomLikeButtonSizeConstraint setOffset:(self.elderModeEnabled ? 38.0 : 32.0)];
+  [self.headerView configureElderModeEnabled:self.elderModeEnabled];
+  [self updateTableHeaderLayoutIfNeeded];
+  [self.tableView reloadData];
 }
 
 
