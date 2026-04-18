@@ -162,7 +162,7 @@
   textField.placeholder = @"请输入种植物名称";
   textField.font = [UIFont systemFontOfSize:18 weight:UIFontWeightMedium];
   textField.textColor = [UIColor colorWithWhite:0.22 alpha:1.0];
-  textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"大白菜"
+  textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"请输入种植物名称"
                                                                      attributes:@{
       NSForegroundColorAttributeName : [UIColor colorWithWhite:0.72 alpha:1.0],
       NSFontAttributeName : [UIFont systemFontOfSize:18 weight:UIFontWeightMedium]
