@@ -67,14 +67,15 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
     OSStatus status = SecItemAdd((__bridge CFDictionaryRef)addQuery, NULL);
     return status == errSecSuccess;
 }
-
+//从keychain中，按照account读取一条通用秘码记录，并将取出的二进制数据按照UTF-8解码为NSString字符串
 + (nullable NSString *)_keychainLoadForAccount:(NSString *)account {
+  //构造传给SecItemCopyMathcing的查询条件
     NSDictionary *query = @{
         (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
         (__bridge id)kSecAttrService: kKeychainService,
         (__bridge id)kSecAttrAccount: account,
-        (__bridge id)kSecReturnData: @YES,
-        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne,
+        (__bridge id)kSecReturnData: @YES,//返回原原始的二进制数据
+        (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne,//限制只返回一条数据
     };
     CFTypeRef result = NULL;
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
@@ -417,11 +418,11 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 
 - (void)tl_restoreSessionFromPersistence {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    NSString *token = [TLWSessionManager _keychainLoadForAccount:kKeychainAccessToken];
-    NSString *refreshToken = [TLWSessionManager _keychainLoadForAccount:kKeychainRefreshToken];
+    NSString *token = [TLWSessionManager _keychainLoadForAccount:kKeychainAccessToken];//获取当前账号的accessToken
+    NSString *refreshToken = [TLWSessionManager _keychainLoadForAccount:kKeychainRefreshToken];//获取刷新token
     NSInteger persistedUserId = [ud integerForKey:kUserIdKey];
 
-    BOOL hasCompleteSession = token.length > 0 && refreshToken.length > 0 && persistedUserId > 0;
+    BOOL hasCompleteSession = token.length > 0 && refreshToken.length > 0 && persistedUserId > 0;//判断会话是否完整
     if (hasCompleteSession) {
         [AGDefaultConfiguration sharedConfig].accessToken = token;
         self.userId = persistedUserId;

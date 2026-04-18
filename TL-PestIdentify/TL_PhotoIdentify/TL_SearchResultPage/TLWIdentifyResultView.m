@@ -312,8 +312,10 @@ static NSInteger const kResultPageCount = 3;
   }];
 
   [aiHintBackgroundView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(aiButton.mas_right).offset(10.0);
-    make.centerY.equalTo(aiButton);
+//    make.left.equalTo(aiButton.mas_right).offset(10.0);
+//    make.centerY.equalTo(aiButton);
+    make.left.equalTo(aiButton.mas_left);
+    make.bottom.equalTo(aiButton.mas_top).offset(-20);
     make.width.mas_equalTo(118.0);
     make.height.mas_equalTo(78.0);
   }];
@@ -602,8 +604,8 @@ static NSInteger const kResultPageCount = 3;
 
   self.firstPageAIHintBackgroundView.hidden = NO;
   [self.firstPageAIHintBackgroundView mas_remakeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(self.aiButton.mas_right).offset(10.0);
-    make.centerY.equalTo(self.aiButton);
+    make.left.equalTo(self.aiButton.mas_left).offset(15);
+    make.bottom.equalTo(self.aiButton.mas_top).offset(-10);
     make.width.mas_equalTo(118.0);
     make.height.mas_equalTo(78.0);
   }];

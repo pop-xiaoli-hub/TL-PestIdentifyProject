@@ -9,6 +9,7 @@
 #import "TLWIdentifyResultView.h"
 #import "TLWIdentifyPageController.h"
 #import "TLWAIAssistantController.h"
+#import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 
 @interface TLWIdentifyResultController ()
@@ -23,10 +24,23 @@
 - (instancetype)init {
   self = [super init];
   if (self) {
-    // 拍照识图结果页固定按设计稿展示，不复用“识别记录”样式。
-    _layoutStyleFlag = 1;
+    // 适老化开启时走大字号/宽间距布局，否则使用默认识图结果布局。
+    _layoutStyleFlag = [self tl_isElderModeEnabled] ? 0 : 1;
   }
   return self;
+}
+
+- (BOOL)tl_isElderModeEnabled {
+  NSInteger currentUserId = [TLWSDKManager shared].sessionManager.userId;
+  NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+  NSString *elderModeKey = [NSString stringWithFormat:@"TLW_elder_mode_%ld", (long)currentUserId];
+  if ([defaults objectForKey:elderModeKey] != nil) {
+    return [defaults boolForKey:elderModeKey];
+  }
+  if ([defaults objectForKey:@"TLW_elder_mode"] != nil) {
+    return [defaults boolForKey:@"TLW_elder_mode"];
+  }
+  return NO;
 }
 
 - (void)viewDidLoad {

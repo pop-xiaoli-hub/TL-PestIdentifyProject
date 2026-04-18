@@ -159,7 +159,7 @@
   self.nameCardView = nameCardView;
 
   UITextField *textField = [[UITextField alloc] init];
-  textField.placeholder = @"大白菜";
+  textField.placeholder = @"请输入种植物名称";
   textField.font = [UIFont systemFontOfSize:18 weight:UIFontWeightMedium];
   textField.textColor = [UIColor colorWithWhite:0.22 alpha:1.0];
   textField.attributedPlaceholder = [[NSAttributedString alloc] initWithString:@"大白菜"
