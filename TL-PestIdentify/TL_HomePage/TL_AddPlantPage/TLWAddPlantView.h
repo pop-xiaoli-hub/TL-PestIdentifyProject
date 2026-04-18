@@ -19,6 +19,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)updateSelectedPlantImage:(nullable UIImage *)image;
 - (void)updateUserAvatarWithURLString:(nullable NSString *)avatarURLString;
+- (void)updateLocationText:(nullable NSString *)locationText;
 
 @end
 

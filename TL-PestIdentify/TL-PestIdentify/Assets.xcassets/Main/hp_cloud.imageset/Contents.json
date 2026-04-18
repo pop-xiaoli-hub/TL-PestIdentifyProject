@@ -1,21 +1,21 @@
 {
-  "images": [
+  "images" : [
     {
-      "idiom": "universal",
-      "filename": "hp_cloud.png",
-      "scale": "1x"
+      "idiom" : "universal",
+      "scale" : "1x"
     },
     {
-      "idiom": "universal",
-      "scale": "2x"
+      "idiom" : "universal",
+      "scale" : "2x"
     },
     {
-      "idiom": "universal",
-      "scale": "3x"
+      "filename" : "生成清新图标风格的天气图标 1.png",
+      "idiom" : "universal",
+      "scale" : "3x"
     }
   ],
-  "info": {
-    "author": "xcode",
-    "version": 1
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
   }
 }

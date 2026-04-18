@@ -219,6 +219,7 @@ static NSInteger const kMessagePageSize = 20;
     TLWMessageItem *item = self.items[indexPath.row];
     [cell configureElderModeEnabled:self.elderModeEnabled];
     [cell configureWithItem:item];
+  
     return cell;
 }
 

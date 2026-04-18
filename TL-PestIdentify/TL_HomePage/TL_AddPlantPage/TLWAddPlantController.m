@@ -8,6 +8,7 @@
 #import "TLWAddPlantController.h"
 #import "TLWAddPlantView.h"
 #import "TLWImagePickerManager.h"
+#import "TLWLocationManager.h"
 #import "TLWSDKManager.h"
 #import <Masonry/Masonry.h>
 
@@ -38,6 +39,11 @@
   [self.myView.contentCardButton addTarget:self action:@selector(tl_addImageTapped) forControlEvents:UIControlEventTouchUpInside];
   [self.myView.confirmButton addTarget:self action:@selector(tl_confirmTapped) forControlEvents:UIControlEventTouchUpInside];
   [self tl_setupDismissKeyboardGesture];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(tl_refreshLocation)
+                                               name:TLWLocationDidUpdateNotification
+                                             object:nil];
+  [self tl_refreshLocation];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -45,10 +51,15 @@
   [self.navigationController setNavigationBarHidden:YES animated:animated];
   self.navigationController.interactivePopGestureRecognizer.delegate = nil;
   [self tl_refreshUserAvatar];
+  [self tl_refreshLocation];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
   [super viewWillDisappear:animated];
+}
+
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)tl_backTapped {
@@ -104,6 +115,11 @@
   TLWSessionManager *sessionManager = [TLWSDKManager shared].sessionManager;
   AGUserProfileDto *profile = sessionManager.cachedProfile;
   [self.myView updateUserAvatarWithURLString:profile.avatarUrl];
+}
+
+- (void)tl_refreshLocation {
+  NSString *locationText = [TLWLocationManager shared].displayLocationName;
+  [self.myView updateLocationText:locationText];
 }
 
 - (TLWImagePickerManager *)imagePickerManager {
