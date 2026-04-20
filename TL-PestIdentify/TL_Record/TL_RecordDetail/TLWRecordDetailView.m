@@ -182,10 +182,10 @@ static CGFloat const kCardGap   = 13;
 
     // 渐变层（frame 在 layoutSubviews 更新）
     _diseaseTagGradient = [CAGradientLayer layer];
-    _diseaseTagGradient.colors = @[
-        (__bridge id)[UIColor colorWithRed:0 green:0.627 blue:1 alpha:1].CGColor,
-        (__bridge id)[UIColor colorWithRed:0 green:1 blue:0.808 alpha:1].CGColor
-    ];
+//    _diseaseTagGradient.colors = @[
+//        (__bridge id)[UIColor colorWithRed:0 green:0.627 blue:1 alpha:1].CGColor,
+//        (__bridge id)[UIColor colorWithRed:0 green:1 blue:0.808 alpha:1].CGColor
+//    ];
     _diseaseTagGradient.startPoint = CGPointMake(0.1, 0);
     _diseaseTagGradient.endPoint   = CGPointMake(1.0, 1);
     _diseaseTagGradient.cornerRadius = 10;

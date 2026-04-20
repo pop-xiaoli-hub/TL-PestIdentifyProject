@@ -40,6 +40,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
 @property (nonatomic, strong) UIImageView *capturedImageView;
 @property (nonatomic, strong) UIImageView *loadingImageView;
 @property (nonatomic, strong) UIImage *capturedImage; // 待识别的图片，接口调用时从此属性读取
+@property (nonatomic, assign) BOOL shouldClearPreviewOnNextAppear;
 @end
 
 @implementation TLWIdentifyPageController
@@ -79,6 +80,10 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
 - (void)viewWillAppear:(BOOL)animated {
   [super viewWillAppear:animated];
   [self.navigationController setNavigationBarHidden:YES animated:NO];
+  if (self.shouldClearPreviewOnNextAppear) {
+    self.shouldClearPreviewOnNextAppear = NO;
+    [self prepareForRetakeCapture];
+  }
   [self tl_setupCamera];//页面出现时启动相机
 }
 
@@ -462,6 +467,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
     vc.image = strongSelf.capturedImage;
     vc.identifyResults = parsedResults;
     vc.hidesBottomBarWhenPushed = YES;
+    strongSelf.shouldClearPreviewOnNextAppear = YES;
         [strongSelf.navigationController pushViewController:vc animated:YES];
       });
         }];
@@ -486,6 +492,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
     vc.image = self.capturedImage;
     vc.identifyResults = localResults;
     vc.hidesBottomBarWhenPushed = YES;
+    self.shouldClearPreviewOnNextAppear = YES;
     [self.navigationController pushViewController:vc animated:YES];
   } else {
     NSLog(@"[兜底] 本地 CoreML 也无结果，双路均失败");
