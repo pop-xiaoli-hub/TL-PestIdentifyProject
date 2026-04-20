@@ -1,7 +1,18 @@
 CLAUDE.md
 WIKI.md
-适老化方案调研.md
-AgriPestClient-SDK使用文档.md
-TL-PestIdentify/AgriPestClient-SDK使用文档.md
 .DS_Store
 .claude/
+
+# iOS
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+Pods/
+
+# Local docs
+适老化方案调研.md
+docs/适老化方案调研.md
+AgriPestClient-SDK使用文档.md
+docs/AgriPestClient-SDK使用文档.md
+TL-PestIdentify/AgriPestClient-SDK使用文档.md
