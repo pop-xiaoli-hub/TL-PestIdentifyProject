@@ -24,6 +24,8 @@ static NSInteger const kResultPageCount = 3;
 @property (nonatomic, strong, readwrite) UIButton *aiButton;
 @property (nonatomic, strong, readwrite) UIButton *retakeButton;
 @property (nonatomic, strong) UILabel *aiTextLabel;
+@property (nonatomic, strong) UIImageView *aiHintImageView;
+@property (nonatomic, strong) UILabel *aiHintLabel;
 
 @property (nonatomic, strong) UILabel *headerTitleLabel;
 @property (nonatomic, strong) UIView *headerTitleContainer;
@@ -78,6 +80,8 @@ static NSInteger const kResultPageCount = 3;
     self.pageSolutionLabels = [NSMutableArray array];
     self.pageAIHintBackgroundViews = [NSMutableArray array];
     self.pageWarnIconViews = [NSMutableArray array];
+    self.pageTagContainerViews = [NSMutableArray array];
+    self.pageTagGradientLayers = [NSMutableArray array];
     [self tl_setupBackground];
     [self tl_setupPhotoArea];
     [self tl_setupBackButton];
@@ -94,6 +98,16 @@ static NSInteger const kResultPageCount = 3;
 
   self.retakeGradientLayer.frame = self.retakeButton.bounds;
   self.retakeGradientLayer.cornerRadius = self.retakeButton.bounds.size.height * 0.5;
+
+  [self.pageTagGradientLayers enumerateObjectsUsingBlock:^(CAGradientLayer * _Nonnull gradientLayer, NSUInteger idx, BOOL * _Nonnull stop) {
+    if (idx >= self.pageTagContainerViews.count) {
+      return;
+    }
+    UIView *containerView = self.pageTagContainerViews[idx];
+    containerView.layer.cornerRadius = containerView.bounds.size.height * 0.28;
+    gradientLayer.frame = containerView.bounds;
+    gradientLayer.cornerRadius = containerView.bounds.size.height * 0.28;
+  }];
 
   CGFloat pageWidth = CGRectGetWidth(self.resultScrollView.bounds);
   if (pageWidth > 0) {
@@ -314,6 +328,20 @@ static NSInteger const kResultPageCount = 3;
   [self addSubview:aiActionContainer];
   self.aiActionContainer = aiActionContainer;
 
+  UIImageView *aiHintImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconClickShowDetail"]];
+  aiHintImageView.contentMode = UIViewContentModeScaleToFill;
+  [aiActionContainer addSubview:aiHintImageView];
+
+  UILabel *aiHintLabel = [[UILabel alloc] init];
+  aiHintLabel.text = @"点击AI小助手\n查询详细方案";
+  aiHintLabel.textColor = [UIColor colorWithRed:0.98 green:0.68 blue:0.13 alpha:1.0];
+  aiHintLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightBold];
+  aiHintLabel.textAlignment = NSTextAlignmentCenter;
+  aiHintLabel.numberOfLines = 2;
+  aiHintLabel.adjustsFontSizeToFitWidth = YES;
+  aiHintLabel.minimumScaleFactor = 0.9;
+  [aiActionContainer addSubview:aiHintLabel];
+
   UIButton *aiButton = [UIButton buttonWithType:UIButtonTypeCustom];
   [aiButton setImage:[UIImage imageNamed:@"Ip_AI"] forState:UIControlStateNormal];
   aiButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
@@ -332,29 +360,47 @@ static NSInteger const kResultPageCount = 3;
   [self addSubview:retakeButton];
 
   [aiActionContainer mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(self).offset(30.0);
-    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-48.0);
-    make.width.mas_equalTo(64.0);
-    make.height.mas_equalTo(82.0);
+    make.left.equalTo(self).offset(20.0);
+    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(18.0);
+    make.width.mas_equalTo(132.0);
+    make.height.mas_equalTo(150.0);
+  }];
+
+  [aiHintImageView mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.top.left.equalTo(aiActionContainer);
+    make.width.mas_equalTo(128.0);
+    make.height.mas_equalTo(72.0);
+  }];
+
+  [aiHintLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.centerX.equalTo(aiHintImageView);
+    make.centerY.equalTo(aiHintImageView).offset(-7.0);
+    make.width.equalTo(aiHintImageView).offset(2.0);
+    make.height.mas_lessThanOrEqualTo(40.0);
   }];
 
   [aiButton mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.centerX.equalTo(aiActionContainer);
+    make.top.equalTo(aiHintImageView.mas_bottom).offset(4.0);
+    make.left.equalTo(aiActionContainer);
     make.width.height.mas_equalTo(55.0);
   }];
 
   [aiTextLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(aiButton.mas_bottom).offset(1.0);
-    make.left.right.bottom.equalTo(aiActionContainer);
+    make.top.equalTo(aiButton.mas_bottom).offset(-9.0);
+    make.centerX.equalTo(aiButton);
+    make.width.mas_equalTo(72.0);
+    make.bottom.equalTo(aiActionContainer);
   }];
 
   [retakeButton mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.centerY.equalTo(aiActionContainer).offset(-6.0);
-    make.right.equalTo(self).offset(-20.0);
-    make.width.mas_equalTo(160.0);
-    make.height.mas_equalTo(62.0);
+    make.right.equalTo(self).offset(-24.0);
+    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(18.0);
+    make.width.mas_equalTo(200.0);
+    make.height.mas_equalTo(80.0);
   }];
 
+  self.aiHintImageView = aiHintImageView;
+  self.aiHintLabel = aiHintLabel;
   self.aiButton = aiButton;
   self.aiTextLabel = aiTextLabel;
   self.retakeButton = retakeButton;
@@ -389,13 +435,27 @@ static NSInteger const kResultPageCount = 3;
   UILabel *pestNameLabel = [[UILabel alloc] init];
   pestNameLabel.text = @"无结果";
   pestNameLabel.textColor = [UIColor whiteColor];
-  pestNameLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+  pestNameLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
   pestNameLabel.textAlignment = NSTextAlignmentCenter;
-  pestNameLabel.backgroundColor = [UIColor colorWithRed:0.34 green:0.74 blue:0.98 alpha:1.0];
-  pestNameLabel.layer.cornerRadius = 18.0;
-  pestNameLabel.layer.masksToBounds = YES;
+  pestNameLabel.backgroundColor = [UIColor clearColor];
   pestNameLabel.hidden = YES;
-  [contentView addSubview:pestNameLabel];
+
+  UIView *tagContainerView = [[UIView alloc] init];
+  tagContainerView.layer.masksToBounds = YES;
+  [contentView addSubview:tagContainerView];
+  [self.pageTagContainerViews addObject:tagContainerView];
+
+  CAGradientLayer *tagGradientLayer = [CAGradientLayer layer];
+  tagGradientLayer.colors = @[
+    (__bridge id)[UIColor colorWithRed:0.31 green:0.70 blue:0.98 alpha:1.0].CGColor,
+    (__bridge id)[UIColor colorWithRed:0.43 green:0.90 blue:0.83 alpha:1.0].CGColor
+  ];
+  tagGradientLayer.startPoint = CGPointMake(0.0, 0.5);
+  tagGradientLayer.endPoint = CGPointMake(1.0, 0.5);
+  [tagContainerView.layer insertSublayer:tagGradientLayer atIndex:0];
+  [self.pageTagGradientLayers addObject:tagGradientLayer];
+
+  [tagContainerView addSubview:pestNameLabel];
   [self.pageTagLabels addObject:pestNameLabel];
 
   UIView *confidenceBadgeView = [[UIView alloc] init];
@@ -437,16 +497,20 @@ static NSInteger const kResultPageCount = 3;
   }];
 
   CGFloat tagTextWidth = [self tl_widthForTagText:pestNameLabel.text];
-  [pestNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+  [tagContainerView mas_makeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(pestTitleLabel.mas_bottom).offset(14.0);
     make.left.equalTo(contentView).offset(24.0);
     make.width.mas_equalTo(tagTextWidth);
-    make.height.mas_equalTo(36.0);
+    make.height.mas_equalTo(54.0);
+  }];
+
+  [pestNameLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(tagContainerView);
   }];
 
   [confidenceBadgeView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(pestNameLabel).offset(-8.0);
-    make.right.equalTo(pestNameLabel).offset(6.0);
+    make.top.equalTo(tagContainerView).offset(-8.0);
+    make.right.equalTo(tagContainerView).offset(8.0);
     make.width.mas_equalTo(36.0);
     make.height.mas_equalTo(22.0);
   }];
@@ -456,7 +520,7 @@ static NSInteger const kResultPageCount = 3;
   }];
 
   [solutionTitleLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(pestNameLabel.mas_bottom).offset(24.0);
+    make.top.equalTo(tagContainerView.mas_bottom).offset(24.0);
     make.left.equalTo(contentView).offset(18.0);
   }];
 
@@ -497,6 +561,9 @@ static NSInteger const kResultPageCount = 3;
   [self.pageTagLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
     label.text = @"无结果";
     label.hidden = NO;
+  }];
+  [self.pageTagContainerViews enumerateObjectsUsingBlock:^(UIView * _Nonnull containerView, NSUInteger idx, BOOL * _Nonnull stop) {
+    containerView.hidden = NO;
   }];
   [self.pageConfidenceBadgeViews enumerateObjectsUsingBlock:^(UIView * _Nonnull badgeView, NSUInteger idx, BOOL * _Nonnull stop) {
     badgeView.hidden = YES;
@@ -542,7 +609,9 @@ static NSInteger const kResultPageCount = 3;
       UILabel *tagLabel = self.pageTagLabels[idx];
       tagLabel.text = name;
       tagLabel.hidden = NO;
-      [tagLabel mas_updateConstraints:^(MASConstraintMaker *make) {
+      UIView *tagContainerView = self.pageTagContainerViews[idx];
+      tagContainerView.hidden = NO;
+      [tagContainerView mas_updateConstraints:^(MASConstraintMaker *make) {
         make.width.mas_equalTo([self tl_widthForTagText:name]);
       }];
     }
@@ -589,6 +658,10 @@ static NSInteger const kResultPageCount = 3;
   self.tabContainer.layer.cornerRadius = 13.0;
   self.tabContainer.layer.borderWidth = 1.0;
   self.tabContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.26].CGColor;
+  self.aiHintImageView.hidden = NO;
+  self.aiHintLabel.hidden = NO;
+  self.aiHintLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightBold];
+  self.aiHintLabel.textColor = [UIColor colorWithRed:0.98 green:0.68 blue:0.13 alpha:1.0];
   self.aiTextLabel.textColor = [UIColor colorWithRed:1.0 green:0.69 blue:0.18 alpha:1.0];
   self.aiTextLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
   self.headerTitleLabel.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
@@ -626,25 +699,103 @@ static NSInteger const kResultPageCount = 3;
 
   [self.resultScrollView mas_remakeConstraints:^(MASConstraintMaker *make) {
     make.top.equalTo(self.tabContainer.mas_bottom).offset(12.0);
-    make.left.right.bottom.equalTo(self.cardView.contentView);
+    make.left.equalTo(self.cardView.contentView).offset(18.0);
+    make.right.equalTo(self.cardView.contentView).offset(-18.0);
+    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(-132.0);
   }];
 
   [self.retakeButton mas_remakeConstraints:^(MASConstraintMaker *make) {
-    make.right.equalTo(self).offset(-20.0);
-    make.bottom.equalTo(self).offset(-28.0);
-    make.width.mas_equalTo(160.0);
-    make.height.mas_equalTo(62.0);
+    make.right.equalTo(self).offset(-24.0);
+    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(18.0);
+    make.width.mas_equalTo(200.0);
+    make.height.mas_equalTo(80.0);
   }];
 
   [self.aiActionContainer mas_remakeConstraints:^(MASConstraintMaker *make) {
-    make.left.equalTo(self).offset(30.0);
-    make.top.equalTo(self).offset(740.0);
-    make.width.mas_equalTo(64.0);
-    make.height.mas_equalTo(82.0);
+    make.left.equalTo(self).offset(20.0);
+    make.bottom.equalTo(self.mas_safeAreaLayoutGuideBottom).offset(18.0);
+    make.width.mas_equalTo(132.0);
+    make.height.mas_equalTo(150.0);
+  }];
+
+  [self.aiButton mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.top.equalTo(self.aiHintImageView.mas_bottom).offset(4.0);
+    make.left.equalTo(self.aiActionContainer);
+    make.width.height.mas_equalTo(55.0);
   }];
 
   [self.aiTextLabel mas_updateConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(self.aiButton.mas_bottom).offset(1.0);
+    make.top.equalTo(self.aiButton.mas_bottom).offset(-9.0);
+  }];
+
+  [self.pageContentViews enumerateObjectsUsingBlock:^(UIView * _Nonnull contentView, NSUInteger idx, BOOL * _Nonnull stop) {
+    if (idx >= self.pagePestTitleLabels.count ||
+        idx >= self.verticalPageScrollViews.count ||
+        idx >= self.pageTagLabels.count ||
+        idx >= self.pageTagContainerViews.count ||
+        idx >= self.pageConfidenceBadgeViews.count ||
+        idx >= self.pageSolutionTitleLabels.count ||
+        idx >= self.pageSolutionLabels.count) {
+      return;
+    }
+
+    UIScrollView *verticalScrollView = self.verticalPageScrollViews[idx];
+    UILabel *pestTitleLabel = self.pagePestTitleLabels[idx];
+    UIView *tagContainerView = self.pageTagContainerViews[idx];
+    UILabel *tagLabel = self.pageTagLabels[idx];
+    UIView *confidenceBadgeView = self.pageConfidenceBadgeViews[idx];
+    UILabel *solutionTitleLabel = self.pageSolutionTitleLabels[idx];
+    UILabel *solutionLabel = self.pageSolutionLabels[idx];
+
+    pestTitleLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightSemibold];
+    pestTitleLabel.textColor = [UIColor colorWithWhite:0.22 alpha:1.0];
+    solutionTitleLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightSemibold];
+    solutionTitleLabel.textColor = [UIColor colorWithWhite:0.22 alpha:1.0];
+    tagContainerView.layer.cornerRadius = 15.0;
+    tagLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
+    tagLabel.textColor = [UIColor whiteColor];
+    confidenceBadgeView.layer.cornerRadius = 11.0;
+    confidenceBadgeView.backgroundColor = [UIColor colorWithRed:1.0 green:0.70 blue:0.26 alpha:1.0];
+    self.pageConfidenceLabels[idx].font = [UIFont systemFontOfSize:11 weight:UIFontWeightSemibold];
+    solutionLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
+    solutionLabel.textColor = [UIColor colorWithWhite:0.32 alpha:1.0];
+    [self tl_applySolutionStyleToLabel:solutionLabel];
+
+    [pestTitleLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+      make.top.equalTo(contentView).offset(10.0);
+      make.left.equalTo(contentView).offset(2.0);
+    }];
+
+    [tagContainerView mas_remakeConstraints:^(MASConstraintMaker *make) {
+      make.top.equalTo(pestTitleLabel.mas_bottom).offset(14.0);
+      make.left.equalTo(contentView).offset(8.0);
+      make.width.mas_equalTo([self tl_widthForTagText:tagLabel.text]);
+      make.height.mas_equalTo(54.0);
+    }];
+
+    [confidenceBadgeView mas_remakeConstraints:^(MASConstraintMaker *make) {
+      make.top.equalTo(tagContainerView).offset(-8.0);
+      make.right.equalTo(tagContainerView).offset(8.0);
+      make.width.mas_equalTo(36.0);
+      make.height.mas_equalTo(22.0);
+    }];
+
+    [solutionTitleLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+      make.top.equalTo(tagContainerView.mas_bottom).offset(24.0);
+      make.left.equalTo(contentView).offset(2.0);
+    }];
+
+    [solutionLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+      make.top.equalTo(solutionTitleLabel.mas_bottom).offset(12.0);
+      make.left.equalTo(contentView).offset(2.0);
+      make.right.equalTo(contentView).offset(-6.0);
+    }];
+
+    [contentView mas_remakeConstraints:^(MASConstraintMaker *make) {
+      make.top.left.right.equalTo(verticalScrollView);
+      make.width.equalTo(verticalScrollView);
+      make.bottom.equalTo(solutionLabel.mas_bottom).offset(72.0);
+    }];
   }];
 
   [self.pageSolutionLabels enumerateObjectsUsingBlock:^(UILabel * _Nonnull label, NSUInteger idx, BOOL * _Nonnull stop) {
@@ -732,6 +883,8 @@ static NSInteger const kResultPageCount = 3;
   self.pillView.layer.shadowOpacity = 1.0;
   self.pillView.layer.shadowOffset = CGSizeMake(0, 2);
   self.pillView.layer.shadowRadius = 7.0;
+  self.aiHintImageView.hidden = YES;
+  self.aiHintLabel.hidden = YES;
   self.aiTextLabel.textColor = [UIColor colorWithRed:0.95 green:0.65 blue:0.15 alpha:1.0];
   self.aiTextLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightSemibold];
   [self.tabButtons enumerateObjectsUsingBlock:^(UIButton * _Nonnull button, NSUInteger idx, BOOL * _Nonnull stop) {
@@ -812,9 +965,10 @@ static NSInteger const kResultPageCount = 3;
     pestTitleLabel.textColor = [UIColor colorWithWhite:0.24 alpha:1.0];
     solutionTitleLabel.font = [UIFont systemFontOfSize:28 weight:UIFontWeightBold];
     solutionTitleLabel.textColor = [UIColor colorWithWhite:0.24 alpha:1.0];
+    UIView *tagContainerView = self.pageTagContainerViews[idx];
+    tagContainerView.layer.cornerRadius = 12.0;
     tagLabel.font = [UIFont systemFontOfSize:22 weight:UIFontWeightSemibold];
-    tagLabel.layer.cornerRadius = 12.0;
-    tagLabel.backgroundColor = [UIColor colorWithRed:0.34 green:0.77 blue:0.94 alpha:1.0];
+    tagLabel.backgroundColor = [UIColor clearColor];
     confidenceBadgeView.layer.cornerRadius = 13.0;
     confidenceBadgeView.backgroundColor = [UIColor colorWithRed:1.0 green:0.63 blue:0.20 alpha:1.0];
     self.pageConfidenceLabels[idx].font = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
@@ -827,7 +981,7 @@ static NSInteger const kResultPageCount = 3;
       make.left.equalTo(contentView);
     }];
 
-    [tagLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
+    [tagContainerView mas_remakeConstraints:^(MASConstraintMaker *make) {
       make.top.equalTo(pestTitleLabel.mas_bottom).offset(12.0);
       make.left.equalTo(contentView).offset(10.0);
       make.width.mas_equalTo(MAX(112.0, [self tl_widthForTagText:tagLabel.text] + 6.0));
@@ -835,14 +989,14 @@ static NSInteger const kResultPageCount = 3;
     }];
 
     [confidenceBadgeView mas_remakeConstraints:^(MASConstraintMaker *make) {
-      make.top.equalTo(tagLabel).offset(-8.0);
-      make.right.equalTo(tagLabel).offset(10.0);
+      make.top.equalTo(tagContainerView).offset(-8.0);
+      make.right.equalTo(tagContainerView).offset(10.0);
       make.width.mas_equalTo(46.0);
       make.height.mas_equalTo(26.0);
     }];
 
     [solutionTitleLabel mas_remakeConstraints:^(MASConstraintMaker *make) {
-      make.top.equalTo(tagLabel.mas_bottom).offset(26.0);
+      make.top.equalTo(tagContainerView.mas_bottom).offset(26.0);
       make.left.equalTo(contentView);
     }];
 
@@ -873,7 +1027,8 @@ static NSInteger const kResultPageCount = 3;
     make.height.mas_equalTo(96.0);
   }];
 
-  [self.aiButton mas_updateConstraints:^(MASConstraintMaker *make) {
+  [self.aiButton mas_remakeConstraints:^(MASConstraintMaker *make) {
+    make.top.left.equalTo(self.aiActionContainer);
     make.width.height.mas_equalTo(64.0);
   }];
 
@@ -999,9 +1154,9 @@ static NSInteger const kResultPageCount = 3;
   NSString *safeText = text.length > 0 ? text : @"";
   UIFont *font = self.usesRecordStyleLayout
     ? [UIFont systemFontOfSize:22 weight:UIFontWeightSemibold]
-    : [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-  CGFloat horizontalPadding = self.usesRecordStyleLayout ? 40.0 : 32.0;
-  CGFloat minWidth = self.usesRecordStyleLayout ? 104.0 : 88.0;
+    : [UIFont systemFontOfSize:18 weight:UIFontWeightBold];
+  CGFloat horizontalPadding = self.usesRecordStyleLayout ? 40.0 : 38.0;
+  CGFloat minWidth = self.usesRecordStyleLayout ? 104.0 : 96.0;
   CGSize textSize = [safeText sizeWithAttributes:@{NSFontAttributeName: font}];
   return MAX(minWidth, ceil(textSize.width) + horizontalPadding);
 }

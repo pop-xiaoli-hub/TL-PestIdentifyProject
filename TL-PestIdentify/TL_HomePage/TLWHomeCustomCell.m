@@ -212,7 +212,7 @@
   UIButton *deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
   deleteButton.hidden = YES;
   deleteButton.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.62];
-  deleteButton.layer.cornerRadius = 20.0;
+  deleteButton.layer.cornerRadius = 19.0;
   deleteButton.layer.masksToBounds = YES;
   [deleteButton addTarget:self action:@selector(tl_deleteButtonTapped) forControlEvents:UIControlEventTouchUpInside];
   [contentCardButton addSubview:deleteButton];
@@ -321,10 +321,10 @@
   }];
 
   [deleteButton mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.right.equalTo(contentCardButton).offset(-14.0);
-    make.bottom.equalTo(contentCardButton).offset(-14.0);
-    make.width.mas_equalTo(124.0);
-    make.height.mas_equalTo(48.0);
+    make.right.equalTo(contentCardButton).offset(-4.0);
+    make.bottom.equalTo(contentCardButton).offset(-3.0);
+    make.width.mas_equalTo(104.0);
+    make.height.mas_equalTo(38.0);
   }];
 
   [deleteIconContainer mas_makeConstraints:^(MASConstraintMaker *make) {

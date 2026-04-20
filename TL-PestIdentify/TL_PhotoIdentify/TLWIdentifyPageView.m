@@ -50,9 +50,9 @@
   [self.blurView.contentView addSubview:self.recordButton];
   [self.recordButton mas_makeConstraints:^(MASConstraintMaker *make) {
       make.right.equalTo(self.blurView.contentView.mas_right).offset(8);
-      make.top.equalTo(self.blurView.contentView.mas_top).offset(68);
+      make.top.equalTo(self.blurView.contentView.mas_top).offset(66);
       make.height.mas_equalTo(60);
-      make.width.mas_equalTo(115);
+      make.width.mas_equalTo(135);
   }];
   self.captureButton = [UIButton buttonWithType:UIButtonTypeCustom];
   [self.captureButton setImage:[UIImage imageNamed:@"lp_capture"] forState:UIControlStateNormal];
