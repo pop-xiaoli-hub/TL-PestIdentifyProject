@@ -6,8 +6,11 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "TLWRecordModel.h"
 
 @interface TLWRecordDetailView : UIView
+
+@property (nonatomic, strong, readonly) UIButton *backButton;
 
 // 照片
 @property (nonatomic, strong, readonly) UIImageView *photoView;
@@ -27,5 +30,6 @@
 
 /// 切换 Tab 选中态并动画移动指示器
 - (void)selectTabAtIndex:(NSInteger)index animated:(BOOL)animated;
+- (void)configureWithResults:(NSArray<TLWRecordResult *> *)results;
 
 @end

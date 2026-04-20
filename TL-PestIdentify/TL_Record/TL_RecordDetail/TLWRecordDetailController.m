@@ -38,15 +38,25 @@
     [self.myView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.edges.equalTo(self.view);
     }];
-    [self.view bringSubviewToFront:self.navBar];
+    self.navBar.hidden = YES;
 
     [self tl_bindActions];
     [self tl_configureView];
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self.navigationController setNavigationBarHidden:YES animated:animated];
+    self.navBar.hidden = YES;
+}
+
 #pragma mark - Setup
 
 - (void)tl_bindActions {
+    [self.myView.backButton addTarget:self
+                               action:@selector(tl_backTapped)
+                     forControlEvents:UIControlEventTouchUpInside];
+
     [self.myView.aiButton addTarget:self
                              action:@selector(tl_openAIAssistant)
                    forControlEvents:UIControlEventTouchUpInside];
@@ -65,14 +75,7 @@
                                 placeholderImage:nil];
     }
 
-    // 隐藏没有数据的 Tab 按钮（结果数量可能不足 3 个）
-    NSArray<UIButton *> *tabs = self.myView.tabButtons;
-    for (int i = 0; i < 3; i++) {
-        BOOL hasResult = (i < (NSInteger)_item.results.count);
-        tabs[i].hidden = !hasResult;
-        NSString *title = hasResult ? _item.results[i].title : [NSString stringWithFormat:@"结果%u", i + 1];
-        [tabs[i] setTitle:(title.length > 0 ? title : @"结果") forState:UIControlStateNormal];
-    }
+    [self.myView configureWithResults:self.item.results ?: @[]];
 
     // 展示第一个结果
     [self tl_showResultAtIndex:0 animated:NO];
@@ -83,15 +86,18 @@
     if (index >= (NSInteger)_item.results.count) return;
 
     _selectedIndex = index;
-    TLWRecordResult *result = _item.results[index];
-
     [self.myView selectTabAtIndex:index animated:animated];
-    self.myView.pestNameLabel.text   = result.pestName;
-    self.myView.confidenceLabel.text = [result displayConfidenceText];
-    self.myView.solutionLabel.text   = result.solution;
 }
 
 #pragma mark - Actions
+
+- (void)tl_backTapped {
+    if (self.navigationController) {
+        [self.navigationController popViewControllerAnimated:YES];
+    } else {
+        [self dismissViewControllerAnimated:YES completion:nil];
+    }
+}
 
 - (void)tl_tabTapped:(UIButton *)sender {
     [self tl_showResultAtIndex:sender.tag animated:YES];
