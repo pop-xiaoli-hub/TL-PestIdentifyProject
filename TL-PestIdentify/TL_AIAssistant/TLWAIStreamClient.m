@@ -6,6 +6,7 @@
 #import "TLWAIStreamClient.h"
 #import <AgriPestClient/AGChatRequest.h>
 #import <AgriPestClient/AGDefaultConfiguration.h>
+#import "TLWPerfLog.h"
 
 @interface TLWAIStreamClient () <NSURLSessionDataDelegate>
 @property (nonatomic, strong, nullable) NSURLSession *session;
@@ -13,6 +14,8 @@
 @property (nonatomic, strong) NSMutableData *buffer;   // 切帧前的原始字节缓冲（防粘包）
 @property (nonatomic, assign) BOOL authFailed;         // 命中 401/403 后丢弃后续事件
 @property (nonatomic, assign) BOOL finished;           // 已 done/error，避免重复回调
+@property (nonatomic, assign) CFAbsoluteTime requestStartTime;
+@property (nonatomic, assign) BOOL didLogFirstByte;
 @end
 
 @implementation TLWAIStreamClient
@@ -43,8 +46,6 @@
         [self tl_invokeErrorWithMessage:@"请求体序列化失败"];
         return nil;
     }
-    NSLog(@"\n========== [AI-STREAM] REQUEST ==========\nbody: %@\n=========================================", body);
-
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
     req.HTTPMethod = @"POST";
     req.HTTPBody = bodyData;
@@ -66,6 +67,11 @@
     self.buffer = [NSMutableData data];
     self.authFailed = NO;
     self.finished = NO;
+    self.requestStartTime = TLWPerfTick();
+    self.didLogFirstByte = NO;
+    TLWPerfLog(@"ai-stream request start hasImage=%@ textLen=%lu",
+               chatRequest.imageUrl.length > 0 ? @"YES" : @"NO",
+               (unsigned long)chatRequest.text.length);
 
     self.currentTask = [self.session dataTaskWithRequest:req];
     [self.currentTask resume];
@@ -88,7 +94,8 @@ didReceiveResponse:(NSURLResponse *)response
  completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
     NSHTTPURLResponse *http = (NSHTTPURLResponse *)response;
     NSInteger code = http.statusCode;
-    NSLog(@"\n========== [AI-STREAM] RESPONSE ==========\nstatus: %ld\nheaders: %@\n==========================================", (long)code, http.allHeaderFields ?: @{});
+    TLWPerfLog(@"ai-stream response status=%ld ttfb=%.0fms",
+               (long)code, TLWPerfMs(self.requestStartTime));
     if (code == 401 || code == 403) {
         self.authFailed = YES;
         self.finished = YES;
@@ -111,8 +118,10 @@ didReceiveResponse:(NSURLResponse *)response
           dataTask:(NSURLSessionDataTask *)dataTask
     didReceiveData:(NSData *)data {
     if (self.authFailed || self.finished) return;
-    NSString *chunk = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    NSLog(@"\n========== [AI-STREAM] RAW CHUNK ==========\n%@\n===========================================", chunk ?: [NSString stringWithFormat:@"<non-utf8 %lu bytes>", (unsigned long)data.length]);
+    if (!self.didLogFirstByte) {
+        self.didLogFirstByte = YES;
+        TLWPerfLog(@"ai-stream firstByte=%.0fms", TLWPerfMs(self.requestStartTime));
+    }
     [self.buffer appendData:data];
     [self tl_drainBuffer];
 }
@@ -157,7 +166,6 @@ didCompleteWithError:(NSError *)error {
 }
 
 - (void)tl_parseFrame:(NSString *)frame {
-    NSLog(@"\n========== [AI-STREAM] RAW FRAME ==========\n%@\n===========================================", frame);
     NSArray<NSString *> *lines = [frame componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
     NSString *eventName = nil;
     NSMutableString *dataJoined = [NSMutableString string];
@@ -179,7 +187,6 @@ didCompleteWithError:(NSError *)error {
         // id:、retry: 等其他字段忽略
     }
     if (eventName.length == 0) return;
-    NSLog(@"\n========== [AI-STREAM] EVENT ==========\nevent: %@\ndata: %@\n=======================================", eventName, dataJoined.copy ?: @"");
     [self tl_dispatchEvent:eventName data:dataJoined.copy];
 }
 
@@ -235,6 +242,7 @@ didCompleteWithError:(NSError *)error {
     }
     if ([eventName isEqualToString:@"done"]) {
         self.finished = YES;
+        TLWPerfLog(@"ai-stream done total=%.0fms", TLWPerfMs(self.requestStartTime));
         id json = [self tl_jsonObjectFromString:dataString];
         NSDictionary *info = [json isKindOfClass:[NSDictionary class]] ? json : @{};
         void (^cb)(NSDictionary *) = self.onDone;

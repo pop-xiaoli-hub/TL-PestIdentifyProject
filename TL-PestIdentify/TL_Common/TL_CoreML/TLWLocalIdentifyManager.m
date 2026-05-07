@@ -6,6 +6,7 @@
 //
 
 #import "TLWLocalIdentifyManager.h"
+#import "TLWPerfLog.h"
 #import <CoreML/CoreML.h>
 #import <ImageIO/ImageIO.h>
 #import <Vision/Vision.h>
@@ -44,26 +45,24 @@ static NSString * const TLWLocalIdentifyErrorDomain = @"TLWLocalIdentify";
 #pragma mark - 加载模型
 
 - (void)tl_loadModel {
+    CFAbsoluteTime t0 = TLWPerfTick();
     NSError *error = nil;
-    // 从 bundle 加载编译后的 mlmodel， 如果拿不到URL，说明模型没有正确打包或名字不对
     NSURL *modelURL = [[NSBundle mainBundle] URLForResource:@"PestClassifier" withExtension:@"mlmodelc"];
     if (!modelURL) {
         NSLog(@"[CoreML] PestClassifier.mlmodelc 未找到");
         return;
     }
-    //  接着真正加载模型，把磁盘上的模型变成内存里的MLModel对象，然后
     MLModel *mlModel = [MLModel modelWithContentsOfURL:modelURL error:&error];
     if (error || !mlModel) {
         NSLog(@"[CoreML] 模型加载失败: %@", error.localizedDescription);
         return;
     }
-    //  然后这一行吧MLModel包成Vision能识别的VNCoreModel
     self.vnModel = [VNCoreMLModel modelForMLModel:mlModel error:&error];
     if (error || !self.vnModel) {
         NSLog(@"[CoreML] VNCoreMLModel 创建失败: %@", error.localizedDescription);
         return;
     }
-    NSLog(@"[CoreML] 模型加载成功");
+    TLWPerfLog(@"coreml loadModel ok cost=%.0fms", TLWPerfMs(t0));
 }
 
 #pragma mark - 识别
@@ -82,6 +81,7 @@ static NSString * const TLWLocalIdentifyErrorDomain = @"TLWLocalIdentify";
         return;
     }
 
+    CFAbsoluteTime identifyT0 = TLWPerfTick();
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         @autoreleasepool {
             CGImagePropertyOrientation orientation = kCGImagePropertyOrientationUp;
@@ -97,6 +97,7 @@ static NSString * const TLWLocalIdentifyErrorDomain = @"TLWLocalIdentify";
                                                                                 orientation:orientation
                                                                                       error:&predictError];
             CGImageRelease(cgImage);
+            TLWPerfLog(@"coreml identify total=%.0fms", TLWPerfMs(identifyT0));
 
             if (!scores || scores.count == 0) {
                 [self tl_completeWithResults:nil
@@ -219,25 +220,14 @@ static NSString * const TLWLocalIdentifyErrorDomain = @"TLWLocalIdentify";
     }
 
     NSArray<TLWLocalIdentifyResult *> *combinedResults = [self tl_resultsFromScores:aggregatedScores];
-    NSLog(@"[CoreML] 输入图像 %zux%zu, orientation=%ld, 成功策略=%lu",
-          CGImageGetWidth(cgImage),
-          CGImageGetHeight(cgImage),
-          (long)orientation,
-          (unsigned long)successfulRuns);
-    for (NSString *strategyLog in strategyLogs) {
-        NSLog(@"%@", strategyLog);
-    }
-    if (combinedResults.count > 0) {
-        TLWLocalIdentifyResult *topResult = combinedResults.firstObject;
-        NSLog(@"[CoreML] 聚合结果 Top1: %@ / %@ (%.1f%%)",
-              topResult.crop.length > 0 ? topResult.crop : @"未知作物",
-              topResult.name,
-              topResult.confidence * 100);
-        if (topResult.confidence < 0.45f) {
-            NSLog(@"[CoreML] Top1 置信度偏低，结果仅供参考，建议重拍更近、更清晰的叶片");
-        }
-    }
-
+    TLWLocalIdentifyResult *top = combinedResults.firstObject;
+    TLWPerfLog(@"coreml predict img=%zux%zu strategies=%lu top=%@/%@ conf=%.1f%%",
+               CGImageGetWidth(cgImage),
+               CGImageGetHeight(cgImage),
+               (unsigned long)successfulRuns,
+               top.crop.length > 0 ? top.crop : @"-",
+               top.name ?: @"-",
+               (top.confidence * 100));
     return [aggregatedScores copy];
 }
 
