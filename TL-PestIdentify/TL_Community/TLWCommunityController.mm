@@ -496,7 +496,6 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   } else {
     post.imageAspectRatio = 0.75;
   }
-  NSLog(@"点赞数-1 : %@", post.likeCount);
   cell.elderModeEnabled = self.elderModeEnabled;
   [cell configureWithPost:post];
   return cell;

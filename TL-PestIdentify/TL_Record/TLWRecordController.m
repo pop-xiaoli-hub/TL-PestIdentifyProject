@@ -147,9 +147,6 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
     __weak typeof(self) weakSelf = self;
     [[TLWSDKManager shared].api getHistoryWithCompletionHandler:^(AGResultListAgentChatHistory *output, NSError *error) {
       NSArray* array = output.data;
-      for (AGAgentChatHistory* model in array) {
-        NSLog(@"识别机录：%@", model.agentResponse);
-      }
         dispatch_async(dispatch_get_main_queue(), ^{
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;

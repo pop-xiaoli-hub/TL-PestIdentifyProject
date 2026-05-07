@@ -466,6 +466,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
     return nil;
   }
 
+  CFAbsoluteTime weatherT0 = TLWPerfTick();
   TLWPerfLog(@"[HomeWeather] request start lat=%.6f lon=%.6f", latitude, longitude);
   NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
   request.HTTPMethod = @"GET";
@@ -534,7 +535,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
       @"weatherText": weatherText,
       @"iconCode": iconCode
     };
-    TLWPerfLog(@"[HomeWeather] request success temp=%@ text=%@ icon=%@", temperature, weatherText, iconCode);
+    TLWPerfLog(@"[HomeWeather] request success temp=%@ text=%@ icon=%@ cost=%.0fms", temperature, weatherText, iconCode, TLWPerfMs(weatherT0));
     if (completion) {
       dispatch_async(dispatch_get_main_queue(), ^{
         completion(weatherInfo, nil);
