@@ -29,12 +29,8 @@ static CGFloat const TLWIdentifyCloudJPEGQuality = 0.78f;
 static CGFloat const TLWIdentifyCloudMaxEdge = 1280.0f;
 static CGFloat const TLWIdentifyMinLocalFallbackConfidence = 0.60f;
 static NSInteger const TLWIdentifyDisplayResultCount = 3;
-// 探针会让后端额外跑一次模型推理，仅 Debug 开启，避免线上 2× GPU 成本
-#if DEBUG
+// 探针会让后端额外跑一次模型推理。开发期开 YES 测耗时；上线前手动改为 NO 关闭以省后端 GPU
 static BOOL const TLWIdentifyEnableProfileProbe = YES;
-#else
-static BOOL const TLWIdentifyEnableProfileProbe = NO;
-#endif
 
 @interface TLWIdentifyPageController ()<AVCapturePhotoCaptureDelegate>
 //  主视图
