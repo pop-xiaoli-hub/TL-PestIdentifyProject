@@ -101,6 +101,15 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   [self tl_applyCommunityLayoutStyle];
   [self tl_fetchCommunityFeed];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(tl_onFavoritedChanged)
+                                               name:TLWFavoritedDidChangeNotification
+                                             object:nil];
+}
+
+- (void)tl_onFavoritedChanged {
+  // 清缓存时间戳，下次 viewDidAppear 会重新拉取最新收藏列表
+  self.tl_lastFavoritedFetchTime = nil;
 }
 
 - (void)dealloc {

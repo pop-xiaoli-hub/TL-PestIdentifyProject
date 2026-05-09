@@ -10,6 +10,8 @@
 #import <AgriPestClient/AGApiClient.h>
 #import "TLWPerfLog.h"
 
+NSString * const TLWFavoritedDidChangeNotification = @"TLWFavoritedDidChangeNotification";
+
 static NSString * _Nullable TLWQWeatherPlistValue(NSString *key) {
     id value = [[NSBundle mainBundle] objectForInfoDictionaryKey:key];
     return [value isKindOfClass:[NSString class]] ? value : nil;
@@ -302,11 +304,21 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
 
 //获取收藏的帖子
 - (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
-  return [self.api favoritePostWithId:_id completionHandler:handler];
+  return [self.api favoritePostWithId:_id completionHandler:^(AGResultVoid *output, NSError *error) {
+    if (!error && output && output.code.integerValue == 200) {
+      [[NSNotificationCenter defaultCenter] postNotificationName:TLWFavoritedDidChangeNotification object:nil];
+    }
+    if (handler) handler(output, error);
+  }];
 }
 
 - (NSURLSessionTask *)unfavoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
-  return [self.api unfavoritePostWithId:_id completionHandler:handler];
+  return [self.api unfavoritePostWithId:_id completionHandler:^(AGResultVoid *output, NSError *error) {
+    if (!error && output && output.code.integerValue == 200) {
+      [[NSNotificationCenter defaultCenter] postNotificationName:TLWFavoritedDidChangeNotification object:nil];
+    }
+    if (handler) handler(output, error);
+  }];
 }
 
 - (NSURLSessionTask *)likePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
