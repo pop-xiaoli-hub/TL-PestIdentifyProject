@@ -393,14 +393,21 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
         [self tl_probeCloudIdentifyProfileWithRequest:request manager:manager];
       }
 
+      __block CFAbsoluteTime chatMainT0 = 0;
       __block void (^performCloudIdentify)(BOOL);
       performCloudIdentify = ^(BOOL didRetryAuth) {
+        chatMainT0 = TLWPerfTick();
         [manager.api chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *chatOutput, NSError *chatError) {
       dispatch_async(dispatch_get_main_queue(), ^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) {
           return;
         }
+
+        TLWPerfLog(@"chat-main client=%.0fms code=%@ items=%lu",
+                   TLWPerfMs(chatMainT0),
+                   chatOutput.code ?: @"<nil>",
+                   (unsigned long)chatOutput.data.count);
 
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:chatOutput.code
