@@ -15,18 +15,26 @@
 #import <AgriPestClient/AGChatRequest.h>
 #import <AgriPestClient/AGDiagnosisItem.h>
 #import <AgriPestClient/AGResultChatProfileResponse.h>
+#import <AgriPestClient/AGChatProfileResponse.h>
+#import <AgriPestClient/AGProfile.h>
 #import <AgriPestClient/AGResultListDiagnosisItem.h>
 #import <AgriPestClient/AGDefaultConfiguration.h>
 #import "TLWPhotoPickerController.h"
 #import "TLWLocalIdentifyManager.h"
 #import "TLWLocationManager.h"
 #import "TLWToast.h"
+#import "TLWPerfLog.h"
 
 static CGFloat const TLWIdentifyCloudJPEGQuality = 0.78f;
 static CGFloat const TLWIdentifyCloudMaxEdge = 1280.0f;
 static CGFloat const TLWIdentifyMinLocalFallbackConfidence = 0.60f;
 static NSInteger const TLWIdentifyDisplayResultCount = 3;
+// 探针会让后端额外跑一次模型推理，仅 Debug 开启，避免线上 2× GPU 成本
+#if DEBUG
 static BOOL const TLWIdentifyEnableProfileProbe = YES;
+#else
+static BOOL const TLWIdentifyEnableProfileProbe = NO;
+#endif
 
 @interface TLWIdentifyPageController ()<AVCapturePhotoCaptureDelegate>
 //  主视图
@@ -384,6 +392,11 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
             request.useSingleModel.boolValue ? @"YES" : @"NO",
             TLWIdentifyEnableProfileProbe ? @"YES" : @"NO");
 
+      // 探针并行发出（cacheKey 错开，避免命中主调用缓存导致 profile 数字全 0）
+      if (TLWIdentifyEnableProfileProbe) {
+        [self tl_probeCloudIdentifyProfileWithRequest:request manager:manager];
+      }
+
       __block void (^performCloudIdentify)(BOOL);
       performCloudIdentify = ^(BOOL didRetryAuth) {
         [manager.api chatWithChatRequest:request completionHandler:^(AGResultListDiagnosisItem *chatOutput, NSError *chatError) {
@@ -418,9 +431,6 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
             NSLog(@"[云端] diagnosisCount=%lu", (unsigned long)chatOutput.data.count);
           }
           NSLog(@"============================================");
-          if (TLWIdentifyEnableProfileProbe) {
-            [strongSelf tl_probeCloudIdentifyProfileWithRequest:request manager:manager];
-          }
           waitingForLocalFallback = YES;
           presentLocalFallbackIfNeeded();
           return;
@@ -431,9 +441,6 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
                                                   [strongSelf tl_resultsFromDiagnosisItems:chatOutput.data]];
         if (parsedResults.count == 0) {
           NSLog(@"[云端] 结构化结果解析失败，回退本地识别");
-          if (TLWIdentifyEnableProfileProbe) {
-            [strongSelf tl_probeCloudIdentifyProfileWithRequest:request manager:manager];
-          }
           waitingForLocalFallback = YES;
           presentLocalFallbackIfNeeded();
           return;
@@ -452,9 +459,6 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
           NSLog(@"[云端] Top%ld: %@ | 置信度: %@ | 依据: %@", (long)(i + 1), r[@"name"], r[@"confidence"], r[@"reason"]);
         }
         NSLog(@"============================================");
-        if (TLWIdentifyEnableProfileProbe) {
-          [strongSelf tl_probeCloudIdentifyProfileWithRequest:request manager:manager];
-        }
 
     if (parsedResults.count == 0) {
       waitingForLocalFallback = YES;
@@ -699,34 +703,45 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
   return results.copy;
 }
 
-- (void)tl_probeCloudIdentifyProfileWithRequest:(AGChatRequest *)request manager:(TLWSDKManager *)manager {
+- (void)tl_probeCloudIdentifyProfileWithRequest:(AGChatRequest *)request
+                                         manager:(TLWSDKManager *)manager {
+  CFAbsoluteTime probeT0 = TLWPerfTick();
+
   AGChatRequest *probeRequest = [[AGChatRequest alloc] init];
   probeRequest.text = request.text;
   probeRequest.imageUrl = request.imageUrl;
   probeRequest.useSingleModel = request.useSingleModel;
-  probeRequest.extraInfo = request.extraInfo;
+  // 给 extraInfo 加唯一标记，让后端 cacheKey 跟主调用错开，避免命中缓存导致 profile 数字全 0
+  NSString *originalExtra = request.extraInfo ?: @"";
+  NSString *probeMarker = [NSString stringWithFormat:@"[probe-%@]", [[NSUUID UUID] UUIDString]];
+  probeRequest.extraInfo = [originalExtra stringByAppendingString:probeMarker];
   probeRequest.saveHistory = @(NO);
 
   [manager.api chatProfileWithChatRequest:probeRequest completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
     dispatch_async(dispatch_get_main_queue(), ^{
+      double clientMs = TLWPerfMs(probeT0);
       if (error || !output || output.code.integerValue != 200 || !output.data.profile) {
-        NSLog(@"[云端][profile] 探针失败 error=%@ code=%@ message=%@",
-              error.localizedDescription ?: @"<nil>",
-              output.code ?: @"<nil>",
-              output.message ?: @"<nil>");
+        TLWPerfLog(@"chat-profile probe FAIL client=%.0fms err=%@ code=%@ msg=%@",
+                   clientMs,
+                   error.localizedDescription ?: @"<nil>",
+                   output.code ?: @"<nil>",
+                   output.message ?: @"<nil>");
         return;
       }
-
-      NSLog(@"[云端][profile] requestId=%@ requestBytes=%@ imageType=%@ imageLength=%@ singleModel=%@ totalMs=%@ visionMs=%@ agentMs=%@ saveHistoryMs=%@",
-            output.data.profile.requestId ?: @"<nil>",
-            output.data.profile.requestBytes ?: @"<nil>",
-            output.data.profile.imageUrlType ?: @"<nil>",
-            output.data.profile.imageUrlLength ?: @"<nil>",
-            output.data.profile.singleModel ?: @"<nil>",
-            output.data.profile.totalMs ?: @"<nil>",
-            output.data.profile.visionMs ?: @"<nil>",
-            output.data.profile.agentMs ?: @"<nil>",
-            output.data.profile.saveHistoryMs ?: @"<nil>");
+      AGProfile *p = output.data.profile;
+      double serverMs = p.totalMs.doubleValue;
+      double netOthers = (clientMs >= 0 && serverMs > 0) ? (clientMs - serverMs) : -1;
+      TLWPerfLog(@"chat-profile client=%.0fms server=%.0fms net+others=%.0fms vision=%@ agent=%@ save=%@ reqBytes=%@ imageType=%@ singleModel=%@ reqId=%@",
+                 clientMs,
+                 serverMs,
+                 netOthers,
+                 p.visionMs ?: @"<nil>",
+                 p.agentMs ?: @"<nil>",
+                 p.saveHistoryMs ?: @"<nil>",
+                 p.requestBytes ?: @"<nil>",
+                 p.imageUrlType ?: @"<nil>",
+                 p.singleModel ?: @"<nil>",
+                 p.requestId ?: @"<nil>");
     });
   }];
 }
