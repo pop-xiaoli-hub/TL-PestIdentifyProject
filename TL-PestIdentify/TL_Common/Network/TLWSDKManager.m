@@ -8,6 +8,9 @@
 #import <UIKit/UIKit.h>
 #import <float.h>
 #import <AgriPestClient/AGApiClient.h>
+#import "TLWPerfLog.h"
+
+NSString * const TLWFavoritedDidChangeNotification = @"TLWFavoritedDidChangeNotification";
 
 static NSString * _Nullable TLWQWeatherPlistValue(NSString *key) {
     id value = [[NSBundle mainBundle] objectForInfoDictionaryKey:key];
@@ -41,6 +44,12 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
 @property (nonatomic, strong, readwrite) AGApiService *api;
 @property (nonatomic, strong, readwrite) TLWSessionManager *sessionManager;
 @property (nonatomic, strong, readwrite) NSArray<AGPostResponseDto *> *cachedFavoritedPosts;
+
+- (nullable NSURLSessionTask *)tl_uploadFileURLs:(NSArray<NSURL *> *)fileURLs
+                                          prefix:(NSString *)prefix
+                                    didRetryAuth:(BOOL)didRetryAuth
+                                      completion:(void(^)(NSArray<NSString *> * _Nullable urls,
+                                                          NSError * _Nullable error))completion;
 @end
 
 @implementation TLWSDKManager
@@ -115,8 +124,8 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
   if (!images.count) {
     if (completion) {
       completion(@[], nil);
-      return nil;
     }
+    return nil;
   }
   NSMutableArray<NSURL* >* fileURLS = [NSMutableArray array];
   NSMutableArray<NSString* >* tempPaths = [NSMutableArray array];
@@ -143,36 +152,61 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
   if (fileURLS.count == 0) {
     if (completion) {
       completion(nil, [NSError errorWithDomain:@"upload" code:-1 userInfo:@{NSLocalizedDescriptionKey:@"no valid images"}]);
-      return nil;
     }
+    return nil;
   }
   //调用 SDK 接口上传图片，拿到远端 url
-  return [[TLWSDKManager shared].api uploadFilesWithFiles:fileURLS prefix:prefix completionHandler:^(AGResultListString *output, NSError *error) {
+  CFAbsoluteTime uploadT0 = TLWPerfTick();
+  NSUInteger uploadCount = fileURLS.count;
+  return [self tl_uploadFileURLs:fileURLS prefix:prefix didRetryAuth:NO completion:^(NSArray<NSString *> *urls, NSError *error) {
+    for (NSString *temp in tempPaths) {
+      [[NSFileManager defaultManager] removeItemAtPath:temp error:nil];
+    }
+    TLWPerfLog(@"upload images count=%lu cost=%.0fms err=%@",
+               (unsigned long)uploadCount, TLWPerfMs(uploadT0), error.localizedDescription ?: @"-");
+    if (completion) completion(urls, error);
+  }];
+}
+
+- (NSURLSessionTask *)tl_uploadFileURLs:(NSArray<NSURL *> *)fileURLs
+                                  prefix:(NSString *)prefix
+                            didRetryAuth:(BOOL)didRetryAuth
+                              completion:(void(^)(NSArray<NSString *> *urls, NSError *error))completion {
+  __weak typeof(self) weakSelf = self;
+  return [self.api uploadFilesWithFiles:fileURLs prefix:prefix completionHandler:^(AGResultListString *output, NSError *error) {
     dispatch_async(dispatch_get_main_queue(), ^{
-      //删除临时文件
-      for (NSString* temp in tempPaths) {
-        [[NSFileManager defaultManager] removeItemAtPath:temp error:nil];
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) return;
+
+      BOOL authFailure = [strongSelf.sessionManager shouldAttemptTokenRefreshForCode:output.code error:error];
+      if (authFailure && !didRetryAuth) {
+        NSError *authError = error ?: [NSError errorWithDomain:@"TLWAuth"
+                                                          code:output.code.integerValue
+                                                      userInfo:@{NSLocalizedDescriptionKey: output.message ?: @"登录状态已失效"}];
+        [strongSelf.sessionManager handleUnauthorizedWithRetry:^{
+          [strongSelf tl_uploadFileURLs:fileURLs prefix:prefix didRetryAuth:YES completion:completion];
+        } failure:^{
+          if (completion) completion(nil, authError);
+        }];
+        return;
+      }
+      if (authFailure) {
+        [strongSelf.sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
       }
       if (error) {
-        NSLog(@"[Upload] 上传失败: %@", error.localizedDescription);
-        if (completion) {
-          completion(nil, error);
-          return;
-        }
+        if (completion) completion(nil, error);
+        return;
       }
-      //服务器返回200，成功
-      if (output.code && output.code.integerValue == 200) {
-        NSArray<NSString *> *urls = output.data ?: @[];
-        if (completion) {
-          completion(urls, nil);
-        }
-      } else {
-        NSString *msg = output.message ?: @"upload failed";
-        NSError *e = [NSError errorWithDomain:@"upload" code:output.code.integerValue userInfo:@{NSLocalizedDescriptionKey: msg}];
-        if (completion) {
-          completion(nil, e);
-        }
+      if (output.code.integerValue == 200) {
+        if (completion) completion(output.data ?: @[], nil);
+        return;
       }
+
+      NSString *message = output.message ?: @"upload failed";
+      NSError *responseError = [NSError errorWithDomain:@"upload"
+                                                   code:output.code.integerValue
+                                               userInfo:@{NSLocalizedDescriptionKey: message}];
+      if (completion) completion(nil, responseError);
     });
   }];
 }
@@ -230,7 +264,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
 }
 
 - (void)fetchAllFavoritedPostsWithCompletion:(void (^)(NSArray<AGPostResponseDto *> * _Nullable posts, NSError * _Nullable error))completion {
-  NSLog(@"开始拉取用户收藏的贴子");
+  CFAbsoluteTime favT0 = TLWPerfTick();
   if (![self.sessionManager isLoggedIn]) {
     self.cachedFavoritedPosts = @[];
     if (completion) {
@@ -256,7 +290,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
       if (!s) return;
 
       if (error || !output || output.code.integerValue != 200) {
-        if (!error && [s.sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([s.sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [s.sessionManager handleUnauthorizedWithRetry:^{
             fetchPageBlock(pageIndex);
           }];
@@ -265,9 +299,9 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
         NSError *finalError = error;
         if (!finalError) {
           NSString *msg = output.message ?: @"拉取收藏帖子失败";
-          NSLog(@"拉取帖子失败");
           finalError = [NSError errorWithDomain:@"TLWSDKManager.favorite" code:output.code.integerValue userInfo:@{NSLocalizedDescriptionKey : msg}];
         }
+        TLWPerfLog(@"fetchAllFavoritedPosts failed cost=%.0fms err=%@", TLWPerfMs(favT0), finalError.localizedDescription);
         fetchPageBlock = nil;
         dispatch_async(dispatch_get_main_queue(), ^{
           if (completion) completion(nil, finalError);
@@ -275,7 +309,6 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
         return;
       }
 
-      NSLog(@"拉取帖子成功");
       NSArray<AGPostResponseDto *> *list = output.data.list ?: @[];
       [accumulator addObjectsFromArray:list];
 
@@ -285,6 +318,8 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
       } else {
         fetchPageBlock = nil;
         s.cachedFavoritedPosts = [accumulator copy];
+        TLWPerfLog(@"fetchAllFavoritedPosts ok pages=%ld total=%lu cost=%.0fms",
+                   (long)(pageIndex + 1), (unsigned long)accumulator.count, TLWPerfMs(favT0));
         dispatch_async(dispatch_get_main_queue(), ^{
           if (completion) completion(s.cachedFavoritedPosts, nil);
         });
@@ -297,11 +332,21 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
 
 //获取收藏的帖子
 - (NSURLSessionTask *)favoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
-  return [self.api favoritePostWithId:_id completionHandler:handler];
+  return [self.api favoritePostWithId:_id completionHandler:^(AGResultVoid *output, NSError *error) {
+    if (!error && output && output.code.integerValue == 200) {
+      [[NSNotificationCenter defaultCenter] postNotificationName:TLWFavoritedDidChangeNotification object:nil];
+    }
+    if (handler) handler(output, error);
+  }];
 }
 
 - (NSURLSessionTask *)unfavoritePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
-  return [self.api unfavoritePostWithId:_id completionHandler:handler];
+  return [self.api unfavoritePostWithId:_id completionHandler:^(AGResultVoid *output, NSError *error) {
+    if (!error && output && output.code.integerValue == 200) {
+      [[NSNotificationCenter defaultCenter] postNotificationName:TLWFavoritedDidChangeNotification object:nil];
+    }
+    if (handler) handler(output, error);
+  }];
 }
 
 - (NSURLSessionTask *)likePostWithId:(NSNumber *)_id completionHandler:(void (^)(AGResultVoid * output, NSError * error))handler {
@@ -394,6 +439,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
       if (!didRetryAuth
           && [strongSelf.sessionManager handleAuthFailureForCode:output.code
                                                          message:output.message
+                                                           error:error
                                                       retryBlock:^{
         performRequest(YES);
       }]) {
@@ -424,7 +470,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
         completion(nil, configError);
       });
     }
-    NSLog(@"[HomeWeather] missing config apiKey=%@ host=%@", apiKey.length > 0 ? @"YES" : @"NO", host.length > 0 ? @"YES" : @"NO");
+    TLWPerfLog(@"[HomeWeather] missing config apiKey=%@ host=%@", apiKey.length > 0 ? @"YES" : @"NO", host.length > 0 ? @"YES" : @"NO");
     return nil;
   }
 
@@ -437,7 +483,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
         completion(nil, hostError);
       });
     }
-    NSLog(@"[HomeWeather] invalid public host=%@", host);
+    TLWPerfLog(@"[HomeWeather] invalid public host=%@", host);
     return nil;
   }
 
@@ -461,7 +507,8 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
     return nil;
   }
 
-  NSLog(@"[HomeWeather] request start lat=%.6f lon=%.6f", latitude, longitude);
+  CFAbsoluteTime weatherT0 = TLWPerfTick();
+  TLWPerfLog(@"[HomeWeather] request start lat=%.6f lon=%.6f", latitude, longitude);
   NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
   request.HTTPMethod = @"GET";
   [request setValue:apiKey forHTTPHeaderField:@"X-QW-Api-Key"];
@@ -469,7 +516,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
 
   NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
     if (error) {
-      NSLog(@"[HomeWeather] request failed error=%@", error.localizedDescription);
+      TLWPerfLog(@"[HomeWeather] request failed error=%@", error.localizedDescription);
       if (completion) {
         dispatch_async(dispatch_get_main_queue(), ^{
           completion(nil, error);
@@ -484,7 +531,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
       NSError *statusError = [NSError errorWithDomain:@"TLWSDKManager.weather"
                                                  code:httpResponse.statusCode
                                              userInfo:@{NSLocalizedDescriptionKey: statusMessage}];
-      NSLog(@"[HomeWeather] request failed status=%ld", (long)httpResponse.statusCode);
+      TLWPerfLog(@"[HomeWeather] request failed status=%ld", (long)httpResponse.statusCode);
       if (completion) {
         dispatch_async(dispatch_get_main_queue(), ^{
           completion(nil, statusError);
@@ -512,7 +559,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
       NSError *parseError = [NSError errorWithDomain:@"TLWSDKManager.weather"
                                                 code:code.integerValue ?: -1002
                                             userInfo:@{NSLocalizedDescriptionKey: message}];
-      NSLog(@"[HomeWeather] request failed code=%@ message=%@", code ?: @"nil", message);
+      TLWPerfLog(@"[HomeWeather] request failed code=%@ message=%@", code ?: @"nil", message);
       if (completion) {
         dispatch_async(dispatch_get_main_queue(), ^{
           completion(nil, parseError);
@@ -529,7 +576,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
       @"weatherText": weatherText,
       @"iconCode": iconCode
     };
-    NSLog(@"[HomeWeather] request success temp=%@ text=%@ icon=%@", temperature, weatherText, iconCode);
+    TLWPerfLog(@"[HomeWeather] request success temp=%@ text=%@ icon=%@ cost=%.0fms", temperature, weatherText, iconCode, TLWPerfMs(weatherT0));
     if (completion) {
       dispatch_async(dispatch_get_main_queue(), ^{
         completion(weatherInfo, nil);

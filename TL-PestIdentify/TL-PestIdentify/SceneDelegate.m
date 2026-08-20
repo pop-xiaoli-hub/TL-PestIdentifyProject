@@ -12,6 +12,7 @@
 #import "TLWPreferenceController.h"
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
+#import "TLWPerfLog.h"
 
 static const NSInteger kLaunchProfileRetryCount = 3;
 static const NSTimeInterval kLaunchProfileRetryDelay = 1.0;
@@ -29,6 +30,7 @@ static inline void TLWLaunchDebugToast(NSString *message) {
 @property (nonatomic, copy) NSString *launchProfileValidationID;
 @property (nonatomic, weak) UIViewController *launchProfileValidationRootController;
 @property (nonatomic, assign) NSInteger launchProfileValidationUserId;
+@property (nonatomic, assign) BOOL didLogFirstActive;
 
 @end
 
@@ -190,8 +192,11 @@ static inline void TLWLaunchDebugToast(NSString *message) {
 
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
-  // Called when the scene has moved from an inactive state to an active state.
-  // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
+  if (!self.didLogFirstActive) {
+    self.didLogFirstActive = YES;
+    TLWPerfLog(@"launch firstActive total=%.0fms",
+               (CFAbsoluteTimeGetCurrent() - kTLWAppStartTimestamp) * 1000.0);
+  }
 }
 
 

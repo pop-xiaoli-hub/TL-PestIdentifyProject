@@ -6,6 +6,8 @@
 #import "TLWSessionManager.h"
 #import "TLWDBManager.h"
 #import "TLWToast.h"
+#import <AgriPestClient/AGApiClient.h>
+#import <AgriPestClient/AGServiceCode.h>
 #import <Security/Security.h>
 
 static NSString * const kKeychainService = @"com.tl.pestidentify.auth";
@@ -26,6 +28,7 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 @property (nonatomic, strong, readwrite) AGApiService *api;
 @property (nonatomic, strong, readwrite) AGUserProfileDto *cachedProfile;
 @property (nonatomic, strong) NSMutableArray<dispatch_block_t> *pendingRetryBlocks;
+@property (nonatomic, strong) NSMutableArray<dispatch_block_t> *pendingRefreshFailureBlocks;
 @property (nonatomic, assign) BOOL isRefreshing;
 @property (nonatomic, assign) BOOL isHandlingSessionInvalidation;
 @property (nonatomic, assign) NSTimeInterval lastAuthToastTimestamp;
@@ -33,13 +36,14 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 
 //  这是一个会话版本号，用于避免旧回调污染新会话
 @property (nonatomic, assign) NSUInteger authStateVersion;
-// 记录最近一次 refresh 成功后对应的会话版本，避免新 token 仍返回 403 时重复 refresh
-@property (nonatomic, assign) NSUInteger lastRefreshSucceededAuthStateVersion;
 
 - (void)tl_fetchProfileWithCompletion:(nullable void(^)(AGUserProfileDto * _Nullable profile))completion
                          didRetryAuth:(BOOL)didRetryAuth;
 - (void)tl_showAuthToastIfNeeded:(NSString *)message;
 - (void)tl_forceLogoutAndNotifyWithMessage:(nullable NSString *)message;
+- (nullable NSNumber *)tl_serviceCodeFromError:(nullable NSError *)error;
+- (nullable NSString *)tl_serverMessageFromError:(nullable NSError *)error;
+- (NSInteger)tl_httpStatusCodeFromError:(nullable NSError *)error;
 
 @end
 
@@ -101,8 +105,8 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
     if (self) {
         _api = api;
         _pendingRetryBlocks = [NSMutableArray array];
+        _pendingRefreshFailureBlocks = [NSMutableArray array];
         _authStateVersion = 0;
-        _lastRefreshSucceededAuthStateVersion = NSNotFound;
         [self tl_restoreSessionFromPersistence];
     }
     return self;
@@ -217,10 +221,17 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
             if (!didRetryAuth
                 && [self handleAuthFailureForCode:output.code
                                           message:output.message
+                                            error:error
                                        retryBlock:^{
                     NSLog(@"[Profile] retry fetch after refresh");
                     [self tl_fetchProfileWithCompletion:completion didRetryAuth:YES];
                 }]) {
+                return;
+            }
+
+            if (didRetryAuth && [self shouldAttemptTokenRefreshForCode:output.code error:error]) {
+                [self invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
+                if (completion) completion(nil);
                 return;
             }
 
@@ -241,9 +252,9 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 - (void)logout {
     @synchronized (self) {
         self.authStateVersion += 1;
-        self.lastRefreshSucceededAuthStateVersion = NSNotFound;
         self.isRefreshing = NO;
         [self.pendingRetryBlocks removeAllObjects];
+        [self.pendingRefreshFailureBlocks removeAllObjects];
     }
 
     [self tl_clearPersistedSessionArtifacts];
@@ -260,30 +271,49 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 }
 
 - (BOOL)shouldAttemptTokenRefreshForCode:(NSNumber *)code {
-    NSInteger statusCode = code.integerValue;
-    if (statusCode == 401) {
+    return [self shouldAttemptTokenRefreshForCode:code error:nil];
+}
+
+- (BOOL)shouldAttemptTokenRefreshForCode:(NSNumber *)code error:(NSError *)error {
+    NSInteger responseCode = code.integerValue;
+    if (responseCode == 401 || responseCode == AGServiceCodeInvalidTokenOrTokenExpired) {
         return YES;
     }
-    if (statusCode != 403) {
-        return NO;
+
+    NSInteger errorServiceCode = [self tl_serviceCodeFromError:error].integerValue;
+    if (errorServiceCode == 401 || errorServiceCode == AGServiceCodeInvalidTokenOrTokenExpired) {
+        return YES;
     }
 
-    @synchronized (self) {
-        return self.lastRefreshSucceededAuthStateVersion != self.authStateVersion;
-    }
+    return [self tl_httpStatusCodeFromError:error] == 401;
 }
 
 - (BOOL)handleAuthFailureForCode:(NSNumber *)code
                          message:(NSString *)message
                       retryBlock:(nullable void(^)(void))retryBlock {
-    if (![self shouldAttemptTokenRefreshForCode:code]) {
+    return [self handleAuthFailureForCode:code
+                                  message:message
+                                    error:nil
+                               retryBlock:retryBlock];
+}
+
+- (BOOL)handleAuthFailureForCode:(NSNumber *)code
+                         message:(NSString *)message
+                           error:(NSError *)error
+                      retryBlock:(nullable void(^)(void))retryBlock {
+    if (![self shouldAttemptTokenRefreshForCode:code error:error]) {
         return NO;
     }
 
-    NSLog(@"[Auth] response considered expired: code=%@ userId=%ld message=%@",
+    NSNumber *errorServiceCode = [self tl_serviceCodeFromError:error];
+    NSInteger httpStatus = [self tl_httpStatusCodeFromError:error];
+    NSString *effectiveMessage = message.length > 0 ? message : [self tl_serverMessageFromError:error];
+    NSLog(@"[Auth] response considered expired: code=%@ errorCode=%@ http=%ld userId=%ld message=%@",
           code ?: @"<nil>",
+          errorServiceCode ?: @"<nil>",
+          (long)httpStatus,
           (long)self.userId,
-          message ?: @"<empty>");
+          effectiveMessage ?: @"<empty>");
     [self tl_showAuthToastIfNeeded:@"登录状态已失效，正在尝试恢复"];
     [self handleUnauthorizedWithRetry:retryBlock];
     return YES;
@@ -297,31 +327,49 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
                                    code:(NSNumber *)code
                           serverMessage:(NSString *)serverMessage
                          defaultMessage:(NSString *)defaultMessage {
-    if (error.localizedDescription.length > 0) {
-        return error.localizedDescription;
-    }
-    if (code.integerValue == 401) {
+    NSNumber *errorServiceCode = [self tl_serviceCodeFromError:error];
+    NSInteger effectiveCode = code.integerValue;
+    if (effectiveCode == 0) effectiveCode = errorServiceCode.integerValue;
+    NSInteger httpStatus = [self tl_httpStatusCodeFromError:error];
+    NSString *effectiveMessage = serverMessage.length > 0 ? serverMessage : [self tl_serverMessageFromError:error];
+    if (effectiveCode == 401
+        || effectiveCode == AGServiceCodeInvalidTokenOrTokenExpired
+        || httpStatus == 401) {
         return @"登录状态异常，请重新登录";
     }
-    if (code.integerValue == 403 || code.integerValue == 4003) {
-        return serverMessage.length > 0 ? serverMessage : @"当前账号没有权限访问该内容";
+    if (effectiveCode == 403
+        || effectiveCode == AGServiceCodeAccessDenied
+        || httpStatus == 403) {
+        return effectiveMessage.length > 0 ? effectiveMessage : @"当前账号没有权限访问该内容";
     }
-    if (serverMessage.length > 0) {
-        return serverMessage;
+    if (effectiveMessage.length > 0) {
+        return effectiveMessage;
+    }
+    if (error.localizedDescription.length > 0) {
+        return error.localizedDescription;
     }
     return defaultMessage;
 }
 
 - (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock {
+    [self handleUnauthorizedWithRetry:retryBlock failure:nil];
+}
+
+- (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock
+                            failure:(nullable void(^)(void))failureBlock {
     NSString *refreshToken = nil;
     NSUInteger requestVersion = 0;
     BOOL shouldStartRefresh = NO;
     BOOL shouldForceLogout = NO;
     NSString *logoutMessage = nil;
+    NSArray<dispatch_block_t> *failureBlocks = nil;
 
     @synchronized (self) {
         if (retryBlock) {
             [self.pendingRetryBlocks addObject:[retryBlock copy]];
+        }
+        if (failureBlock) {
+            [self.pendingRefreshFailureBlocks addObject:[failureBlock copy]];
         }
         if (self.isRefreshing) {
             NSLog(@"[Token] refresh already in progress, queued retry block count=%lu",
@@ -334,7 +382,9 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
             NSLog(@"[Token] no refreshToken available, force logout");
             shouldForceLogout = YES;
             logoutMessage = @"登录信息已失效，请重新登录";
+            failureBlocks = [self.pendingRefreshFailureBlocks copy];
             [self.pendingRetryBlocks removeAllObjects];
+            [self.pendingRefreshFailureBlocks removeAllObjects];
         } else {
             self.isRefreshing = YES;
             requestVersion = self.authStateVersion;
@@ -343,6 +393,9 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
     }
 
     if (shouldForceLogout) {
+        for (dispatch_block_t block in failureBlocks) {
+            block();
+        }
         [self tl_forceLogoutAndNotifyWithMessage:logoutMessage];
         return;
     }
@@ -367,6 +420,7 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
                 if (requestVersion != self.authStateVersion) {
                     NSLog(@"[Token] ignore refresh result because auth state changed");
                     [self.pendingRetryBlocks removeAllObjects];
+                    [self.pendingRefreshFailureBlocks removeAllObjects];
                     shouldIgnore = YES;
                 }
             }
@@ -377,9 +431,9 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
                 if (saved) {
                     NSArray<dispatch_block_t> *blocks = nil;
                     @synchronized (self) {
-                        self.lastRefreshSucceededAuthStateVersion = self.authStateVersion;
                         blocks = [self.pendingRetryBlocks copy];
                         [self.pendingRetryBlocks removeAllObjects];
+                        [self.pendingRefreshFailureBlocks removeAllObjects];
                     }
                     NSLog(@"[Token] refresh success: code=%@ newUserId=%@ retryCount=%lu",
                           output.code,
@@ -395,8 +449,14 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
                       output.data.token.length > 0 ? @"present" : @"nil",
                       output.data.refreshToken.length > 0 ? @"present" : @"nil",
                       output.data.userId ?: @"<nil>");
+                NSArray<dispatch_block_t> *refreshFailureBlocks = nil;
                 @synchronized (self) {
+                    refreshFailureBlocks = [self.pendingRefreshFailureBlocks copy];
                     [self.pendingRetryBlocks removeAllObjects];
+                    [self.pendingRefreshFailureBlocks removeAllObjects];
+                }
+                for (dispatch_block_t block in refreshFailureBlocks) {
+                    block();
                 }
                 [self tl_forceLogoutAndNotifyWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
                 return;
@@ -406,8 +466,14 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
                   output.code ?: @"<nil>",
                   output.message ?: @"<empty>",
                   error.localizedDescription ?: @"<nil>");
+            NSArray<dispatch_block_t> *refreshFailureBlocks = nil;
             @synchronized (self) {
+                refreshFailureBlocks = [self.pendingRefreshFailureBlocks copy];
                 [self.pendingRetryBlocks removeAllObjects];
+                [self.pendingRefreshFailureBlocks removeAllObjects];
+            }
+            for (dispatch_block_t block in refreshFailureBlocks) {
+                block();
             }
             [self tl_forceLogoutAndNotifyWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
         });
@@ -415,6 +481,68 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 }
 
 #pragma mark - Private
+
+- (nullable id)tl_responsePayloadFromError:(nullable NSError *)error {
+    NSError *currentError = error;
+    for (NSInteger depth = 0; currentError && depth < 8; depth += 1) {
+        id payload = currentError.userInfo[AGResponseObjectErrorKey];
+        if (!payload) {
+            payload = currentError.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey];
+        }
+        if (payload) return payload;
+
+        NSError *underlying = currentError.userInfo[NSUnderlyingErrorKey];
+        if (![underlying isKindOfClass:[NSError class]] || underlying == currentError) break;
+        currentError = underlying;
+    }
+    return nil;
+}
+
+- (nullable NSDictionary *)tl_responseDictionaryFromError:(nullable NSError *)error {
+    id payload = [self tl_responsePayloadFromError:error];
+    if ([payload isKindOfClass:[NSDictionary class]]) {
+        return payload;
+    }
+    if (![payload isKindOfClass:[NSData class]]) {
+        return nil;
+    }
+
+    id json = [NSJSONSerialization JSONObjectWithData:payload options:0 error:nil];
+    return [json isKindOfClass:[NSDictionary class]] ? json : nil;
+}
+
+- (nullable NSNumber *)tl_serviceCodeFromError:(nullable NSError *)error {
+    id value = [self tl_responseDictionaryFromError:error][@"code"];
+    if ([value isKindOfClass:[NSNumber class]]) return value;
+    if ([value isKindOfClass:[NSString class]] && [value length] > 0) {
+        return @([value integerValue]);
+    }
+    return nil;
+}
+
+- (nullable NSString *)tl_serverMessageFromError:(nullable NSError *)error {
+    NSDictionary *payload = [self tl_responseDictionaryFromError:error];
+    for (NSString *key in @[@"message", @"msg", @"error"]) {
+        id value = payload[key];
+        if ([value isKindOfClass:[NSString class]] && [value length] > 0) return value;
+    }
+    return nil;
+}
+
+- (NSInteger)tl_httpStatusCodeFromError:(nullable NSError *)error {
+    NSError *currentError = error;
+    for (NSInteger depth = 0; currentError && depth < 8; depth += 1) {
+        id response = currentError.userInfo[AFNetworkingOperationFailingURLResponseErrorKey];
+        if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
+            return ((NSHTTPURLResponse *)response).statusCode;
+        }
+
+        NSError *underlying = currentError.userInfo[NSUnderlyingErrorKey];
+        if (![underlying isKindOfClass:[NSError class]] || underlying == currentError) break;
+        currentError = underlying;
+    }
+    return 0;
+}
 
 - (void)tl_restoreSessionFromPersistence {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];

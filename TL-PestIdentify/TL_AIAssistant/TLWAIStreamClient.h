@@ -27,7 +27,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) void (^onDone)(NSDictionary *info);
 /// SSE event: error 或底层请求失败。serverMessage 为服务端给出的提示文案（可空）。
 @property (nonatomic, copy, nullable) void (^onError)(NSError * _Nullable error, NSString * _Nullable serverMessage);
-/// HTTP 状态码命中 401/403 时回调，调用方负责触发 token 续期 + 重建 stream。
+/// HTTP 401，或错误响应体业务码命中 4006 时回调，调用方负责触发 token 续期 + 重建 stream。
 @property (nonatomic, copy, nullable) void (^onAuthFailure)(void);
 
 /// 发起一次流式对话。

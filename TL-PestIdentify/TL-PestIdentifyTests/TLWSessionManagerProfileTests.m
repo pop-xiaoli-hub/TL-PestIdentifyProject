@@ -8,6 +8,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
 - (BOOL)saveAuthResponse:(id)auth;
 - (void)fetchProfileWithCompletion:(void(^)(id profile))completion;
 - (void)logout;
+- (BOOL)shouldAttemptTokenRefreshForCode:(NSNumber *)code error:(NSError *)error;
 @property (nonatomic, assign) NSInteger userId;
 @property (nonatomic, copy) NSString *username;
 @property (nonatomic, strong, readonly) id cachedProfile;
@@ -21,6 +22,8 @@ static NSString * const kProfileUsernameKey = @"TLW_username";
 static NSString * const kProfileGeneratedPasswordKey = @"TLW_generated_password";
 static NSString * const kProfileLegacyTokenKey = @"TLW_access_token";
 static NSString * const kProfileLegacyRefreshKey = @"TLW_refresh_token";
+static NSString * const kTestAGResponseObjectErrorKey = @"AGResponseObject";
+static NSString * const kTestAFResponseErrorKey = @"com.alamofire.serialization.response.error.response";
 
 @interface TLWFakeProfileAuthResponse : NSObject
 @property (nonatomic, copy) NSString *token;
@@ -131,7 +134,53 @@ typedef void (^TLWProfileCompletion)(id output, NSError *error);
     XCTAssertEqualObjects(self.manager.username, @"user_b");
 }
 
+- (void)testSDKBusinessCodesDistinguishExpiredTokenFromAccessDenied {
+    XCTAssertTrue([self.manager shouldAttemptTokenRefreshForCode:@4006 error:nil]);
+    XCTAssertTrue([self.manager shouldAttemptTokenRefreshForCode:@401 error:nil]);
+    XCTAssertFalse([self.manager shouldAttemptTokenRefreshForCode:@403 error:nil]);
+    XCTAssertFalse([self.manager shouldAttemptTokenRefreshForCode:@4003 error:nil]);
+}
+
+- (void)testHTTPUnauthorizedTriggersRefreshWhenSDKOutputIsNil {
+    NSError *error = [self tl_httpErrorWithStatusCode:401 responseBody:nil];
+
+    XCTAssertTrue([self.manager shouldAttemptTokenRefreshForCode:nil error:error]);
+}
+
+- (void)testHTTPForbiddenOnlyTriggersRefreshForExpiredTokenBusinessCode {
+    NSData *expiredBody = [NSJSONSerialization dataWithJSONObject:@{
+        @"code": @4006,
+        @"message": @"Invalid token or token expired",
+    } options:0 error:nil];
+    NSError *expiredError = [self tl_httpErrorWithStatusCode:403 responseBody:expiredBody];
+    XCTAssertTrue([self.manager shouldAttemptTokenRefreshForCode:nil error:expiredError]);
+
+    NSData *deniedBody = [NSJSONSerialization dataWithJSONObject:@{
+        @"code": @4003,
+        @"message": @"Access denied",
+    } options:0 error:nil];
+    NSError *deniedError = [self tl_httpErrorWithStatusCode:403 responseBody:deniedBody];
+    XCTAssertFalse([self.manager shouldAttemptTokenRefreshForCode:nil error:deniedError]);
+}
+
 #pragma mark - Helpers
+
+- (NSError *)tl_httpErrorWithStatusCode:(NSInteger)statusCode responseBody:(NSData *)responseBody {
+    NSURL *url = [NSURL URLWithString:@"https://example.invalid/api/users/me"];
+    NSHTTPURLResponse *response = [[NSHTTPURLResponse alloc] initWithURL:url
+                                                             statusCode:statusCode
+                                                            HTTPVersion:@"HTTP/1.1"
+                                                           headerFields:@{@"Content-Type": @"application/json"}];
+    NSMutableDictionary *userInfo = [@{
+        kTestAFResponseErrorKey: response,
+    } mutableCopy];
+    if (responseBody) {
+        userInfo[kTestAGResponseObjectErrorKey] = responseBody;
+    }
+    return [NSError errorWithDomain:@"com.alamofire.error.serialization.response"
+                               code:NSURLErrorBadServerResponse
+                           userInfo:userInfo];
+}
 
 - (TLWFakeProfileAuthResponse *)tl_authResponseWithToken:(NSString *)token
                                             refreshToken:(NSString *)refreshToken

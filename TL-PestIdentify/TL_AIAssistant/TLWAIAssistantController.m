@@ -425,13 +425,12 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
 
             TLWAIStreamClient *client = [[TLWAIStreamClient alloc] init];
             client.onMeta = ^(NSDictionary *meta) {
-                NSLog(@"[AI-STREAM][%@] parsed meta: %@", compareTag, meta);
+                (void)meta;
             };
 
             client.onDiseaseList = ^(NSArray *diseases) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AI-STREAM][%@] parsed disease list: %@", compareTag, diseases);
                 s.diseaseHeaderText = [s tl_headerTextFromDiseaseList:diseases];
                 [s tl_refreshAIMessageText];
                 [s.myView displayMessages:s.session.messages];
@@ -441,7 +440,6 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             client.onPlanDelta = ^(NSString *delta) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AI-STREAM][%@] parsed plan delta: %@", compareTag, delta);
                 [s.pendingDelta appendString:delta];
                 // 等 60ms timer 合并 flush，避免每帧刷 tableView 抖动
             };
@@ -449,7 +447,6 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             client.onPlanFinal = ^(NSString *fullText) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AI-STREAM][%@] parsed plan final: %@", compareTag, fullText);
                 [s.pendingDelta setString:@""];
                 s.planAccumulated = [fullText mutableCopy];
                 [s tl_refreshAIMessageText];
@@ -460,13 +457,12 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             client.onDone = ^(NSDictionary *info) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AI-STREAM][%@] done info: %@", compareTag, info);
+                (void)info;
                 [s tl_flushPendingDeltasIfNeeded];
                 [s tl_stopDeltaFlushTimer];
                 if (s.planAccumulated.length == 0 && s.diseaseHeaderText.length == 0) {
                     aiMessage.text = @"AI 暂时无法给出回复，请换个描述再试试。";
                 }
-                NSLog(@"[AI-STREAM][%@] visible text: %@", compareTag, aiMessage.text ?: @"");
                 aiMessage.status = TLWAIAssistantMessageStatusIdle;
                 s.currentAIMessage = nil;
                 s.streamClient = nil;
@@ -478,7 +474,6 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
             client.onError = ^(NSError *err, NSString *serverMsg) {
                 __strong typeof(weakSelf) s = weakSelf;
                 if (!s || s.currentAIMessage != aiMessage) return;
-                NSLog(@"[AI-STREAM][%@] error: err=%@ serverMsg=%@", compareTag, err, serverMsg);
                 [s tl_stopDeltaFlushTimer];
                 aiMessage.status = TLWAIAssistantMessageStatusFailed;
                 NSString *reason = serverMsg.length > 0 ? serverMsg : (err.localizedDescription ?: @"请求失败");
@@ -496,7 +491,7 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
                 if (!s || s.currentAIMessage != aiMessage) return;
                 TLWSessionManager *sessionManager = [TLWSDKManager shared].sessionManager;
                 if (didRetryAuth) {
-                    // 续期成功后第二次又 401：按既有约定走登出，避免死循环
+                    // 续期成功后第二次仍鉴权失败：结束会话，避免死循环。
                     [s tl_stopDeltaFlushTimer];
                     [sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，请重新登录"];
                     aiMessage.status = TLWAIAssistantMessageStatusFailed;
@@ -507,9 +502,19 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
                     [s.myView displayMessages:s.session.messages];
                     return;
                 }
-                // 首次 401：走统一续期，成功后用新 token 重建一次 stream
+                // 首次鉴权失败：走统一续期，成功后用新 token 重建一次 stream。
                 [sessionManager handleUnauthorizedWithRetry:^{
                     if (streamOnce) streamOnce(YES);
+                } failure:^{
+                    __strong typeof(weakSelf) refreshedSelf = weakSelf;
+                    if (!refreshedSelf || refreshedSelf.currentAIMessage != aiMessage) return;
+                    [refreshedSelf tl_stopDeltaFlushTimer];
+                    aiMessage.status = TLWAIAssistantMessageStatusFailed;
+                    aiMessage.text = @"登录已失效，请重新登录";
+                    refreshedSelf.currentAIMessage = nil;
+                    refreshedSelf.streamClient = nil;
+                    [refreshedSelf.myView exitAILoadingMode];
+                    [refreshedSelf.myView displayMessages:refreshedSelf.session.messages];
                 }];
             };
 
@@ -565,30 +570,10 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
     probeRequest.extraInfo = request.extraInfo;
     probeRequest.saveHistory = request.saveHistory;
 
-    NSLog(@"\n========== [AI-PROFILE] REQUEST [%@] ==========\ntext=%@\nimageUrl=%@\nuseSingleModel=%@\nsaveHistory=%@\nextraInfo=%@\n===============================================",
-          tag,
-          probeRequest.text ?: @"",
-          probeRequest.imageUrl ?: @"",
-          probeRequest.useSingleModel ?: @NO,
-          probeRequest.saveHistory ?: @NO,
-          probeRequest.extraInfo ?: @"");
-
     [[[TLWSDKManager shared] api] chatProfileWithChatRequest:probeRequest completionHandler:^(AGResultChatProfileResponse *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (error) {
-                NSLog(@"\n========== [AI-PROFILE] ERROR [%@] ==========\n%@\n============================================", tag, error);
-                return;
-            }
-
-            NSString *answer = [self tl_trimmedStringFromValue:output.data.answer];
-            id profileJSON = output.data.profile ? [output.data.profile toDictionary] : @{};
-            NSLog(@"\n========== [AI-PROFILE] RESPONSE [%@] ==========\ncode=%@\nmessage=%@\nanswer=%@\nprofile=%@\nrawOutput=%@\n================================================",
-                  tag,
-                  output.code,
-                  output.message,
-                  answer ?: @"",
-                  profileJSON ?: @{},
-                  [output toDictionary] ?: @{});
+            (void)tag; (void)output; (void)error;
+            // [AI-PROFILE] 调试打印已下线，按需在断点中查看 output。
         });
     }];
 }

@@ -13,6 +13,7 @@
 #import "TLWDBMyPublishedModel.h"
 #import "TLWDBMyPublishedModel+WCTTableCoding.h"
 #import "TLWSDKManager.h"
+#import "TLWPerfLog.h"
 #import <WCDB/WCDBObjc.h>
 #import <AgriPestClient/AGPostResponseDto.h>
 
@@ -80,6 +81,7 @@
 
 //批量插入
 - (BOOL)upsertCollectedPostsFromDtos:(NSArray<AGPostResponseDto *> *)postDtos {
+    CFAbsoluteTime t0 = TLWPerfTick();
     @synchronized (self) {
         [self setupCollectedTableIfNeeded];
         if (postDtos.count == 0) {
@@ -117,17 +119,23 @@
         }
 
         if (!insertSuccess || !replaceSuccess) {
-            NSLog(@"[DB] upsert 批量收藏失败");
+            TLWPerfLog(@"db collected upsertBatch FAIL count=%lu cost=%.0fms",
+                       (unsigned long)postDtos.count, TLWPerfMs(t0));
             return NO;
         }
+        TLWPerfLog(@"db collected upsertBatch ok count=%lu cost=%.0fms",
+                   (unsigned long)postDtos.count, TLWPerfMs(t0));
         return YES;
     }
 }
 
 - (NSArray<TLWDBCollectedModel *> *)fetchAllCollectedPosts {
+    CFAbsoluteTime t0 = TLWPerfTick();
     @synchronized (self) {
         [self setupCollectedTableIfNeeded];
         NSArray<TLWDBCollectedModel *> *result = [self.collectedTable getObjectsOrders:TLWDBCollectedModel.collectedAt.asOrder(WCTOrderedDescending)];
+        TLWPerfLog(@"db collected fetchAll count=%lu cost=%.1fms",
+                   (unsigned long)result.count, TLWPerfMs(t0));
         return result ?: @[];
     }
 }
@@ -138,7 +146,7 @@
 }
 
 - (void)printFormattedCollectedPosts {
-    NSLog(@"%@", [self formattedCollectedPostsDescription]);
+    // 调试用全表打印保留方法签名，但默认不再打印（性能毒瘤）。需要时手动调用 description。
 }
 
 - (nullable TLWDBCollectedModel *)fetchCollectedPostByPostId:(NSNumber *)postId {
@@ -241,9 +249,12 @@
 }
 
 - (NSArray<TLWDBIdentificationModel *> *)fetchAllIdentificationRecords {
+    CFAbsoluteTime t0 = TLWPerfTick();
     @synchronized (self) {
         [self setupIdentificationTableIfNeeded];
         NSArray<TLWDBIdentificationModel *> *result = [self.identificationTable getObjectsOrders:TLWDBIdentificationModel.identifiedAt.asOrder(WCTOrderedDescending)];
+        TLWPerfLog(@"db identification fetchAll count=%lu cost=%.1fms",
+                   (unsigned long)result.count, TLWPerfMs(t0));
         return result ?: @[];
     }
 }
@@ -408,9 +419,12 @@
 }
 
 - (NSArray<TLWDBMyPublishedModel *> *)fetchAllMyPublishedPosts {
+    CFAbsoluteTime t0 = TLWPerfTick();
     @synchronized (self) {
         [self setupMyPublishedTableIfNeeded];
         NSArray<TLWDBMyPublishedModel *> *result = [self.myPublishedTable getObjectsOrders:TLWDBMyPublishedModel.publishedAt.asOrder(WCTOrderedDescending)];
+        TLWPerfLog(@"db myPublished fetchAll count=%lu cost=%.1fms",
+                   (unsigned long)result.count, TLWPerfMs(t0));
         return result ?: @[];
     }
 }

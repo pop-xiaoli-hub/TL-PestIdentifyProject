@@ -9,17 +9,25 @@
 #import "TLWDBManager.h"
 #import "TLWDBMyPublishedModel.h"
 
-@interface TLWSDKManager : NSObject
-+ (instancetype)shared;
+@interface TLWSessionManager : NSObject
+- (instancetype)initWithAPIService:(id)api;
+- (void)updateAPIService:(id)api;
 - (BOOL)isLoggedIn;
 - (void)logout;
 - (void)handleUnauthorizedWithRetry:(void(^)(void))retryBlock;
+- (void)handleUnauthorizedWithRetry:(void(^)(void))retryBlock
+                            failure:(void(^)(void))failureBlock;
 - (BOOL)saveAuthResponse:(id)auth;
 - (nullable NSString *)refreshToken;
 - (BOOL)shouldAttemptTokenRefreshForCode:(NSNumber *)code;
 @property (nonatomic, assign) NSInteger userId;
 @property (nonatomic, copy, nullable) NSString *username;
 @property (nonatomic, copy, nullable, readonly) NSString *generatedPassword;
+@end
+
+@interface TLWSDKManager : NSObject
++ (instancetype)shared;
+@property (nonatomic, strong, readonly) TLWSessionManager *sessionManager;
 @end
 
 static NSString * const kAuthService = @"com.tl.pestidentify.auth";
@@ -75,7 +83,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 @end
 
 @interface TLWAuthSessionIntegrationTests : XCTestCase
-@property (nonatomic, strong) TLWSDKManager *manager;
+@property (nonatomic, strong) TLWSessionManager *manager;
 @end
 
 @implementation TLWAuthSessionIntegrationTests
@@ -83,16 +91,11 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 - (void)setUp {
     [super setUp];
     self.continueAfterFailure = NO;
-    self.manager = [TLWSDKManager shared];
     [self tl_clearPersistedAuthState];
-    [self.manager logout];
-    [self.manager setValue:[NSObject new] forKey:@"api"];
-    [self.manager setValue:[NSMutableArray array] forKey:@"pendingRetryBlocks"];
-    [self.manager setValue:@(NO) forKey:@"isRefreshing"];
+    self.manager = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
 }
 
 - (void)tearDown {
-    [self.manager setValue:[NSObject new] forKey:@"api"];
     [self.manager logout];
     [self tl_clearPersistedAuthState];
     [super tearDown];
@@ -106,7 +109,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [ud setInteger:9527 forKey:kUserIdKey];
     [ud setObject:@"tester_restart" forKey:kUsernameKey];
 
-    TLWSDKManager *coldStartManager = [[TLWSDKManager alloc] init];
+    TLWSessionManager *coldStartManager = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
 
     XCTAssertTrue([coldStartManager isLoggedIn]);
     XCTAssertEqual(coldStartManager.userId, 9527);
@@ -119,7 +122,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [ud setInteger:4242 forKey:kUserIdKey];
     [ud setObject:@"ghost_user" forKey:kUsernameKey];
 
-    TLWSDKManager *coldStartManager = [[TLWSDKManager alloc] init];
+    TLWSessionManager *coldStartManager = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
 
     XCTAssertFalse([coldStartManager isLoggedIn]);
     XCTAssertEqual(coldStartManager.userId, 0);
@@ -135,7 +138,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [ud setInteger:5252 forKey:kUserIdKey];
     [ud setObject:@"ghost_user" forKey:kUsernameKey];
 
-    TLWSDKManager *coldStartManager = [[TLWSDKManager alloc] init];
+    TLWSessionManager *coldStartManager = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
 
     XCTAssertFalse([coldStartManager isLoggedIn]);
     XCTAssertEqual(coldStartManager.userId, 0);
@@ -153,7 +156,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [self tl_saveKeychainValue:@"persisted_refresh_token" account:kRefreshTokenAccount];
     [ud setObject:@"ghost_user" forKey:kUsernameKey];
 
-    TLWSDKManager *coldStartManager = [[TLWSDKManager alloc] init];
+    TLWSessionManager *coldStartManager = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
 
     XCTAssertFalse([coldStartManager isLoggedIn]);
     XCTAssertEqual(coldStartManager.userId, 0);
@@ -172,7 +175,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [ud setInteger:8080 forKey:kUserIdKey];
     [ud setObject:@"legacy_user" forKey:kUsernameKey];
 
-    TLWSDKManager *coldStartManager = [[TLWSDKManager alloc] init];
+    TLWSessionManager *coldStartManager = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
 
     XCTAssertFalse([coldStartManager isLoggedIn]);
     XCTAssertEqual(coldStartManager.userId, 0);
@@ -284,10 +287,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [[NSUserDefaults standardUserDefaults] setInteger:1337 forKey:kUserIdKey];
 
     // 重新初始化让 init 读到这些值
-    TLWSDKManager *mgr = [[TLWSDKManager alloc] init];
-    [mgr setValue:[NSObject new] forKey:@"api"];
-    [mgr setValue:[NSMutableArray array] forKey:@"pendingRetryBlocks"];
-    [mgr setValue:@(NO) forKey:@"isRefreshing"];
+    TLWSessionManager *mgr = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
 
     __block BOOL retryExecuted = NO;
     [mgr handleUnauthorizedWithRetry:^{
@@ -303,7 +303,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [self tl_saveKeychainValue:@"refresh_for_concurrency" account:kRefreshTokenAccount];
 
     TLWMockApiService *mockApi = [[TLWMockApiService alloc] init];
-    [self.manager setValue:mockApi forKey:@"api"];
+    [self.manager updateAPIService:mockApi];
 
     XCTestExpectation *refreshStarted = [self expectationWithDescription:@"refresh started"];
     XCTestExpectation *allRetriesExecuted = [self expectationWithDescription:@"all retries executed"];
@@ -366,7 +366,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     XCTAssertTrue([self.manager saveAuthResponse:initialAuth]);
 
     TLWMockApiService *mockApi = [[TLWMockApiService alloc] init];
-    [self.manager setValue:mockApi forKey:@"api"];
+    [self.manager updateAPIService:mockApi];
 
     XCTestExpectation *refreshStarted = [self expectationWithDescription:@"refresh started"];
     XCTestExpectation *retryExecuted = [self expectationWithDescription:@"retry executed"];
@@ -407,53 +407,11 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     XCTAssertNil([[NSUserDefaults standardUserDefaults] stringForKey:kGeneratedPasswordKey]);
 }
 
-- (void)testForbiddenAfterSuccessfulRefreshDoesNotTriggerSecondRefresh {
-    TLWFakeAuthResponse *initialAuth = [self tl_authResponseWithToken:@"initial_access"
-                                                         refreshToken:@"initial_refresh"
-                                                               userId:5152
-                                                             username:@"refresh_user"
-                                                    generatedPassword:nil];
-    XCTAssertTrue([self.manager saveAuthResponse:initialAuth]);
-    XCTAssertTrue([self.manager shouldAttemptTokenRefreshForCode:@403]);
-
-    TLWMockApiService *mockApi = [[TLWMockApiService alloc] init];
-    [self.manager setValue:mockApi forKey:@"api"];
-
-    XCTestExpectation *refreshStarted = [self expectationWithDescription:@"refresh started"];
-    XCTestExpectation *callbackHandled = [self expectationWithDescription:@"refresh callback handled"];
-
-    __block TLWRefreshCompletion refreshCompletion = nil;
-
-    mockApi.onRefreshCalled = ^(TLWRefreshCompletion completion) {
-        refreshCompletion = [completion copy];
-        [refreshStarted fulfill];
-    };
-
-    [self.manager handleUnauthorizedWithRetry:nil];
-
-    [self waitForExpectations:@[refreshStarted] timeout:2.0];
-    XCTAssertNotNil(refreshCompletion);
-
-    TLWFakeAuthResponse *refreshedAuth = [self tl_authResponseWithToken:@"refreshed_access"
-                                                           refreshToken:@"refreshed_refresh"
-                                                                 userId:5152
-                                                               username:@"refresh_user"
-                                                      generatedPassword:nil];
-    TLWFakeResultAuthResponse *result = [[TLWFakeResultAuthResponse alloc] init];
-    result.code = @200;
-    result.data = refreshedAuth;
-
-    refreshCompletion(result, nil);
-
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [callbackHandled fulfill];
-    });
-    [self waitForExpectations:@[callbackHandled] timeout:2.0];
-
-    XCTAssertEqual(mockApi.refreshCallCount, 1);
+- (void)testAccessDeniedDoesNotTriggerTokenRefresh {
     XCTAssertFalse([self.manager shouldAttemptTokenRefreshForCode:@403]);
+    XCTAssertFalse([self.manager shouldAttemptTokenRefreshForCode:@4003]);
+    XCTAssertTrue([self.manager shouldAttemptTokenRefreshForCode:@4006]);
     XCTAssertTrue([self.manager shouldAttemptTokenRefreshForCode:@401]);
-    XCTAssertEqualObjects([self.manager refreshToken], @"refreshed_refresh");
 }
 
 - (void)testRefreshRejectsIncompleteAuthPayloadAndLogsOut {
@@ -465,7 +423,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     XCTAssertTrue([self.manager saveAuthResponse:initialAuth]);
 
     TLWMockApiService *mockApi = [[TLWMockApiService alloc] init];
-    [self.manager setValue:mockApi forKey:@"api"];
+    [self.manager updateAPIService:mockApi];
 
     XCTestExpectation *refreshStarted = [self expectationWithDescription:@"refresh started"];
     XCTestExpectation *callbackHandled = [self expectationWithDescription:@"callback handled"];
@@ -511,11 +469,49 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [self tl_assertRuntimeAccessTokenCleared];
 }
 
+- (void)testRefreshFailureRunsFailureCallbackAndDropsRetry {
+    TLWFakeAuthResponse *initialAuth = [self tl_authResponseWithToken:@"initial_access"
+                                                         refreshToken:@"initial_refresh"
+                                                               userId:5152
+                                                             username:@"refresh_user"
+                                                    generatedPassword:nil];
+    XCTAssertTrue([self.manager saveAuthResponse:initialAuth]);
+
+    TLWMockApiService *mockApi = [[TLWMockApiService alloc] init];
+    [self.manager updateAPIService:mockApi];
+
+    XCTestExpectation *refreshStarted = [self expectationWithDescription:@"refresh started"];
+    XCTestExpectation *failureCalled = [self expectationWithDescription:@"failure callback"];
+    __block TLWRefreshCompletion refreshCompletion = nil;
+    __block BOOL retryCalled = NO;
+
+    mockApi.onRefreshCalled = ^(TLWRefreshCompletion completion) {
+        refreshCompletion = [completion copy];
+        [refreshStarted fulfill];
+    };
+
+    [self.manager handleUnauthorizedWithRetry:^{
+        retryCalled = YES;
+    } failure:^{
+        [failureCalled fulfill];
+    }];
+
+    [self waitForExpectations:@[refreshStarted] timeout:2.0];
+    XCTAssertNotNil(refreshCompletion);
+    refreshCompletion(nil, [NSError errorWithDomain:NSURLErrorDomain
+                                                code:NSURLErrorNotConnectedToInternet
+                                            userInfo:nil]);
+
+    [self waitForExpectations:@[failureCalled] timeout:2.0];
+    XCTAssertFalse(retryCalled);
+    XCTAssertFalse([self.manager isLoggedIn]);
+}
+
 - (void)testLogoutDuringInFlightRefreshDoesNotRestoreSession {
     [self tl_saveKeychainValue:@"refresh_for_logout_race" account:kRefreshTokenAccount];
 
     TLWMockApiService *mockApi = [[TLWMockApiService alloc] init];
-    [self.manager setValue:mockApi forKey:@"api"];
+    [self.manager updateAPIService:mockApi];
 
     XCTestExpectation *refreshStarted = [self expectationWithDescription:@"refresh started"];
     XCTestExpectation *callbackHandled = [self expectationWithDescription:@"stale refresh callback handled"];
@@ -572,7 +568,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 
     TLWDBManager *dbManager = [TLWDBManager shared];
 
-    [self.manager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_a"
+    [[TLWSDKManager shared].sessionManager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_a"
                                                      refreshToken:@"db_refresh_a"
                                                            userId:userA
                                                          username:@"db_user_a"
@@ -580,7 +576,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     XCTAssertTrue([dbManager upsertCollectedPostFromDto:[self tl_postWithId:@91001 title:@"User A Post"]]);
     XCTAssertEqual(dbManager.fetchAllCollectedPosts.count, 1);
 
-    [self.manager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_b"
+    [[TLWSDKManager shared].sessionManager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_b"
                                                      refreshToken:@"db_refresh_b"
                                                            userId:userB
                                                          username:@"db_user_b"
@@ -589,7 +585,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     XCTAssertTrue([dbManager upsertCollectedPostFromDto:[self tl_postWithId:@91002 title:@"User B Post"]]);
     XCTAssertEqual(dbManager.fetchAllCollectedPosts.count, 1);
 
-    [self.manager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_a_again"
+    [[TLWSDKManager shared].sessionManager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_a_again"
                                                      refreshToken:@"db_refresh_a_again"
                                                            userId:userA
                                                          username:@"db_user_a"
@@ -597,7 +593,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     XCTAssertEqual(dbManager.fetchAllCollectedPosts.count, 1);
 
     [dbManager deleteAllCollectedPosts];
-    [self.manager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_b_cleanup"
+    [[TLWSDKManager shared].sessionManager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_b_cleanup"
                                                      refreshToken:@"db_refresh_b_cleanup"
                                                            userId:userB
                                                          username:@"db_user_b"
@@ -612,7 +608,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [self tl_clearMyPublishedPostsForUserId:userId];
 
     TLWDBManager *dbManager = [TLWDBManager shared];
-    [self.manager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_my_post"
+    [[TLWSDKManager shared].sessionManager saveAuthResponse:[self tl_authResponseWithToken:@"db_access_my_post"
                                                      refreshToken:@"db_refresh_my_post"
                                                            userId:userId
                                                          username:@"db_user_my_post"
@@ -721,13 +717,13 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 }
 
 - (void)tl_clearCollectedPostsForUserId:(NSInteger)userId {
-    self.manager.userId = userId;
+    [TLWSDKManager shared].sessionManager.userId = userId;
     [[TLWDBManager shared] reopenForCurrentUser];
     [[TLWDBManager shared] deleteAllCollectedPosts];
 }
 
 - (void)tl_clearMyPublishedPostsForUserId:(NSInteger)userId {
-    self.manager.userId = userId;
+    [TLWSDKManager shared].sessionManager.userId = userId;
     [[TLWDBManager shared] reopenForCurrentUser];
     [[TLWDBManager shared] deleteAllMyPublishedPosts];
 }

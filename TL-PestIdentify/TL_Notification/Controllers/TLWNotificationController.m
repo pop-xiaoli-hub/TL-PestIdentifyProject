@@ -79,7 +79,7 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
                                     completionHandler:^(AGResultMessageGroupResponseDto *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (error || output.code.integerValue != 200) {
-                if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self fetchMessages]; }];
                     return;
                 }
@@ -186,14 +186,7 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
         [[TLWSDKManager shared].api markAsReadWithId:msgId
                                    completionHandler:^(AGResultVoid *output, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                if (error) {
-                    // 网络失败，回滚未读状态
-                    item.hasUnread = YES;
-                    [weakSelf.myView.tableView reloadRowsAtIndexPaths:@[currentIndexPath]
-                                                     withRowAnimation:UITableViewRowAnimationNone];
-                    return;
-                }
-                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [[TLWSDKManager shared].api markAsReadWithId:msgId
                                                    completionHandler:^(AGResultVoid *o, NSError *e) {
@@ -206,6 +199,13 @@ static NSString *const kNotifCellID = @"TLWNotificationCell";
                             }
                         }];
                     }];
+                    return;
+                }
+                if (error) {
+                    // 网络失败，回滚未读状态
+                    item.hasUnread = YES;
+                    [weakSelf.myView.tableView reloadRowsAtIndexPaths:@[currentIndexPath]
+                                                     withRowAnimation:UITableViewRowAnimationNone];
                     return;
                 }
                 if (output.code.integerValue != 200) {

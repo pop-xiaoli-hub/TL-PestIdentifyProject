@@ -9,6 +9,8 @@
 #import <SpeechEngineToB/SpeechEngine.h>
 #import <TargetConditionals.h>
 #import <UserNotifications/UserNotifications.h>
+#import "TLWPerfLog.h"
+#import "TLWMetricKitReporter.h"
 
 @interface AppDelegate () <UNUserNotificationCenterDelegate>
 
@@ -18,6 +20,7 @@
 
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+  CFAbsoluteTime didFinishT0 = TLWPerfTick();
   NSDictionary *env = [NSProcessInfo processInfo].environment;
   BOOL isRunningTests = (env[@"XCTestConfigurationFilePath"] != nil);
   // 单元测试宿主启动时跳过语音 SDK 初始化，避免影响测试进程拉起。
@@ -25,7 +28,11 @@
     // 初始化火山引擎 Dialog 语音 SDK 环境
     [SpeechEngine prepareEnvironment];
     [UNUserNotificationCenter currentNotificationCenter].delegate = self;
+    [[TLWMetricKitReporter sharedInstance] start];
   }
+  TLWPerfLog(@"launch preMain+earlyMain=%.0fms didFinish=%.0fms",
+             (didFinishT0 - kTLWAppStartTimestamp) * 1000.0,
+             TLWPerfMs(didFinishT0));
   return YES;
 }
 
@@ -47,20 +54,12 @@
 }
 
 - (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
-  const unsigned char *dataBuffer = (const unsigned char *)deviceToken.bytes;
-  if (!dataBuffer || deviceToken.length == 0) {
-    return;
-  }
-
-  NSMutableString *token = [NSMutableString stringWithCapacity:(deviceToken.length * 2)];
-  for (NSInteger i = 0; i < deviceToken.length; i++) {
-    [token appendFormat:@"%02x", dataBuffer[i]];
-  }
-  NSLog(@"[Push] APNs device token: %@", token);
+  // device token 不再打印到日志（安全风险）；如需上报请通过专用通道。
+  (void)deviceToken;
 }
 
 - (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
-  NSLog(@"[Push] Failed to register for remote notifications: %@", error.localizedDescription);
+  TLWPerfLog(@"[Push] register failed: %@", error.localizedDescription);
 }
 
 

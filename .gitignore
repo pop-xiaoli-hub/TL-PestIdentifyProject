@@ -16,3 +16,10 @@ docs/适老化方案调研.md
 AgriPestClient-SDK使用文档.md
 docs/AgriPestClient-SDK使用文档.md
 TL-PestIdentify/AgriPestClient-SDK使用文档.md
+_INTERVIEW_PREP.md
+docs/INTERVIEW_PREP.md
+docs/优化总览.md
+docs/性能基线.md
+
+# 性能测量原始数据（.trace 可达数百 MB）
+perf-data/

@@ -7,8 +7,12 @@
 
 #import <UIKit/UIKit.h>
 #import "AppDelegate.h"
+#import "TLWPerfLog.h"
+
+CFAbsoluteTime kTLWAppStartTimestamp = 0;
 
 int main(int argc, char * argv[]) {
+  kTLWAppStartTimestamp = CFAbsoluteTimeGetCurrent();
   NSString * appDelegateClassName;
   @autoreleasepool {
       // Setup code that might create autoreleased objects goes here.

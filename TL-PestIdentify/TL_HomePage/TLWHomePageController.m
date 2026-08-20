@@ -19,9 +19,11 @@
 #import "TLWWarningModel.h"
 #import "TLWSDKManager.h"
 #import "TLWLocationManager.h"
+#import "TLWPerfLog.h"
 #import "TLWToast.h"
 #import <AgriPestClient/AGResultListAgentChatHistory.h>
 #import <float.h>
+#import <CoreLocation/CoreLocation.h>
 #import <Masonry.h>
 #import <SDWebImage/SDWebImage.h>
 
@@ -49,6 +51,9 @@ extern NSString * const TLWProfileDidUpdateNotification;
 @property (nonatomic, copy) NSString *currentWeatherText;
 @property (nonatomic, copy) NSString *currentWeatherIconCode;
 @property (nonatomic, assign) BOOL isLoadingWeather;
+@property (nonatomic, assign) CLLocationDegrees lastWeatherLat;
+@property (nonatomic, assign) CLLocationDegrees lastWeatherLon;
+@property (nonatomic, strong) NSDate *lastWeatherFetchTime;
 @property (nonatomic, strong) NSMutableSet<NSNumber *> *deletingPlantIds;
 
 @end
@@ -128,9 +133,25 @@ extern NSString * const TLWProfileDidUpdateNotification;
     return;
   }
 
+  // 节流：10 分钟内 + 坐标漂移 < 50m，跳过重复请求
+  static const NSTimeInterval kTLWWeatherCacheTTL = 600.0;
+  static const CLLocationDistance kTLWWeatherMinDistance = 50.0;
+  if (self.lastWeatherFetchTime &&
+      [[NSDate date] timeIntervalSinceDate:self.lastWeatherFetchTime] < kTLWWeatherCacheTTL) {
+    CLLocation *prev = [[CLLocation alloc] initWithLatitude:self.lastWeatherLat longitude:self.lastWeatherLon];
+    CLLocation *curr = [[CLLocation alloc] initWithLatitude:locMgr.latitude longitude:locMgr.longitude];
+    if ([curr distanceFromLocation:prev] < kTLWWeatherMinDistance) {
+      TLWPerfLog(@"[HomeWeather] skip throttled lastFetch=%.0fs ago",
+                 [[NSDate date] timeIntervalSinceDate:self.lastWeatherFetchTime]);
+      return;
+    }
+  }
+
   self.isLoadingWeather = YES;
+  CLLocationDegrees reqLat = locMgr.latitude;
+  CLLocationDegrees reqLon = locMgr.longitude;
   __weak typeof(self) weakSelf = self;
-  [[TLWSDKManager shared] getCurrentWeatherWithLatitude:locMgr.latitude longitude:locMgr.longitude completion:^(NSDictionary * _Nullable weatherInfo, NSError * _Nullable error) {
+  [[TLWSDKManager shared] getCurrentWeatherWithLatitude:reqLat longitude:reqLon completion:^(NSDictionary * _Nullable weatherInfo, NSError * _Nullable error) {
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf) return;
     strongSelf.isLoadingWeather = NO;
@@ -148,6 +169,9 @@ extern NSString * const TLWProfileDidUpdateNotification;
     strongSelf.currentWeatherTemperature = [weatherInfo[@"temperature"] isKindOfClass:[NSString class]] ? weatherInfo[@"temperature"] : [[weatherInfo[@"temperature"] description] copy];
     strongSelf.currentWeatherText = [weatherInfo[@"weatherText"] isKindOfClass:[NSString class]] ? weatherInfo[@"weatherText"] : @"未知";
     strongSelf.currentWeatherIconCode = [weatherInfo[@"iconCode"] isKindOfClass:[NSString class]] ? weatherInfo[@"iconCode"] : @"999";
+    strongSelf.lastWeatherLat = reqLat;
+    strongSelf.lastWeatherLon = reqLon;
+    strongSelf.lastWeatherFetchTime = [NSDate date];
     [strongSelf.homePageView configureWithTemperature:strongSelf.currentWeatherTemperature
                                           weatherText:strongSelf.currentWeatherText
                                              iconCode:strongSelf.currentWeatherIconCode];
@@ -195,13 +219,14 @@ extern NSString * const TLWProfileDidUpdateNotification;
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:output.code
                                                        message:output.message
+                                                         error:error
                                                     retryBlock:^{
           fetchAlertBlock(YES);
         }]) {
           return;
         }
 
-        if (didRetryAuth && [manager.sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if (didRetryAuth && [manager.sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [manager.sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
           return;
         }
@@ -239,14 +264,14 @@ extern NSString * const TLWProfileDidUpdateNotification;
       __strong typeof(weakSelf) strongSelf = weakSelf;
       if (!strongSelf) return;
 
-      if (error) {
-        [strongSelf.homePageView.tableView reloadData];
-        return;
-      }
-      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
         [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
           [strongSelf tl_fetchHistoryRecordCount];
         }];
+        return;
+      }
+      if (error) {
+        [strongSelf.homePageView.tableView reloadData];
         return;
       }
       if (output.code.integerValue != 200) {
@@ -771,6 +796,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:output.code
                                                        message:output.message
+                                                         error:error
                                                     retryBlock:^{
           fetchCropsBlock(YES);
         }]) {
@@ -860,6 +886,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
       if (!didRetryAuth
           && [manager.sessionManager handleAuthFailureForCode:output.code
                                                      message:output.message
+                                                       error:error
                                                   retryBlock:^{
         [strongSelf tl_deletePlantModel:plantModel didRetryAuth:YES];
       }]) {
@@ -931,6 +958,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:output.code
                                                        message:output.message
+                                                         error:error
                                                     retryBlock:^{
           createCropBlock(imageURL, YES);
         }]) {
@@ -969,6 +997,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:output.code
                                                        message:output.message
+                                                         error:error
                                                     retryBlock:^{
           uploadBlock(YES);
         }]) {

@@ -274,6 +274,7 @@ referenceSizeForHeaderInSection:(NSInteger)section {
                 if (!didRetryAuth
                     && [manager.sessionManager handleAuthFailureForCode:output.code
                                                                message:output.message
+                                                                 error:error
                                                             retryBlock:^{
                     savePreferenceBlock(YES);
                 }]) {

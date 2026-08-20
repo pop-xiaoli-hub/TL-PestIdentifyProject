@@ -43,6 +43,8 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 @property (nonatomic, strong) NSArray<NSString *> *searchKeywordSuggestions;
 @property (nonatomic, strong) NSMutableArray<NSString *> *searchHistoryItems;
 @property (nonatomic, assign) BOOL isSearchingPosts;
+@property (nonatomic, assign) BOOL tl_isLoadingFavorited;
+@property (nonatomic, strong) NSDate *tl_lastFavoritedFetchTime;
 - (void)tl_cachePublishedPostFromDto:(AGPostResponseDto *)dto request:(AGPostCreateRequest *)request imageUrls:(NSArray<NSString *> *)imageUrls;
 @end
 
@@ -99,6 +101,15 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   [self tl_applyCommunityLayoutStyle];
   [self tl_fetchCommunityFeed];
   [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(tl_onFavoritedChanged)
+                                               name:TLWFavoritedDidChangeNotification
+                                             object:nil];
+}
+
+- (void)tl_onFavoritedChanged {
+  // 清缓存时间戳，下次 viewDidAppear 会重新拉取最新收藏列表
+  self.tl_lastFavoritedFetchTime = nil;
 }
 
 - (void)dealloc {
@@ -110,14 +121,30 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
 
 - (void)loadCollectedPosts {
+  // 节流：进行中去重 + 30s 内复用缓存
+  static const NSTimeInterval kTLWFavoritedCacheTTL = 30.0;
+  if (self.tl_isLoadingFavorited) {
+    return;
+  }
+  if (self.tl_lastFavoritedFetchTime &&
+      [[NSDate date] timeIntervalSinceDate:self.tl_lastFavoritedFetchTime] < kTLWFavoritedCacheTTL &&
+      self.collectePosts != nil) {
+    return;
+  }
+
+  self.tl_isLoadingFavorited = YES;
   TLWSDKManager* manager = [TLWSDKManager shared];
   __weak typeof(self) weakSelf = self;
   [manager fetchAllFavoritedPostsWithCompletion:^(NSArray<AGPostResponseDto *> * _Nullable posts, NSError * _Nullable error) {
+    __strong typeof(weakSelf) strongSelf = weakSelf;
+    if (!strongSelf) return;
+    strongSelf.tl_isLoadingFavorited = NO;
     if (error) {
       NSLog(@"用户收藏帖子列表获取失败, code = ");
     } else {
       NSLog(@"获取到所有收藏的帖子数位：%ld", posts.count);
-      weakSelf.collectePosts = [NSMutableArray arrayWithArray:posts];
+      strongSelf.collectePosts = [NSMutableArray arrayWithArray:posts];
+      strongSelf.tl_lastFavoritedFetchTime = [NSDate date];
     }
   }];
 }
@@ -348,7 +375,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       if (!strongSelf) return;
 
       if (error || !output || output.code.integerValue != 200 || !output.data) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_reloadPostWithId:postId];
           }];
@@ -422,7 +449,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       strongSelf.isSearchingPosts = NO;
 
       if (error || !output || output.code.integerValue != 200 || !output.data) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           //鉴权过期失败重试
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_executeSearchWithQuery:trimmedQuery];
@@ -496,7 +523,6 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   } else {
     post.imageAspectRatio = 0.75;
   }
-  NSLog(@"点赞数-1 : %@", post.likeCount);
   cell.elderModeEnabled = self.elderModeEnabled;
   [cell configureWithPost:post];
   return cell;
@@ -684,7 +710,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       }
 
       if (error || !output || output.code.integerValue != 200) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_requestSuggestionsForQuery:query];
           }];
@@ -799,7 +825,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       dispatch_async(dispatch_get_main_queue(), ^{
         NSLog(@"5");
         if (output.code.integerValue != 200) {
-          if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+          if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
             [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
               [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *r, NSError *e) {
                 dispatch_async(dispatch_get_main_queue(), ^{

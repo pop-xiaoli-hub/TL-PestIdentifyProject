@@ -59,15 +59,26 @@ extern NSString * const TLWProfileDidUpdateNotification;
 /// 获取本地保存的 refreshToken
 - (nullable NSString *)refreshToken;
 
-/// 判断响应码是否应视为鉴权失效并触发 token 续期。
-/// 当前策略：401 始终触发 refresh；403 只在当前 access token 尚未完成过一次 refresh 时触发，
-/// 避免 refresh 成功后同一请求再次返回 403 时陷入循环重试。
+/// 判断业务响应码是否应视为鉴权失效并触发 token 续期。
+/// 兼容旧接口的业务码 401；当前 SDK 的标准 Token 失效码为 4006。
 - (BOOL)shouldAttemptTokenRefreshForCode:(nullable NSNumber *)code;
 
-/// 统一处理鉴权失败：识别 401/403、展示节流提示，并在 refresh 成功后执行 retryBlock。
+/// 同时检查业务响应码和 SDK 放入 NSError 的 HTTP 响应/原始 JSON。
+/// HTTP 401 视为鉴权失效；HTTP 403 只有响应体业务码为 4006 时才续期，
+/// 避免把 403/4003 权限不足误判成 Token 过期。
+- (BOOL)shouldAttemptTokenRefreshForCode:(nullable NSNumber *)code
+                                   error:(nullable NSError *)error;
+
+/// 统一处理鉴权失败：展示节流提示，并在 refresh 成功后执行 retryBlock。
 /// 返回 YES 表示当前响应已被会话层接管，调用方应直接 return。
 - (BOOL)handleAuthFailureForCode:(nullable NSNumber *)code
                          message:(nullable NSString *)message
+                      retryBlock:(nullable void(^)(void))retryBlock;
+
+/// error-aware 版本。SDK 遇到非 2xx 时 output 可能为空，调用方必须传入 NSError。
+- (BOOL)handleAuthFailureForCode:(nullable NSNumber *)code
+                         message:(nullable NSString *)message
+                           error:(nullable NSError *)error
                       retryBlock:(nullable void(^)(void))retryBlock;
 
 /// 调用方已完成一次 refresh 重试，但鉴权仍失败时可直接强制结束当前会话并回到登录页。
@@ -82,6 +93,11 @@ extern NSString * const TLWProfileDidUpdateNotification;
 /// Token 续期入口：检测到鉴权失效时调用，自动用 refreshToken 换新 accessToken 后执行 retryBlock。
 /// 若 refreshToken 也已过期则强制跳回登录页。多个并发鉴权失败只发一次刷新请求，其余排队等结果。
 - (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock;
+
+/// 带 refresh 失败回调的续期入口。failureBlock 仅在 refresh 无法恢复会话时执行，
+/// 主动 logout 或会话版本变化导致旧回调被丢弃时不会执行。
+- (void)handleUnauthorizedWithRetry:(nullable void(^)(void))retryBlock
+                            failure:(nullable void(^)(void))failureBlock;
 
 @end
 

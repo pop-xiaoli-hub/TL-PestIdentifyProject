@@ -246,16 +246,16 @@ static NSTimeInterval const kMyPublishedSyncInterval = 5 * 60;
             strongSelf.myPostsTask = nil;
             [strongSelf finishMyPostsLoading];
 
+            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
+                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
+                    [strongSelf fetchMyPostsRemotePage:page force:YES];
+                }];
+                return;
+            }
             if (error || !output) {
                 if (!strongSelf.hasLoadedMyPostsOnce) {
                     [strongSelf.myView showPostsStatusText:@"帖子加载失败，请稍后重试"];
                 }
-                return;
-            }
-            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-                    [strongSelf fetchMyPostsRemotePage:page force:YES];
-                }];
                 return;
             }
             if (output.code.integerValue != 200 || !output.data) {
