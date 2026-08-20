@@ -491,7 +491,7 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
                 if (!s || s.currentAIMessage != aiMessage) return;
                 TLWSessionManager *sessionManager = [TLWSDKManager shared].sessionManager;
                 if (didRetryAuth) {
-                    // 续期成功后第二次又 401：按既有约定走登出，避免死循环
+                    // 续期成功后第二次仍鉴权失败：结束会话，避免死循环。
                     [s tl_stopDeltaFlushTimer];
                     [sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，请重新登录"];
                     aiMessage.status = TLWAIAssistantMessageStatusFailed;
@@ -502,9 +502,19 @@ static BOOL const kAIAssistantEnableInterfaceCompareDebug = YES;
                     [s.myView displayMessages:s.session.messages];
                     return;
                 }
-                // 首次 401：走统一续期，成功后用新 token 重建一次 stream
+                // 首次鉴权失败：走统一续期，成功后用新 token 重建一次 stream。
                 [sessionManager handleUnauthorizedWithRetry:^{
                     if (streamOnce) streamOnce(YES);
+                } failure:^{
+                    __strong typeof(weakSelf) refreshedSelf = weakSelf;
+                    if (!refreshedSelf || refreshedSelf.currentAIMessage != aiMessage) return;
+                    [refreshedSelf tl_stopDeltaFlushTimer];
+                    aiMessage.status = TLWAIAssistantMessageStatusFailed;
+                    aiMessage.text = @"登录已失效，请重新登录";
+                    refreshedSelf.currentAIMessage = nil;
+                    refreshedSelf.streamClient = nil;
+                    [refreshedSelf.myView exitAILoadingMode];
+                    [refreshedSelf.myView displayMessages:refreshedSelf.session.messages];
                 }];
             };
 

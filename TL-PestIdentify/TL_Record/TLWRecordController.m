@@ -151,17 +151,17 @@ static NSString *const kHeaderID = @"TLWRecordHeader";
             __strong typeof(weakSelf) self = weakSelf;
             if (!self) return;
 
+            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
+                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
+                    [self tl_fetchRecords];
+                }];
+                return;
+            }
             if (error) {
                 [self tl_setLoading:NO];
                 [TLWToast show:@"加载识别记录失败"];
                 self.sections = @[];
                 [self tl_reloadData];
-                return;
-            }
-            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-                    [self tl_fetchRecords];
-                }];
                 return;
             }
             if (output.code.integerValue != 200) {

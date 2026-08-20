@@ -183,7 +183,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
             strongSelf.avatarUploadTask = nil;
 
             if (error || output.code.integerValue != 200 || output.data.length == 0) {
-                if (!error && !didRetryAuth && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                if (!didRetryAuth && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [strongSelf tl_uploadAvatarFile:fileURL didRetryAuth:YES];
                     }];
@@ -211,7 +211,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
             strongSelf.avatarProfileUpdateTask = nil;
 
             if (err || res.code.integerValue != 200) {
-                if (!err && !didRetryAuth && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:res.code]) {
+                if (!didRetryAuth && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:res.code error:err]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [strongSelf tl_updateAvatarProfileURL:avatarURL didRetryAuth:YES];
                     }];

@@ -313,6 +313,7 @@
           if (!didRetryAuth
               && [manager.sessionManager handleAuthFailureForCode:output.code
                                                          message:output.message
+                                                           error:error
                                                       retryBlock:^{
             dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
               updateBlock(YES);
@@ -448,6 +449,7 @@
           if (!didRetryAuth
               && [manager.sessionManager handleAuthFailureForCode:output.code
                                                          message:output.message
+                                                           error:error
                                                       retryBlock:^{
             updateCropBlock(imageURL, YES);
           }]) {
@@ -482,6 +484,7 @@
           if (!didRetryAuth
               && [manager.sessionManager handleAuthFailureForCode:output.code
                                                          message:output.message
+                                                           error:error
                                                       retryBlock:^{
             uploadBlock(YES);
           }]) {
@@ -554,15 +557,14 @@
       }
 
       strongSelf.tagRequestInFlight = NO;
-      if (error) {
-        [strongSelf tl_showMessage:error.localizedDescription ?: @"标签同步失败"];
-        return;
-      }
-
-      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
         [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
           [strongSelf tl_submitCultivationTagWithStatus:status content:content tagType:tagType];
         }];
+        return;
+      }
+      if (error) {
+        [strongSelf tl_showMessage:error.localizedDescription ?: @"标签同步失败"];
         return;
       }
 
@@ -590,15 +592,14 @@
         return;
       }
 
-      if (error) {
-        NSLog(@"[PlantDetail] getCropDetail error: %@", error);
-        return;
-      }
-
-      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
         [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
           [strongSelf tl_fetchCropDetailAndRefreshCalendar];
         }];
+        return;
+      }
+      if (error) {
+        NSLog(@"[PlantDetail] getCropDetail error: %@", error);
         return;
       }
 

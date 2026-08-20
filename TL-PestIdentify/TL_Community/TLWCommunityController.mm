@@ -375,7 +375,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       if (!strongSelf) return;
 
       if (error || !output || output.code.integerValue != 200 || !output.data) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_reloadPostWithId:postId];
           }];
@@ -449,7 +449,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       strongSelf.isSearchingPosts = NO;
 
       if (error || !output || output.code.integerValue != 200 || !output.data) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           //鉴权过期失败重试
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_executeSearchWithQuery:trimmedQuery];
@@ -710,7 +710,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       }
 
       if (error || !output || output.code.integerValue != 200) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_requestSuggestionsForQuery:query];
           }];
@@ -825,7 +825,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       dispatch_async(dispatch_get_main_queue(), ^{
         NSLog(@"5");
         if (output.code.integerValue != 200) {
-          if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+          if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
             [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
               [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *r, NSError *e) {
                 dispatch_async(dispatch_get_main_queue(), ^{

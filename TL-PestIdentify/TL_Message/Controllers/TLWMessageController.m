@@ -140,7 +140,7 @@ static NSInteger const kMessagePageSize = 20;
             self.myView.tableView.tableFooterView = nil;
 
             if (error || output.code.integerValue != 200) {
-                if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self fetchMessagesPage:page reset:reset]; }];
                     return;
                 }
@@ -355,7 +355,7 @@ static NSInteger const kMessagePageSize = 20;
             item.hasUnread = YES;
             [self tl_reloadMessageRowForMessageId:messageId preferredIndexPath:indexPath];
 
-            if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
                 [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self tl_markMessageAsReadForItem:item preferredIndexPath:indexPath]; }];
             }
         });
@@ -419,6 +419,7 @@ static NSInteger const kMessagePageSize = 20;
             if (!didRetryAuth
                 && [manager.sessionManager handleAuthFailureForCode:output.code
                                                              message:output.message
+                                                               error:error
                                                           retryBlock:^{
                 dispatch_group_enter(group);
                 [self tl_fillMissingPostImageForPostId:postId
@@ -430,7 +431,7 @@ static NSInteger const kMessagePageSize = 20;
                 return;
             }
 
-            if (didRetryAuth && [manager.sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+            if (didRetryAuth && [manager.sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
                 [manager.sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
                 dispatch_group_leave(group);
                 return;

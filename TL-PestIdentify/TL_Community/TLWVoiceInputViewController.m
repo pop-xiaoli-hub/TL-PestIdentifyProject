@@ -122,7 +122,7 @@
       strongSelf.isSearching = NO;
 
       if (error || !output || output.code.integerValue != 200 || !output.data) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf tl_executeSearch];
           }];

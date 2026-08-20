@@ -355,7 +355,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       self.tableView.tableFooterView = nil;
 
       if (error || !output || output.code.integerValue != 200) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [self fetchCommentsPage:page];
           }];
@@ -424,7 +424,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       self.isLoadingDetail = NO;
 
       if (error || !output || output.code.integerValue != 200) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [self fetchPostDetail];
           }];
@@ -527,7 +527,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
     dispatch_async(dispatch_get_main_queue(), ^{
       self.sendButton.enabled = YES;
       if (error || !output || output.code.integerValue != 200) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [self sendComment];
           }];
@@ -658,7 +658,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       if (!strongSelf) return;
       sender.enabled = YES;
       if (error || !output || output.code.integerValue != 200) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf submitCollectTargetState:shouldCollect
                                    previousState:previousState
@@ -714,7 +714,7 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
       if (!strongSelf) return;
       sender.enabled = YES;
       if (error || !output || output.code.integerValue != 200) {
-        if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
             [strongSelf submitLikeTargetState:shouldLike
                                 previousState:previousState

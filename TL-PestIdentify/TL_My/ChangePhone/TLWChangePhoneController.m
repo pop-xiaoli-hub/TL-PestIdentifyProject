@@ -90,16 +90,16 @@
     req.phone = phone;
     [[TLWSDKManager shared].api sendSmsCodeWithSendSmsRequest:req completionHandler:^(AGResultVoid *output, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
+            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
+                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self onSendCode]; }];
+                return;
+            }
             if (error) {
                 self.myView.sendCodeButton.enabled = YES;
                 [self showAlert:error.localizedDescription];
                 return;
             }
             if (output.code.integerValue != 200) {
-                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self onSendCode]; }];
-                    return;
-                }
                 self.myView.sendCodeButton.enabled = YES;
                 [self showAlert:output.message ?: @"发送失败"];
                 return;
@@ -151,16 +151,12 @@
         dispatch_async(dispatch_get_main_queue(), ^{
             self.myView.confirmButton.userInteractionEnabled = YES;
 
-            if (error) {
-                [self showAlert:error.localizedDescription];
+            if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
+                [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
                 return;
             }
-            if (output.code.integerValue != 200) {
-                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
-                    [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{ [self onConfirm]; }];
-                    return;
-                }
-                [self showAlert:output.message ?: @"换绑失败"];
+            if (error || output.code.integerValue != 200) {
+                [self showAlert:error.localizedDescription ?: output.message ?: @"换绑失败"];
                 return;
             }
 

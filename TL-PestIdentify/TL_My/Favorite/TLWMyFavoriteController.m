@@ -190,7 +190,7 @@ static NSTimeInterval const kFavoriteSyncInterval = 5 * 60;
             [self finishRemoteLoading];
 
             if (error || !output || output.code.integerValue != 200) {
-                if (!error && [[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+                if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
                     [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
                         [self fetchRemotePage:page force:YES];
                     }];

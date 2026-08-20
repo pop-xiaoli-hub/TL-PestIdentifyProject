@@ -44,6 +44,12 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
 @property (nonatomic, strong, readwrite) AGApiService *api;
 @property (nonatomic, strong, readwrite) TLWSessionManager *sessionManager;
 @property (nonatomic, strong, readwrite) NSArray<AGPostResponseDto *> *cachedFavoritedPosts;
+
+- (nullable NSURLSessionTask *)tl_uploadFileURLs:(NSArray<NSURL *> *)fileURLs
+                                          prefix:(NSString *)prefix
+                                    didRetryAuth:(BOOL)didRetryAuth
+                                      completion:(void(^)(NSArray<NSString *> * _Nullable urls,
+                                                          NSError * _Nullable error))completion;
 @end
 
 @implementation TLWSDKManager
@@ -118,8 +124,8 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
   if (!images.count) {
     if (completion) {
       completion(@[], nil);
-      return nil;
     }
+    return nil;
   }
   NSMutableArray<NSURL* >* fileURLS = [NSMutableArray array];
   NSMutableArray<NSString* >* tempPaths = [NSMutableArray array];
@@ -146,39 +152,61 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
   if (fileURLS.count == 0) {
     if (completion) {
       completion(nil, [NSError errorWithDomain:@"upload" code:-1 userInfo:@{NSLocalizedDescriptionKey:@"no valid images"}]);
-      return nil;
     }
+    return nil;
   }
   //调用 SDK 接口上传图片，拿到远端 url
   CFAbsoluteTime uploadT0 = TLWPerfTick();
   NSUInteger uploadCount = fileURLS.count;
-  return [[TLWSDKManager shared].api uploadFilesWithFiles:fileURLS prefix:prefix completionHandler:^(AGResultListString *output, NSError *error) {
+  return [self tl_uploadFileURLs:fileURLS prefix:prefix didRetryAuth:NO completion:^(NSArray<NSString *> *urls, NSError *error) {
+    for (NSString *temp in tempPaths) {
+      [[NSFileManager defaultManager] removeItemAtPath:temp error:nil];
+    }
+    TLWPerfLog(@"upload images count=%lu cost=%.0fms err=%@",
+               (unsigned long)uploadCount, TLWPerfMs(uploadT0), error.localizedDescription ?: @"-");
+    if (completion) completion(urls, error);
+  }];
+}
+
+- (NSURLSessionTask *)tl_uploadFileURLs:(NSArray<NSURL *> *)fileURLs
+                                  prefix:(NSString *)prefix
+                            didRetryAuth:(BOOL)didRetryAuth
+                              completion:(void(^)(NSArray<NSString *> *urls, NSError *error))completion {
+  __weak typeof(self) weakSelf = self;
+  return [self.api uploadFilesWithFiles:fileURLs prefix:prefix completionHandler:^(AGResultListString *output, NSError *error) {
     dispatch_async(dispatch_get_main_queue(), ^{
-      //删除临时文件
-      for (NSString* temp in tempPaths) {
-        [[NSFileManager defaultManager] removeItemAtPath:temp error:nil];
+      __strong typeof(weakSelf) strongSelf = weakSelf;
+      if (!strongSelf) return;
+
+      BOOL authFailure = [strongSelf.sessionManager shouldAttemptTokenRefreshForCode:output.code error:error];
+      if (authFailure && !didRetryAuth) {
+        NSError *authError = error ?: [NSError errorWithDomain:@"TLWAuth"
+                                                          code:output.code.integerValue
+                                                      userInfo:@{NSLocalizedDescriptionKey: output.message ?: @"登录状态已失效"}];
+        [strongSelf.sessionManager handleUnauthorizedWithRetry:^{
+          [strongSelf tl_uploadFileURLs:fileURLs prefix:prefix didRetryAuth:YES completion:completion];
+        } failure:^{
+          if (completion) completion(nil, authError);
+        }];
+        return;
       }
-      TLWPerfLog(@"upload images count=%lu cost=%.0fms err=%@",
-                 (unsigned long)uploadCount, TLWPerfMs(uploadT0), error.localizedDescription ?: @"-");
+      if (authFailure) {
+        [strongSelf.sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
+      }
       if (error) {
-        if (completion) {
-          completion(nil, error);
-          return;
-        }
+        if (completion) completion(nil, error);
+        return;
       }
-      //服务器返回200，成功
-      if (output.code && output.code.integerValue == 200) {
-        NSArray<NSString *> *urls = output.data ?: @[];
-        if (completion) {
-          completion(urls, nil);
-        }
-      } else {
-        NSString *msg = output.message ?: @"upload failed";
-        NSError *e = [NSError errorWithDomain:@"upload" code:output.code.integerValue userInfo:@{NSLocalizedDescriptionKey: msg}];
-        if (completion) {
-          completion(nil, e);
-        }
+      if (output.code.integerValue == 200) {
+        if (completion) completion(output.data ?: @[], nil);
+        return;
       }
+
+      NSString *message = output.message ?: @"upload failed";
+      NSError *responseError = [NSError errorWithDomain:@"upload"
+                                                   code:output.code.integerValue
+                                               userInfo:@{NSLocalizedDescriptionKey: message}];
+      if (completion) completion(nil, responseError);
     });
   }];
 }
@@ -262,7 +290,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
       if (!s) return;
 
       if (error || !output || output.code.integerValue != 200) {
-        if (!error && [s.sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if ([s.sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [s.sessionManager handleUnauthorizedWithRetry:^{
             fetchPageBlock(pageIndex);
           }];
@@ -411,6 +439,7 @@ static BOOL TLWQWeatherHostRequiresDedicatedHost(NSString *host) {
       if (!didRetryAuth
           && [strongSelf.sessionManager handleAuthFailureForCode:output.code
                                                          message:output.message
+                                                           error:error
                                                       retryBlock:^{
         performRequest(YES);
       }]) {

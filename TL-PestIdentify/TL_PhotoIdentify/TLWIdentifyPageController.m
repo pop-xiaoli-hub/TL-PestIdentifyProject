@@ -412,6 +412,7 @@ static BOOL const TLWIdentifyEnableProfileProbe = YES;
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:chatOutput.code
                                                        message:chatOutput.message
+                                                         error:chatError
                                                     retryBlock:^{
           performCloudIdentify(YES);
         }]) {

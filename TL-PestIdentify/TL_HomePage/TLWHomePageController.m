@@ -219,13 +219,14 @@ extern NSString * const TLWProfileDidUpdateNotification;
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:output.code
                                                        message:output.message
+                                                         error:error
                                                     retryBlock:^{
           fetchAlertBlock(YES);
         }]) {
           return;
         }
 
-        if (didRetryAuth && [manager.sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+        if (didRetryAuth && [manager.sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
           [manager.sessionManager invalidateSessionWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
           return;
         }
@@ -263,14 +264,14 @@ extern NSString * const TLWProfileDidUpdateNotification;
       __strong typeof(weakSelf) strongSelf = weakSelf;
       if (!strongSelf) return;
 
-      if (error) {
-        [strongSelf.homePageView.tableView reloadData];
-        return;
-      }
-      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code]) {
+      if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
         [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
           [strongSelf tl_fetchHistoryRecordCount];
         }];
+        return;
+      }
+      if (error) {
+        [strongSelf.homePageView.tableView reloadData];
         return;
       }
       if (output.code.integerValue != 200) {
@@ -795,6 +796,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:output.code
                                                        message:output.message
+                                                         error:error
                                                     retryBlock:^{
           fetchCropsBlock(YES);
         }]) {
@@ -884,6 +886,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
       if (!didRetryAuth
           && [manager.sessionManager handleAuthFailureForCode:output.code
                                                      message:output.message
+                                                       error:error
                                                   retryBlock:^{
         [strongSelf tl_deletePlantModel:plantModel didRetryAuth:YES];
       }]) {
@@ -955,6 +958,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:output.code
                                                        message:output.message
+                                                         error:error
                                                     retryBlock:^{
           createCropBlock(imageURL, YES);
         }]) {
@@ -993,6 +997,7 @@ extern NSString * const TLWProfileDidUpdateNotification;
         if (!didRetryAuth
             && [manager.sessionManager handleAuthFailureForCode:output.code
                                                        message:output.message
+                                                         error:error
                                                     retryBlock:^{
           uploadBlock(YES);
         }]) {
