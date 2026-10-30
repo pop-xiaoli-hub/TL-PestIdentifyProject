@@ -193,6 +193,14 @@
   post.isLiked = dto.isLiked.boolValue;
   post.isCollected = dto.isFavorited.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
+  id imageSizes = [dto respondsToSelector:NSSelectorFromString(@"imageSizes")] ? [dto valueForKey:@"imageSizes"] : nil;
+  id coverSize = [imageSizes isKindOfClass:[NSArray class]] ? [imageSizes firstObject] : nil;
+  if ([coverSize respondsToSelector:NSSelectorFromString(@"width")] &&
+      [coverSize respondsToSelector:NSSelectorFromString(@"height")]) {
+    NSNumber *width = [coverSize valueForKey:@"width"];
+    NSNumber *height = [coverSize valueForKey:@"height"];
+    [post applyCoverAspectRatioWithWidth:width.doubleValue height:height.doubleValue];
+  }
   return post;
 }
 

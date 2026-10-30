@@ -19,9 +19,6 @@
 @property (nonatomic, strong) UILabel *userLabel;
 @property (nonatomic, strong) UIImageView *likeIconView;
 @property (nonatomic, strong) UILabel *likeLabel;
-/// 本地发布中的毛玻璃遮罩（叠在 photoView 顶部）
-@property (nonatomic, strong) UIVisualEffectView *pendingBlurView;
-@property (nonatomic, strong) UILabel *pendingLabel;
 
 @end
 
@@ -80,7 +77,6 @@
   self.titleLabel.text = nil;
   self.userLabel.text = nil;
   self.likeLabel.text = nil;
-  self.pendingBlurView.hidden = YES;
 }
 
 - (void)setupSubviews {
@@ -164,46 +160,6 @@
     make.centerY.equalTo(self.avatarView);
   }];
 
-  // 本地发布中的毛玻璃遮罩，叠在整个 cell 顶部，默认隐藏
-  UIBlurEffect *pendingBlur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterialLight];
-  self.pendingBlurView = [[UIVisualEffectView alloc] initWithEffect:pendingBlur];
-  self.pendingBlurView.layer.cornerRadius = 14.0;
-  self.pendingBlurView.layer.masksToBounds = YES;
-  self.pendingBlurView.hidden = YES;
-  [self.contentView addSubview:self.pendingBlurView];
-  [self.pendingBlurView mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.edges.equalTo(self.contentView);
-  }];
-
-  // 遮罩上的「发布中」旋转 loading + 文字
-  UIImage *loadingImage = [UIImage imageNamed:@"Ip_load"];
-  UIImageView *loadingIV = [[UIImageView alloc] initWithImage:loadingImage];
-  loadingIV.contentMode = UIViewContentModeScaleAspectFit;
-  [self.pendingBlurView.contentView addSubview:loadingIV];
-
-  CABasicAnimation *rotation = [CABasicAnimation animationWithKeyPath:@"transform.rotation.z"];
-  rotation.fromValue = @(0);
-  rotation.toValue = @(M_PI * 2);
-  rotation.duration = 1.0;
-  rotation.repeatCount = HUGE_VALF;
-  rotation.removedOnCompletion = NO;
-  [loadingIV.layer addAnimation:rotation forKey:@"tl_loading_rotate"];
-
-  self.pendingLabel = [[UILabel alloc] init];
-  self.pendingLabel.text = @"发布中...";
-  self.pendingLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightMedium];
-  self.pendingLabel.textColor = [UIColor colorWithWhite:0.15 alpha:1.0];
-  [self.pendingBlurView.contentView addSubview:self.pendingLabel];
-
-  [loadingIV mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.centerX.equalTo(self.pendingBlurView);
-    make.centerY.equalTo(self.pendingBlurView).offset(-10);
-    make.width.height.mas_equalTo(30);
-  }];
-  [self.pendingLabel mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.centerX.equalTo(self.pendingBlurView);
-    make.top.equalTo(loadingIV.mas_bottom).offset(6);
-  }];
 }
 
 - (void)setElderModeEnabled:(BOOL)elderModeEnabled {
@@ -211,7 +167,6 @@
 
   self.contentView.layer.cornerRadius = elderModeEnabled ? 22.0 : 14.0;
   self.backgroundBlurView.layer.cornerRadius = elderModeEnabled ? 22.0 : 14.0;
-  self.pendingBlurView.layer.cornerRadius = elderModeEnabled ? 22.0 : 14.0;
 
   self.backgroundBlurView.effect = elderModeEnabled ? nil : [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialLight];
   self.backgroundBlurView.backgroundColor = elderModeEnabled
@@ -236,8 +191,6 @@
   self.avatarView.layer.cornerRadius = elderModeEnabled ? 18.0 : 10.0;
   self.likeIconView.hidden = elderModeEnabled;
   self.likeLabel.hidden = elderModeEnabled;
-  self.pendingLabel.font = [UIFont systemFontOfSize:(elderModeEnabled ? 14.0 : 12.0)
-                                             weight:UIFontWeightMedium];
 
   [self.avatarView mas_updateConstraints:^(MASConstraintMaker *make) {
     make.width.height.mas_equalTo(elderModeEnabled ? 36.0 : 20.0);
@@ -306,8 +259,6 @@
   self.likeLabel.text = [NSString stringWithFormat:@"%@", post.likeCount];
   [self setElderModeEnabled:self.elderModeEnabled];
 
-  // 本地发布中：显示毛玻璃遮罩；上传完成后隐藏
-  self.pendingBlurView.hidden = !post.isLocalPending;
 }
 
 @end

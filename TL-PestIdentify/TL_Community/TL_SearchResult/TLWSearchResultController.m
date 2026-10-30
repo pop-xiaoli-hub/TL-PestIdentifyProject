@@ -68,7 +68,19 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
   post.isLiked = dto.isLiked.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
   post.createdAt = dto.createdAt;
+
+  id imageSizes = [dto respondsToSelector:NSSelectorFromString(@"imageSizes")] ? [dto valueForKey:@"imageSizes"] : nil;
+  id coverSize = [imageSizes isKindOfClass:[NSArray class]] ? [imageSizes firstObject] : nil;
+  NSNumber *coverWidth = [coverSize respondsToSelector:NSSelectorFromString(@"width")] ? [coverSize valueForKey:@"width"] : nil;
+  NSNumber *coverHeight = [coverSize respondsToSelector:NSSelectorFromString(@"height")] ? [coverSize valueForKey:@"height"] : nil;
+  [post applyCoverAspectRatioWithWidth:coverWidth.doubleValue height:coverHeight.doubleValue];
   return post;
+}
+
+- (void)tl_applyFallbackAspectRatioToPost:(TLWCommunityPost *)post atIndex:(NSInteger)index {
+  if (post.imageAspectRatio <= 0.0) {
+    post.imageAspectRatio = index == 0 ? 0.60 : 0.75;
+  }
 }
 
 - (void)tl_reloadPostWithId:(NSNumber *)postId {
@@ -107,8 +119,9 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
 
       TLWCommunityPost *updatedPost = [strongSelf tl_postFromDto:output.data];
       TLWCommunityPost *oldPost = strongSelf.posts[targetIndex];
-      updatedPost.imageAspectRatio = oldPost.imageAspectRatio;
-      updatedPost.isLocalPending = oldPost.isLocalPending;
+      if (updatedPost.imageAspectRatio <= 0.0) {
+        updatedPost.imageAspectRatio = oldPost.imageAspectRatio;
+      }
       strongSelf.posts[targetIndex] = updatedPost;
 
       [strongSelf.myView tl_setEmptyHidden:(strongSelf.posts.count > 0)];
@@ -135,7 +148,7 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
 - (__kindof UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
   TLWCommunityCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:kSearchResultCellID forIndexPath:indexPath];
   TLWCommunityPost *post = self.posts[indexPath.item];
-  post.imageAspectRatio = 0.75;
+  [self tl_applyFallbackAspectRatioToPost:post atIndex:indexPath.item];
   [cell configureWithPost:post];
   return cell;
 }
@@ -166,9 +179,9 @@ static NSString *const kSearchResultCellID = @"TLWSearchResultCell";
 
 #pragma mark - TLWCommunityWaterfallLayoutDelegate
 
-- (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout heightForItemAtIndexPath:(NSIndexPath *)indexPath itemWidth:(CGFloat)width {
+- (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionView *)layout heightForItemAtIndexPath:(NSIndexPath *)indexPath itemWidth:(CGFloat)width {
   TLWCommunityPost *post = self.posts[indexPath.item];
-  post.imageAspectRatio = 0.75;
+  [self tl_applyFallbackAspectRatioToPost:post atIndex:indexPath.item];
   return [post cellHeightForWidth:width];
 }
 

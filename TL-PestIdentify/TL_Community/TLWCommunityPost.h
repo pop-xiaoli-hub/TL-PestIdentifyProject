@@ -37,9 +37,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) NSDate *createdAt;
 /// 图片纵横比（高度 / 宽度），用于计算瀑布流高度
 @property (nonatomic, assign) CGFloat imageAspectRatio;
+/// 用封面像素尺寸写入高宽比。宽或高无效时不改现有值。
+- (BOOL)applyCoverAspectRatioWithWidth:(CGFloat)width height:(CGFloat)height;
 
-/// 是否为本地发布中（尚未上传成功）的帖子，显示毛玻璃遮罩
-@property (nonatomic, assign) BOOL isLocalPending;
+
 
 @property (nonatomic, copy) NSArray *picUrls;
 

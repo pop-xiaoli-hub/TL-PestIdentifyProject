@@ -12,6 +12,7 @@
 #import "TLWCommunityPost.h"
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
+#import "TLWDBManager.h"
 
 static NSString * const kTLWPublishContentPlaceholder = @"点击输入您要发布的内容";
 
@@ -21,6 +22,8 @@ static NSString * const kTLWPublishContentPlaceholder = @"点击输入您要发�
 @property (nonatomic, strong, nullable) id draftObject;
 @property (nonatomic, strong) NSMutableArray<UIImage *> *selectedImages;
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedCrops;
+@property (nonatomic, assign) BOOL publishing;
+@property (nonatomic, assign) NSUInteger publishGeneration;
 
 @end
 
@@ -65,6 +68,12 @@ static NSString * const kTLWPublishContentPlaceholder = @"点击输入您要发�
   if (self.draftObject) {
     [self tl_applyDraftIfNeeded];
   }
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+  [super viewDidDisappear:animated];
+  self.publishGeneration += 1;
+  [self tl_setPublishing:NO];
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch {
@@ -232,6 +241,7 @@ static NSString * const kTLWPublishContentPlaceholder = @"点击输入您要发�
 
 /// 返回按钮点击：默认直接关闭当前控制器，外部可根据需要替换为自定义路由
 - (void)tl_backButtonTapped {
+  if (self.publishing) return;
   if (self.navigationController) {
     [self.navigationController popViewControllerAnimated:YES];
   } else {
@@ -283,6 +293,7 @@ static NSString * const kTLWPublishContentPlaceholder = @"点击输入您要发�
 
 #pragma mark-点击发布
 - (void)tl_confirmPublishTapped {
+  if (self.publishing) return;
   NSString *title = [self.myView.titleTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
   NSString* content = [self.myView.contentTextView.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
   BOOL hasValidContent = content.length > 0 && ![content isEqualToString:kTLWPublishContentPlaceholder];
@@ -307,44 +318,116 @@ static NSString * const kTLWPublishContentPlaceholder = @"点击输入您要发�
     return;
   }
 
-  TLWCommunityPost* post = [[TLWCommunityPost alloc] init];
-  TLWSDKManager* manager = [TLWSDKManager shared];
-  AGUserProfileDto* userData = manager.sessionManager.cachedProfile;
-  post.images = [NSArray arrayWithArray:self.selectedImages];
-  post.authorName = [userData.username copy];
-  post.title = [title copy];
-  post.content = [content copy];
-  post.authorAvatar = [userData.avatarUrl copy];
-
-  if (self.clickPublish) {
-    self.clickPublish(post);
-  }
-  NSDictionary* userInfo = @{
-    @"images" : self.selectedImages,
-    @"crops" : self.selectedCrops,
-    @"title" : title,
-    @"content" : content
-  };
-  [[NSNotificationCenter defaultCenter] postNotificationName:@"updatePost" object:self userInfo:userInfo];
-  UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:@"发布成功" preferredStyle:UIAlertControllerStyleAlert];
-  [alert addAction:[UIAlertAction actionWithTitle:@"确认" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-    [self dismissViewControllerAnimated:YES completion:nil];
-  }]];
-  [self presentViewController:alert animated:YES completion:nil];
+  NSArray<UIImage *> *images = [self.selectedImages copy];
+  AGPostCreateRequest *request = [AGPostCreateRequest new];
+  request.title = title;
+  request.content = content;
+  request.tags = [self.selectedCrops copy];
+  NSUInteger generation = ++self.publishGeneration;
+  [self.view endEditing:YES];
+  [self tl_setPublishing:YES];
+  __weak typeof(self) weakSelf = self;
+  [[TLWSDKManager shared] uploadImages:images prefix:@"post" completion:^(NSArray<NSString *> *urls, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) self = weakSelf;
+      if (!self || generation != self.publishGeneration || !self.publishing) return;
+      if (error || urls.count != images.count) {
+        [self tl_failPublish:error.localizedDescription ?: @"图片上传失败，当前输入已保留" generation:generation];
+        return;
+      }
+      request.images = urls;
+      [self tl_createPost:request images:images generation:generation didRetryAuth:NO];
+    });
+  }];
 }
 
-- (void)updatePostToService:(AGPostCreateRequest* )request {
+- (void)tl_setPublishing:(BOOL)publishing {
+  self.publishing = publishing;
+  self.modalInPresentation = publishing;
+  self.myView.confirmPublishButton.enabled = !publishing;
+  self.myView.backButton.enabled = !publishing;
+  self.myView.titleTextField.enabled = !publishing;
+  self.myView.contentTextView.editable = !publishing;
+  self.myView.addImageButton.enabled = !publishing;
+  self.myView.cropSelectButton.enabled = !publishing;
+  self.myView.imagesCollectionView.userInteractionEnabled = !publishing;
+  self.myView.cropsCollectionView.userInteractionEnabled = !publishing;
+  if (publishing) [self.myView tl_createBlurLoadingView];
+  else [self.myView tl_dismissBlurLoadingView];
+}
 
+- (void)tl_failPublish:(NSString *)message generation:(NSUInteger)generation {
+  if (generation != self.publishGeneration || !self.publishing) return;
+  [self tl_setPublishing:NO];
+  [TLWToast show:message];
+}
+
+- (void)tl_createPost:(AGPostCreateRequest *)request
+              images:(NSArray<UIImage *> *)images
+          generation:(NSUInteger)generation
+        didRetryAuth:(BOOL)didRetryAuth {
+  __weak typeof(self) weakSelf = self;
+  TLWSDKManager *manager = [TLWSDKManager shared];
+  [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      __strong typeof(weakSelf) self = weakSelf;
+      if (!self || generation != self.publishGeneration || !self.publishing) return;
+      if (!didRetryAuth && [manager.sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
+        [manager.sessionManager handleUnauthorizedWithRetry:^{
+          __strong typeof(weakSelf) owner = weakSelf;
+          if (owner.publishing && generation == owner.publishGeneration)
+            [owner tl_createPost:request images:images generation:generation didRetryAuth:YES];
+        } failure:^{
+          [weakSelf tl_failPublish:@"登录状态恢复失败，当前输入已保留" generation:generation];
+        }];
+        return;
+      }
+      AGPostResponseDto *dto = output.data;
+      if (error || output.code.integerValue != 200 || dto._id.longLongValue <= 0) {
+        BOOL unknownResult = [error.domain isEqualToString:NSURLErrorDomain] &&
+          (error.code == NSURLErrorTimedOut || error.code == NSURLErrorNetworkConnectionLost);
+        NSString *message = unknownResult ? @"发布结果暂未确认，请先到“我的发布”核实后再重试；当前输入已保留" :
+          (output.message.length ? output.message : @"发布未成功，当前输入已保留");
+        [self tl_failPublish:message generation:generation];
+        return;
+      }
+      dto.title = dto.title ?: request.title;
+      dto.content = dto.content ?: request.content;
+      dto.images = dto.images.count ? dto.images : request.images;
+      dto.tags = dto.tags ?: request.tags;
+      dto.authorName = dto.authorName ?: manager.sessionManager.cachedProfile.username;
+      dto.authorAvatar = dto.authorAvatar ?: manager.sessionManager.cachedProfile.avatarUrl;
+      dto.likeCount = dto.likeCount ?: @0;
+      dto.favoriteCount = dto.favoriteCount ?: @0;
+      BOOL cached = [[TLWDBManager shared] upsertMyPublishedPostFromDto:dto];
+      TLWCommunityPost *post = [TLWCommunityPost new];
+      post._id = dto._id;
+      post.title = dto.title;
+      post.content = dto.content;
+      post.images = dto.images;
+      post.tags = dto.tags;
+      post.authorName = dto.authorName;
+      post.authorAvatar = dto.authorAvatar;
+      post.likeCount = dto.likeCount;
+      post.favoriteCount = dto.favoriteCount;
+      post.isLiked = dto.isLiked.boolValue;
+      post.isCollected = dto.isFavorited.boolValue;
+      post.createdAt = dto.createdAt;
+      UIImage *cover = images.firstObject;
+      [post applyCoverAspectRatioWithWidth:cover.size.width height:cover.size.height];
+      // 先结束本次回调资格，避免同一完成回调重复插入；关闭动画期间仍禁用发布。
+      self.publishGeneration += 1;
+      [self.myView tl_dismissBlurLoadingView];
+      if (self.onPublished) self.onPublished(post);
+      [TLWToast show:cached ? @"发布成功" : @"发布成功，本地记录稍后刷新"];
+      if (self.navigationController && !self.presentingViewController)
+        [self.navigationController popViewControllerAnimated:YES];
+      else [self dismissViewControllerAnimated:YES completion:nil];
+    });
+  }];
 }
 
 
 
 
 @end
-
-/*
-
- -(NSURLSessionTask*) uploadFilesWithFiles: (NSArray<NSURL*>*) files
-     prefix: (NSString*) prefix
-     completionHandler: (void (^)(AGResultListString* output, NSError* error)) handler;
- */

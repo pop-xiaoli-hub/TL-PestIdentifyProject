@@ -15,6 +15,7 @@
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
 #import <Masonry/Masonry.h>
+#import <SDWebImage/SDWebImagePrefetcher.h>
 #import "TLWDBManager.h"
 #import "TLWCommunitySuggestionCell.h"
 #import "TLWLoadingIndicator.h"
@@ -23,7 +24,7 @@ static NSString *const kCommunitySuggestionCellID = @"TLWCommunitySuggestionCell
 static NSInteger const kCommunityFeedPageSize = 20;
 static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
-@interface TLWCommunityController () <UICollectionViewDataSource, UICollectionViewDelegate, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate, UITableViewDataSource, UITableViewDelegate>
+@interface TLWCommunityController () <UICollectionViewDataSource, UICollectionViewDelegate, UICollectionViewDataSourcePrefetching, TLWCommunityWaterfallLayoutDelegate, UITextFieldDelegate, UITableViewDataSource, UITableViewDelegate>
 
 @property (nonatomic, strong) TLWCommunityView *myView;
 @property (nonatomic, strong) NSMutableArray *posts;
@@ -45,7 +46,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 @property (nonatomic, assign) BOOL isSearchingPosts;
 @property (nonatomic, assign) BOOL tl_isLoadingFavorited;
 @property (nonatomic, strong) NSDate *tl_lastFavoritedFetchTime;
-- (void)tl_cachePublishedPostFromDto:(AGPostResponseDto *)dto request:(AGPostCreateRequest *)request imageUrls:(NSArray<NSString *> *)imageUrls;
+@property (nonatomic, strong) NSMutableDictionary<NSURL *, SDWebImagePrefetchToken *> *communityImagePrefetchTokens;
 @end
 
 @implementation TLWCommunityController
@@ -54,6 +55,11 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   [super viewWillAppear:animated];
   [self tl_applyCommunityLayoutStyle];//进行适老化设置判断
   [self tl_resetSearchStateIfNeeded];
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+  [super viewWillDisappear:animated];
+  [self tl_cancelCommunityImagePrefetches];
 }
 
 - (void)viewDidLoad {
@@ -67,6 +73,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   UICollectionView *collectionView = self.myView.collectionView;
   collectionView.dataSource = self;
   collectionView.delegate = self;
+  collectionView.prefetchDataSource = self;
   TLWCommunityWaterfallLayout *layout = (TLWCommunityWaterfallLayout *)collectionView.collectionViewLayout;
   layout.delegate = self;
   [collectionView registerClass:[TLWCommunityCell class] forCellWithReuseIdentifier:kCommunityCellID];
@@ -87,6 +94,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   self.myView.collectionView.refreshControl = refreshControl;
   self.refreshControl = refreshControl;
   self.posts = [NSMutableArray array];
+  self.communityImagePrefetchTokens = [NSMutableDictionary dictionary];
   self.searchSuggestions = [NSMutableArray array];
   self.searchHistoryItems = [NSMutableArray array];
   self.pendingSuggestionQuery = @"";
@@ -100,7 +108,6 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   [self.myView tl_setSearchHistoryItems:self.searchHistoryItems];
   [self tl_applyCommunityLayoutStyle];
   [self tl_fetchCommunityFeed];
-  [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tl_updatePost:) name:@"updatePost" object:nil];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(tl_onFavoritedChanged)
                                                name:TLWFavoritedDidChangeNotification
@@ -116,6 +123,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   [[NSNotificationCenter defaultCenter] removeObserver:self];
   [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(tl_fetchSuggestionsNow:) object:nil];
   [self.suggestionTask cancel];
+  [self tl_cancelCommunityImagePrefetches];
 }
 
 
@@ -257,20 +265,26 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
       }
 
       NSArray<TLWCommunityPost *> *newPosts = [strongSelf tl_postsFromDtoList:output.data.list];
-      NSMutableArray<TLWCommunityPost *> *localPendingPosts = [NSMutableArray array];
-      for (TLWCommunityPost *post in strongSelf.posts) {
-        if (post.isLocalPending) {
-          [localPendingPosts addObject:post];
-        }
-      }
 
+      NSInteger previousCount = strongSelf.posts.count;
       if (nextPage == 0) {
-        strongSelf.posts = [NSMutableArray arrayWithArray:localPendingPosts];
+        [strongSelf.posts removeAllObjects];
+        previousCount = 0;
       }
       [strongSelf.posts addObjectsFromArray:newPosts];
       strongSelf.currentFeedPage = nextPage;
       strongSelf.hasMoreFeed = output.data.hasNext.boolValue;
-      [strongSelf.myView.collectionView reloadData];
+      if (nextPage == 0 || previousCount == 0) {
+        [strongSelf.myView.collectionView reloadData];
+      } else {
+        NSMutableArray<NSIndexPath *> *indexPaths = [NSMutableArray array];
+        for (NSInteger item = previousCount; item < (NSInteger)strongSelf.posts.count; item++) {
+          [indexPaths addObject:[NSIndexPath indexPathForItem:item inSection:0]];
+        }
+        [strongSelf.myView.collectionView performBatchUpdates:^{
+          [strongSelf.myView.collectionView insertItemsAtIndexPaths:indexPaths];
+        } completion:nil];
+      }
     });
   }];
 }
@@ -302,6 +316,14 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   post.isCollected = dto.isFavorited.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
   post.createdAt = dto.createdAt;
+  id imageSizes = [dto respondsToSelector:NSSelectorFromString(@"imageSizes")] ? [dto valueForKey:@"imageSizes"] : nil;
+  id coverSize = [imageSizes isKindOfClass:[NSArray class]] ? [imageSizes firstObject] : nil;
+  if ([coverSize respondsToSelector:NSSelectorFromString(@"width")] &&
+      [coverSize respondsToSelector:NSSelectorFromString(@"height")]) {
+    NSNumber *width = [coverSize valueForKey:@"width"];
+    NSNumber *height = [coverSize valueForKey:@"height"];
+    [post applyCoverAspectRatioWithWidth:width.doubleValue height:height.doubleValue];
+  }
   return post;
 }
 
@@ -400,8 +422,9 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 
       TLWCommunityPost *updatedPost = [strongSelf tl_postFromDto:output.data];
       TLWCommunityPost *oldPost = strongSelf.posts[targetIndex];
-      updatedPost.imageAspectRatio = oldPost.imageAspectRatio;
-      updatedPost.isLocalPending = oldPost.isLocalPending;
+      if (updatedPost.imageAspectRatio <= 0.0) {
+        updatedPost.imageAspectRatio = oldPost.imageAspectRatio;
+      }
       strongSelf.posts[targetIndex] = updatedPost;
 
       NSIndexPath *indexPath = [NSIndexPath indexPathForItem:targetIndex inSection:0];
@@ -516,16 +539,85 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   TLWCommunityCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:kCommunityCellID forIndexPath:indexPath];
   TLWCommunityPost *post = self.posts[indexPath.item];
 
-  if (self.elderModeEnabled) {
-    post.imageAspectRatio = 0.62;
-  } else if (indexPath.row == 0) {
-    post.imageAspectRatio = 0.60;
-  } else {
-    post.imageAspectRatio = 0.75;
+  if (post.imageAspectRatio <= 0.0) {
+    if (self.elderModeEnabled) {
+      post.imageAspectRatio = 0.62;
+    } else if (indexPath.row == 0) {
+      post.imageAspectRatio = 0.60;
+    } else {
+      post.imageAspectRatio = 0.75;
+    }
   }
   cell.elderModeEnabled = self.elderModeEnabled;
   [cell configureWithPost:post];
   return cell;
+}
+
+#pragma mark - UICollectionViewDataSourcePrefetching
+
+- (NSURL *)tl_prefetchURLForPost:(TLWCommunityPost *)post {
+  id firstImage = post.images.firstObject;
+  if (!firstImage || firstImage == [NSNull null] || ![firstImage isKindOfClass:[NSString class]]) {
+    return nil;
+  }
+
+  NSString *urlString = (NSString *)firstImage;
+  if (urlString.length == 0) {
+    return nil;
+  }
+  return [NSURL URLWithString:urlString];
+}
+
+- (void)collectionView:(UICollectionView *)collectionView prefetchItemsAtIndexPaths:(NSArray<NSIndexPath *> *)indexPaths {
+  if (collectionView != self.myView.collectionView) {
+    return;
+  }
+
+  SDWebImagePrefetcher *prefetcher = [SDWebImagePrefetcher sharedImagePrefetcher];
+  for (NSIndexPath *indexPath in indexPaths) {
+    if (indexPath.section != 0 || indexPath.item >= self.posts.count) {
+      continue;
+    }
+
+    TLWCommunityPost *post = self.posts[indexPath.item];
+    NSURL *url = [self tl_prefetchURLForPost:post];
+    if (!url || self.communityImagePrefetchTokens[url]) {
+      continue;
+    }
+
+    SDWebImagePrefetchToken *token = [prefetcher prefetchURLs:@[url]];
+    if (token) {
+      self.communityImagePrefetchTokens[url] = token;
+    }
+  }
+}
+
+- (void)collectionView:(UICollectionView *)collectionView cancelPrefetchingForItemsAtIndexPaths:(NSArray<NSIndexPath *> *)indexPaths {
+  if (collectionView != self.myView.collectionView) {
+    return;
+  }
+
+  for (NSIndexPath *indexPath in indexPaths) {
+    if (indexPath.section != 0 || indexPath.item >= self.posts.count) {
+      continue;
+    }
+
+    NSURL *url = [self tl_prefetchURLForPost:self.posts[indexPath.item]];
+    SDWebImagePrefetchToken *token = url ? self.communityImagePrefetchTokens[url] : nil;
+    if (!token) {
+      continue;
+    }
+
+    [token cancel];
+    [self.communityImagePrefetchTokens removeObjectForKey:url];
+  }
+}
+
+- (void)tl_cancelCommunityImagePrefetches {
+  for (SDWebImagePrefetchToken *token in self.communityImagePrefetchTokens.allValues) {
+    [token cancel];
+  }
+  [self.communityImagePrefetchTokens removeAllObjects];
 }
 
 #pragma mark - UICollectionViewDelegate
@@ -533,8 +625,6 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
   if (indexPath.item >= self.posts.count) return;
   TLWCommunityPost *post = self.posts[indexPath.item];
-  // 本地发布中的帖子禁止点击进入详情
-  if (post.isLocalPending) return;
   TLWPostDetailController *detailVC = [[TLWPostDetailController alloc] init];
   NSLog(@"post:%@", post.content);
   NSLog(@"post.favcount = %@", post.favoriteCount);
@@ -557,12 +647,14 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
 - (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)layout heightForItemAtIndexPath:(NSIndexPath *)indexPath itemWidth:(CGFloat)width {
   TLWCommunityPost *post = self.posts[indexPath.item];
   // 瀑布流高度计算使用的纵横比规则应与 cell 展示保持一致
-  if (self.elderModeEnabled) {
-    post.imageAspectRatio = 0.62;
-  } else if (indexPath.row == 0) {
-    post.imageAspectRatio = 0.60;
-  } else {
-    post.imageAspectRatio = 0.75;
+  if (post.imageAspectRatio <= 0.0) {
+    if (self.elderModeEnabled) {
+      post.imageAspectRatio = 0.62;
+    } else if (indexPath.row == 0) {
+      post.imageAspectRatio = 0.60;
+    } else {
+      post.imageAspectRatio = 0.75;
+    }
   }
   CGFloat cellHeight = [post cellHeightForWidth:width];
   return self.elderModeEnabled ? (cellHeight + 28.0) : cellHeight;
@@ -616,27 +708,26 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   TLWPublishController *vc = [[TLWPublishController alloc] init];
   vc.modalPresentationStyle = UIModalPresentationFullScreen;
   __weak typeof(self) weakSelf = self;
-  // 本地发布直接把 TLWCommunityPost 存入瀑布流数据源
-  vc.clickPublish = ^(TLWCommunityPost * _Nonnull post) {
+  // 仅服务端已确认的帖子进入列表，不再创建无法点击的本地 pending 帖子。
+  vc.onPublished = ^(TLWCommunityPost * _Nonnull post) {
     __strong typeof(weakSelf) strongSelf = weakSelf;
     if (!strongSelf) {
       return;
     }
-    // 本地发布帖子的高度固定，不做真实宽高比计算
+    // 服务端未提供封面尺寸时保留已有比例兜底。
     if (post.imageAspectRatio <= 0.0) {
-      post.imageAspectRatio = 0.65;
+      post.imageAspectRatio = strongSelf.elderModeEnabled ? 0.62 : 0.60;
     }
-    // 标记为本地发布中，cell 顶部会显示毛玻璃遮罩
-    post.isLocalPending = YES;
     // 插入到数组最前面，让新帖子显示在最上方
     [strongSelf.posts insertObject:post atIndex:0];
-    NSLog(@"post.content: %@", post.content);
     NSIndexPath *indexPath = [NSIndexPath indexPathForItem:0 inSection:0];
 
-    // 如果正在分页拉取，分页回调会触发 reloadData；为避免数据源/插入操作冲突，此处兜底全量刷新
+    // 发布前发出的 feed 响应可能不含新帖，淘汰它，避免覆盖刚确认的首项。
     if (strongSelf.tl_isFetchingFeed) {
-      [strongSelf.myView.collectionView reloadData];
-      return;
+      strongSelf.feedRequestToken += 1;
+      strongSelf.tl_isFetchingFeed = NO;
+      [strongSelf.refreshControl endRefreshing];
+      [TLWLoadingIndicator hideInView:strongSelf.myView.collectionView];
     }
 
     // 只插入新增的 1 个 item，并滚动到顶部
@@ -793,169 +884,7 @@ static NSTimeInterval const kCommunityRefreshTimeout = 8.0;
   [self tl_executeSearchWithQuery:text];
 }
 
-- (void)tl_updatePost:(NSNotification* )notification {
-  __weak typeof(self) weakSelf = self;
-  TLWSDKManager* manager = [TLWSDKManager shared];
-  NSDictionary* dict = notification.userInfo;
-  NSString* title = dict[@"title"];
-  NSString* content = dict[@"content"];
-  [manager uploadImages:dict[@"images"] prefix:@"post" completion:^(NSArray<NSString *> * _Nullable urls, NSError * _Nullable error) {
-    __strong typeof(weakSelf) strongSelf = weakSelf;
-    NSLog(@"1");
-    if (!strongSelf) {
-      NSLog(@"2");
-      return;
-    }
-    if (error) {
-      NSLog(@"3");
-      UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"上传图片失败" message:error.localizedDescription preferredStyle:UIAlertControllerStyleAlert];
-      [alert addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
-      [strongSelf presentViewController:alert animated:YES completion:nil];
-      return;
-    }
-    NSLog(@"4");
-    AGPostCreateRequest* request = [[AGPostCreateRequest alloc] init];
-    request.title = [title copy];
-    request.content = [content copy];
-    request.images = urls ?: @[];
-    request.tags = [dict[@"crops"] copy] ?: @[];
-    NSLog(@"图片url已获取");
-    NSLog(@"strongSelf: %@", strongSelf);
-    [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *output, NSError *error) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        NSLog(@"5");
-        if (output.code.integerValue != 200) {
-          if ([[TLWSDKManager shared].sessionManager shouldAttemptTokenRefreshForCode:output.code error:error]) {
-            [[TLWSDKManager shared].sessionManager handleUnauthorizedWithRetry:^{
-              [manager.api createPostWithPostCreateRequest:request completionHandler:^(AGResultPostResponseDto *r, NSError *e) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                  if (r.code.integerValue == 200) {
-                    [strongSelf tl_cachePublishedPostFromDto:r.data request:request imageUrls:urls];
-                  }
-                  [TLWToast show:(r.code.integerValue == 200) ? @"帖子发布成功" : @"帖子发送失败"];
-                });
-              }];
-            }];
-            return;
-          }
-          NSLog(@"6");
-          [TLWToast show:@"帖子发送失败"];
-          NSLog(@"帖子发布失败");
-          return;
-        }
-        NSLog(@"7");
-        NSLog(@"帖子发布成功");
-        NSLog(@"strongSelf:%@", strongSelf);
-        [strongSelf tl_showTopToast:@"帖子发布成功"];
-        // 上传成功：找到本地发布中的帖子，清除 pending 标记并刷新对应 cell
-        NSInteger pendingIndex = NSNotFound;
-        AGPostResponseDto* dto = output.data;
-        [strongSelf tl_cachePublishedPostFromDto:dto request:request imageUrls:urls];
-        for (NSInteger i = 0; i < (NSInteger)strongSelf.posts.count; i++) {
-          TLWCommunityPost *p = strongSelf.posts[i];
-          if (p.isLocalPending) {
-            p.isLocalPending = NO;
-            p._id = dto._id;
-            p.images = urls;
-            p.likeCount = @0;
-            p.favoriteCount = @0;
-            pendingIndex = i;
-            break;
-          }
-        }
-        if (pendingIndex != NSNotFound) {
-          NSIndexPath *ip = [NSIndexPath indexPathForItem:pendingIndex inSection:0];
-          [strongSelf.myView.collectionView reloadItemsAtIndexPaths:@[ip]];
-        }
-      });
-    }];
-  }];
-  NSLog(@"8");
-}
 
-- (void)tl_cachePublishedPostFromDto:(AGPostResponseDto *)dto
-                              request:(AGPostCreateRequest *)request
-                            imageUrls:(NSArray<NSString *> *)imageUrls {
-  if (!dto || !dto._id) {
-    return;
-  }
 
-  dto.title = dto.title ?: request.title ?: @"";
-  dto.content = dto.content ?: request.content ?: @"";
-  dto.images = dto.images ?: imageUrls ?: @[];
-  dto.tags = dto.tags ?: request.tags ?: @[];
-  dto.likeCount = dto.likeCount ?: @0;
-  dto.favoriteCount = dto.favoriteCount ?: @0;
-  [[TLWDBManager shared] upsertMyPublishedPostFromDto:dto];
-}
-
-- (void)tl_showTopToast:(NSString *)text {
-  if (text.length == 0) return;
-
-  // 挂到“全局 window”，保证在任何页面都能看到
-  UIWindow *hostWindow = nil;
-  if (@available(iOS 13.0, *)) {
-    // 仅使用前台激活的 Scene，避免取到后台/其他窗口的 keyWindow
-    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-      if (scene.activationState != UISceneActivationStateForegroundActive) continue;
-      if (![scene isKindOfClass:[UIWindowScene class]]) continue;
-      UIWindowScene *windowScene = (UIWindowScene *)scene;
-
-      // 优先取 key window（当前场景正在接收事件的窗口）
-      for (UIWindow *w in windowScene.windows) {
-        if (w.isKeyWindow) {
-          hostWindow = w;
-          break;
-        }
-      }
-      if (!hostWindow) {
-        hostWindow = windowScene.windows.firstObject;
-      }
-      if (hostWindow) break;
-    }
-  } else {
-    // iOS 12 及以下：直接用当前控制器关联的 window 即可（避免使用废弃的 UIApplication.windows）
-    hostWindow = self.view.window;
-  }
-  if (!hostWindow) return;
-
-  UIView *old = [hostWindow viewWithTag:1107];
-  if (old) [old removeFromSuperview];
-
-  UILabel *toast = [UILabel new];
-  toast.tag = 1107;
-  toast.text = text;
-  toast.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-  toast.textColor = [UIColor colorWithRed:0.20 green:0.20 blue:0.20 alpha:1];
-  toast.textAlignment = NSTextAlignmentCenter;
-  toast.backgroundColor = UIColor.whiteColor;
-  toast.layer.cornerRadius = 19;
-  toast.layer.masksToBounds = YES;
-  toast.layer.shadowColor = [UIColor colorWithWhite:0 alpha:0.15].CGColor;
-  toast.layer.shadowOpacity = 1;
-  toast.layer.shadowRadius = 6;
-  toast.layer.shadowOffset = CGSizeMake(0, 2);
-  [hostWindow addSubview:toast];
-
-  [toast mas_makeConstraints:^(MASConstraintMaker *make) {
-    make.top.equalTo(hostWindow.mas_safeAreaLayoutGuideTop).offset(10);
-    make.centerX.equalTo(hostWindow);
-    make.width.mas_equalTo(190);
-    make.height.mas_equalTo(38);
-  }];
-
-  toast.alpha = 0;
-  [UIView animateWithDuration:0.25 animations:^{
-    toast.alpha = 1;
-  } completion:^(BOOL finished) {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      [UIView animateWithDuration:0.25 animations:^{
-        toast.alpha = 0;
-      } completion:^(BOOL done) {
-        [toast removeFromSuperview];
-      }];
-    });
-  }];
-}
 
 @end

@@ -406,7 +406,13 @@ static NSString *const kCommentCellID = @"TLWCommentCell";
   post.isCollected = dto.isFavorited.boolValue;
   post.favoriteCount = dto.favoriteCount ?: @0;
   post.createdAt = dto.createdAt;
-  post.imageAspectRatio = self.post.imageAspectRatio > 0 ? self.post.imageAspectRatio : (4.0 / 3.0);
+  id imageSizes = [dto respondsToSelector:NSSelectorFromString(@"imageSizes")] ? [dto valueForKey:@"imageSizes"] : nil;
+  id coverSize = [imageSizes isKindOfClass:[NSArray class]] ? [imageSizes firstObject] : nil;
+  NSNumber *coverWidth = [coverSize respondsToSelector:NSSelectorFromString(@"width")] ? [coverSize valueForKey:@"width"] : nil;
+  NSNumber *coverHeight = [coverSize respondsToSelector:NSSelectorFromString(@"height")] ? [coverSize valueForKey:@"height"] : nil;
+  if (![post applyCoverAspectRatioWithWidth:coverWidth.doubleValue height:coverHeight.doubleValue]) {
+    post.imageAspectRatio = self.post.imageAspectRatio > 0 ? self.post.imageAspectRatio : 0.75;
+  }
   return post;
 }
 
