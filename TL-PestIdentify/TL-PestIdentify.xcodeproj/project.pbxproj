@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4C0124972FAC7C5E0039B0FD /* MetricKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C0124962FAC7C5E0039B0FD /* MetricKit.framework */; };
 		4CA8AAA72F67B30D00928BBF /* Speech.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4CA8AAA52F67B30100928BBF /* Speech.framework */; };
 		D2061150A3DDF170370A7ADB /* System/Library/Frameworks/CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D31E7F924572FF720FEF53A7 /* System/Library/Frameworks/CoreLocation.framework */; };
 		E4341642EF5A8DADD2A0A520 /* libPods-TL-PestIdentify.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B609417930A6EB21108BD662 /* libPods-TL-PestIdentify.a */; };
@@ -34,6 +35,7 @@
 		0DAAA8D62F59C0B800F327DC /* TL-PestIdentify.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TL-PestIdentify.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8F12F59C0BB00F327DC /* TL-PestIdentifyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0DAAA8FB2F59C0BB00F327DC /* TL-PestIdentifyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TL-PestIdentifyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4C0124962FAC7C5E0039B0FD /* MetricKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetricKit.framework; path = System/Library/Frameworks/MetricKit.framework; sourceTree = SDKROOT; };
 		4CA8AAA52F67B30100928BBF /* Speech.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Speech.framework; path = System/Library/Frameworks/Speech.framework; sourceTree = SDKROOT; };
 		9768E16C67F3514949B5C4B8 /* Pods-TL-PestIdentify.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-TL-PestIdentify.release.xcconfig"; path = "Target Support Files/Pods-TL-PestIdentify/Pods-TL-PestIdentify.release.xcconfig"; sourceTree = "<group>"; };
 		B609417930A6EB21108BD662 /* libPods-TL-PestIdentify.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-TL-PestIdentify.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -139,6 +141,7 @@
 				4CA8AAA72F67B30D00928BBF /* Speech.framework in Frameworks */,
 				D2061150A3DDF170370A7ADB /* System/Library/Frameworks/CoreLocation.framework in Frameworks */,
 				E4341642EF5A8DADD2A0A520 /* libPods-TL-PestIdentify.a in Frameworks */,
+				4C0124972FAC7C5E0039B0FD /* MetricKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -205,6 +208,7 @@
 		B350BCC6805633DF370785C6 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				4C0124962FAC7C5E0039B0FD /* MetricKit.framework */,
 				4CA8AAA52F67B30100928BBF /* Speech.framework */,
 				D31E7F924572FF720FEF53A7 /* System/Library/Frameworks/CoreLocation.framework */,
 				B609417930A6EB21108BD662 /* libPods-TL-PestIdentify.a */,
@@ -458,6 +462,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TL-PestIdentify/Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用您的相机进行拍照";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "仅用于调试时连接电脑上的本地流式测试服务。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "需要获取您的位置信息，为您提供精准的病虫害预警服务。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "需要使用麦克风进行 AI 语音通话。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册以更换头像";
@@ -467,6 +472,7 @@
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -496,6 +502,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TL-PestIdentify/Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "需要使用您的相机进行拍照";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "仅用于调试时连接电脑上的本地流式测试服务。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "需要获取您的位置信息，为您提供精准的病虫害预警服务。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "需要使用麦克风进行 AI 语音通话。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "需要访问相册以更换头像";
@@ -505,6 +512,7 @@
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -643,7 +651,7 @@
 				DEVELOPMENT_TEAM = JASSJ2R9D6;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = arm64;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.xiaoli.TL-PestIdentifyTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -662,7 +670,7 @@
 				DEVELOPMENT_TEAM = JASSJ2R9D6;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = arm64;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.xiaoli.TL-PestIdentifyTests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -681,6 +689,7 @@
 				DEVELOPMENT_TEAM = JASSJ2R9D6;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = arm64;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.xiaoli.TL-PestIdentifyUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -700,6 +709,7 @@
 				DEVELOPMENT_TEAM = JASSJ2R9D6;
 				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = arm64;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.xiaoli.TL-PestIdentifyUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
