@@ -4,34 +4,50 @@
 //
 
 #import "TLWAIStreamClient.h"
+#import "TLWAISSEParser.h"
 #import <AgriPestClient/AGChatRequest.h>
 #import <AgriPestClient/AGDefaultConfiguration.h>
 #import <AgriPestClient/AGServiceCode.h>
+#import "TLWAIStreamDebugConfiguration.h"
 #import "TLWPerfLog.h"
+#import "TLWAITrace.h"
+#import "TLWAIEventEnvelope.h"
 
 @interface TLWAIStreamClient () <NSURLSessionDataDelegate>
 @property (nonatomic, strong, nullable) NSURLSession *session;
 @property (nonatomic, strong, nullable) NSURLSessionDataTask *currentTask;
-@property (nonatomic, strong) NSMutableData *buffer;   // 切帧前的原始字节缓冲（防粘包）
+@property (nonatomic, strong) NSMutableData *buffer;   // 仅用于累积非 2xx 的错误响应体
+@property (nonatomic, strong) TLWAISSEParser *parser;  // 2xx 流的切帧解析器
 @property (nonatomic, assign) BOOL authFailed;         // 命中 token 失效后丢弃后续事件
 @property (nonatomic, assign) BOOL finished;           // 已 done/error，避免重复回调
 @property (nonatomic, assign) NSInteger responseStatusCode;
 @property (nonatomic, assign) CFAbsoluteTime requestStartTime;
 @property (nonatomic, assign) BOOL didLogFirstByte;
+@property (nonatomic, assign) NSUInteger captureChunkIndex;
+@property (nonatomic, assign) BOOL metadataChanged;
+@property (nonatomic, copy, nullable) NSString *responseRetryAfter;
 @end
 
 @implementation TLWAIStreamClient
 
 - (NSURLSessionDataTask *)streamChatWithRequest:(AGChatRequest *)chatRequest
                                     accessToken:(NSString *)accessToken {
-    NSString *host = [AGDefaultConfiguration sharedConfig].host;
-    if (host.length == 0) {
-        [self tl_invokeErrorWithMessage:@"后端地址未配置"];
-        return nil;
+    @synchronized (self) {
+    NSString *testEndpoint = TLWAIStreamTestEndpoint();
+    BOOL localTest = testEndpoint != nil;
+    NSURL *url = nil;
+    if (localTest) {
+        url = TLWAIValidatedStreamTestURL(testEndpoint);
+    } else {
+        NSString *host = [AGDefaultConfiguration sharedConfig].host;
+        if (host.length == 0) {
+            [self tl_invokeErrorWithMessage:@"后端地址未配置"];
+            return nil;
+        }
+        url = [NSURL URLWithString:[host stringByAppendingString:@"/api/v1/agent/chat/stream"]];
     }
-    NSURL *url = [NSURL URLWithString:[host stringByAppendingString:@"/api/v1/agent/chat/stream"]];
     if (!url) {
-        [self tl_invokeErrorWithMessage:@"后端地址无效"];
+        [self tl_invokeErrorWithMessage:localTest ? @"本地流式测试地址无效，请检查 TLW_AI_STREAM_TEST_URL" : @"后端地址无效"];
         return nil;
     }
 
@@ -54,39 +70,89 @@
     [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
     [req setValue:@"text/event-stream" forHTTPHeaderField:@"Accept"];
     [req setValue:@"no-cache" forHTTPHeaderField:@"Cache-Control"];
-    if (accessToken.length > 0) {
+    if (self.clientRequestId.length > 0) {
+        [req setValue:self.clientRequestId forHTTPHeaderField:@"X-Client-Request-ID"];
+    }
+    if (!localTest && accessToken.length > 0) {
         [req setValue:[NSString stringWithFormat:@"Bearer %@", accessToken]
             forHTTPHeaderField:@"Authorization"];
     }
-    req.timeoutInterval = 60.0;
+    return [self tl_startRequest:req localTest:localTest];
+    }
+}
 
-    NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration defaultSessionConfiguration];
-    cfg.timeoutIntervalForRequest = 60.0;
-    cfg.timeoutIntervalForResource = 120.0;
-    NSOperationQueue *queue = [[NSOperationQueue alloc] init];
-    queue.maxConcurrentOperationCount = 1;
-    self.session = [NSURLSession sessionWithConfiguration:cfg delegate:self delegateQueue:queue];
-    self.buffer = [NSMutableData data];
-    self.authFailed = NO;
-    self.finished = NO;
-    self.responseStatusCode = 0;
-    self.requestStartTime = TLWPerfTick();
-    self.didLogFirstByte = NO;
-    TLWPerfLog(@"ai-stream request start hasImage=%@ textLen=%lu",
-               chatRequest.imageUrl.length > 0 ? @"YES" : @"NO",
-               (unsigned long)chatRequest.text.length);
+- (BOOL)supportsJobRecovery { return NO; }
 
-    self.currentTask = [self.session dataTaskWithRequest:req];
-    [self.currentTask resume];
-    return self.currentTask;
+- (NSURLSessionDataTask *)subscribeToEventsAtURL:(NSURL *)url lastEventID:(NSString *)eventID
+                                   accessToken:(NSString *)accessToken localTest:(BOOL)localTest {
+    NSString *scheme = url.scheme.lowercaseString;
+    if (!url.host.length || (![scheme isEqualToString:@"http"] && ![scheme isEqualToString:@"https"]) ||
+        url.user || url.password || url.fragment ||
+        (eventID.length && [eventID rangeOfCharacterFromSet:NSCharacterSet.newlineCharacterSet].location != NSNotFound)) {
+        [self tl_invokeErrorWithMessage:@"任务订阅地址或游标无效"];
+        return nil;
+    }
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    request.HTTPMethod = @"GET";
+    [request setValue:@"text/event-stream" forHTTPHeaderField:@"Accept"];
+    [request setValue:@"no-cache" forHTTPHeaderField:@"Cache-Control"];
+    if (eventID.length) [request setValue:eventID forHTTPHeaderField:@"Last-Event-ID"];
+    if (!localTest && accessToken.length)
+        [request setValue:[@"Bearer " stringByAppendingString:accessToken] forHTTPHeaderField:@"Authorization"];
+    return [self tl_startRequest:request localTest:localTest];
+}
+
+- (NSURLSessionDataTask *)tl_startRequest:(NSMutableURLRequest *)request localTest:(BOOL)localTest {
+    @synchronized (self) {
+        [self.currentTask cancel];
+        [self.session invalidateAndCancel];
+        request.timeoutInterval = 60;
+        NSURLSessionConfiguration *configuration = localTest ? NSURLSessionConfiguration.ephemeralSessionConfiguration : NSURLSessionConfiguration.defaultSessionConfiguration;
+        if (localTest || self.onEventEnvelope) {
+            request.HTTPShouldHandleCookies = NO;
+            configuration.HTTPCookieStorage = nil;
+            configuration.HTTPShouldSetCookies = NO;
+            configuration.URLCredentialStorage = nil;
+        }
+        configuration.timeoutIntervalForRequest = 60;
+        configuration.timeoutIntervalForResource = 600;
+        NSOperationQueue *queue = [NSOperationQueue new];
+        queue.maxConcurrentOperationCount = 1;
+        self.session = [NSURLSession sessionWithConfiguration:configuration delegate:self delegateQueue:queue];
+        self.buffer = [NSMutableData data];
+        self.parser = [TLWAISSEParser new];
+        [self tl_bindParser];
+        self.authFailed = NO;
+        self.finished = NO;
+        self.responseStatusCode = 0;
+        self.responseRetryAfter = nil;
+        self.metadataChanged = NO;
+        self.requestStartTime = TLWPerfTick();
+        self.didLogFirstByte = NO;
+        self.captureChunkIndex = 0;
+        TLWPerfLog(@"ai-stream request start bodyBytes=%lu", (unsigned long)request.HTTPBody.length);
+        self.currentTask = [self.session dataTaskWithRequest:request];
+        [self.trace mark:TLWAITraceStageRequestStart count:0];
+        [self.currentTask resume];
+        return self.currentTask;
+    }
+}
+
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task
+    willPerformHTTPRedirection:(NSHTTPURLResponse *)response newRequest:(NSURLRequest *)request
+    completionHandler:(void (^)(NSURLRequest *))completionHandler {
+    // 不跟随重定向：保留 POST 语义，并避免 Bearer/Cookie 被转发到其他 origin。
+    completionHandler(nil);
 }
 
 - (void)cancel {
+    @synchronized (self) {
     self.finished = YES;
     [self.currentTask cancel];
     self.currentTask = nil;
     [self.session invalidateAndCancel];
     self.session = nil;
+    }
 }
 
 #pragma mark - NSURLSessionDataDelegate
@@ -95,6 +161,11 @@
           dataTask:(NSURLSessionDataTask *)dataTask
 didReceiveResponse:(NSURLResponse *)response
  completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
+    @synchronized (self) {
+    if (self.finished || self.authFailed || (dataTask && dataTask != self.currentTask)) {
+        completionHandler(NSURLSessionResponseCancel);
+        return;
+    }
     if (![response isKindOfClass:[NSHTTPURLResponse class]]) {
         [self tl_invokeErrorWithMessage:@"服务端返回了无效响应"];
         completionHandler(NSURLSessionResponseCancel);
@@ -103,8 +174,10 @@ didReceiveResponse:(NSURLResponse *)response
     NSHTTPURLResponse *http = (NSHTTPURLResponse *)response;
     NSInteger code = http.statusCode;
     self.responseStatusCode = code;
-    TLWPerfLog(@"ai-stream response status=%ld ttfb=%.0fms",
-               (long)code, TLWPerfMs(self.requestStartTime));
+    self.responseRetryAfter = [http valueForHTTPHeaderField:@"Retry-After"];
+    [self.trace mark:TLWAITraceStageTTFB count:(NSUInteger)MAX(0, code)];
+    TLWPerfLog(@"ai-stream response status=%ld ttfb=%.0fms sse=%d",
+               (long)code, TLWPerfMs(self.requestStartTime), [http.MIMEType.lowercaseString isEqualToString:@"text/event-stream"]);
     if (code == 401) {
         [self tl_invokeAuthFailure];
         completionHandler(NSURLSessionResponseCancel);
@@ -115,28 +188,50 @@ didReceiveResponse:(NSURLResponse *)response
         completionHandler(NSURLSessionResponseAllow);
         return;
     }
+    if (![http.MIMEType.lowercaseString isEqualToString:@"text/event-stream"]) {
+        [self tl_invokeErrorWithMessage:@"响应不是事件流，请稍后重试"];
+        completionHandler(NSURLSessionResponseCancel);
+        return;
+    }
     completionHandler(NSURLSessionResponseAllow);
+    }
 }
 
 - (void)URLSession:(NSURLSession *)session
           dataTask:(NSURLSessionDataTask *)dataTask
     didReceiveData:(NSData *)data {
-    if (self.authFailed || self.finished) return;
+    @synchronized (self) {
+    if (self.authFailed || self.finished || (dataTask && dataTask != self.currentTask)) return;
+    dispatch_block_t activity = self.onActivity;
+    if (activity) dispatch_async(dispatch_get_main_queue(), activity);
     if (!self.didLogFirstByte) {
         self.didLogFirstByte = YES;
         TLWPerfLog(@"ai-stream firstByte=%.0fms", TLWPerfMs(self.requestStartTime));
     }
-    [self.buffer appendData:data];
     if (self.responseStatusCode >= 200 && self.responseStatusCode < 300) {
-        [self tl_drainBuffer];
+        self.captureChunkIndex += 1;
+        TLWPerfLog(@"ai-stream chunk #%lu bytes=%lu",
+                   (unsigned long)self.captureChunkIndex,
+                   (unsigned long)data.length);
+        [self.parser appendData:data];
+        [self tl_flushMetadata];
+        return;
+    }
+    // 非 2xx：错误体要在完成时整体解析，仍然累积到 buffer。
+    if (data.length > 1024 * 1024 - MIN(self.buffer.length, (NSUInteger)(1024 * 1024))) {
+        [self tl_invokeErrorWithMessage:@"错误响应体超过安全上限"];
+        return;
+    }
+    [self.buffer appendData:data];
     }
 }
 
 - (void)URLSession:(NSURLSession *)session
               task:(NSURLSessionTask *)task
 didCompleteWithError:(NSError *)error {
-    if (self.authFailed || self.finished) return;
-    if (error && error.code != NSURLErrorCancelled) {
+    @synchronized (self) {
+    if (self.authFailed || self.finished || (task && task != self.currentTask)) return;
+    if (error) {
         [self tl_invokeError:error message:nil];
         return;
     }
@@ -163,66 +258,73 @@ didCompleteWithError:(NSError *)error {
         if (message.length == 0) {
             message = [NSString stringWithFormat:@"服务端返回异常(%ld)", (long)self.responseStatusCode];
         }
-        [self tl_invokeErrorWithMessage:message];
+        NSMutableDictionary *info = [@{NSLocalizedDescriptionKey:message, @"httpStatus":@(self.responseStatusCode)} mutableCopy];
+        if (self.responseRetryAfter.length) info[@"retryAfter"] = self.responseRetryAfter;
+        [self tl_invokeError:[NSError errorWithDomain:@"TLWAIStreamClient" code:self.responseStatusCode userInfo:info] message:message];
         return;
     }
+    // 仅剩 2xx 自然 EOF 且没有业务 done/error：按规范丢弃残帧并通知调用方不完整。
     self.finished = YES;
-}
-
-#pragma mark - SSE 帧解析
-
-- (void)tl_drainBuffer {
-    while (YES) {
-        NSRange sep = [self tl_frameSeparatorRangeInBuffer:self.buffer];
-        if (sep.location == NSNotFound) break;
-
-        NSData *frameData = [self.buffer subdataWithRange:NSMakeRange(0, sep.location)];
-        NSUInteger consumed = sep.location + sep.length;
-        [self.buffer replaceBytesInRange:NSMakeRange(0, consumed) withBytes:NULL length:0];
-
-        NSString *frame = [[NSString alloc] initWithData:frameData encoding:NSUTF8StringEncoding];
-        if (frame.length == 0) continue;
-        [self tl_parseFrame:frame];
+    NSUInteger leftover = [self.parser finish];
+    [self tl_closeSession];
+    TLWPerfLog(@"ai-stream eofWithoutDone status=%ld leftover=%lu", (long)self.responseStatusCode, (unsigned long)leftover);
+    void (^cb)(NSUInteger) = self.onIncompleteEOF;
+    if (!cb) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (cb) cb(leftover);
+    });
     }
 }
 
-- (NSRange)tl_frameSeparatorRangeInBuffer:(NSData *)buffer {
-    NSData *lfLfData = [@"\n\n" dataUsingEncoding:NSUTF8StringEncoding];
-    NSData *crLfCrLfData = [@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding];
-    NSRange all = NSMakeRange(0, buffer.length);
-    NSRange lfLf = [buffer rangeOfData:lfLfData options:0 range:all];
-    NSRange crLfCrLf = [buffer rangeOfData:crLfCrLfData options:0 range:all];
-    if (lfLf.location == NSNotFound) return crLfCrLf;
-    if (crLfCrLf.location == NSNotFound) return lfLf;
-    return (lfLf.location < crLfCrLf.location) ? lfLf : crLfCrLf;
+#pragma mark - 解析层接线
+
+/// parser 在 delegate 队列（串行）回调；这里转成领域事件后由 tl_dispatchEvent 统一切主线程。
+- (void)tl_bindParser {
+    __weak typeof(self) weakSelf = self;
+    self.parser.onComment = ^(NSString *comment) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf || strongSelf.authFailed || strongSelf.finished) return;
+        TLWPerfLog(@"ai-stream comment length=%lu", (unsigned long)comment.length);
+        void (^cb)(NSString *) = strongSelf.onHeartbeat;
+        NSString *snapshot = comment.copy;
+        if (!cb) return;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (cb) cb(snapshot);
+        });
+    };
+    self.parser.onBufferOverflow = ^{
+        [weakSelf tl_invokeErrorWithMessage:@"事件帧超过安全上限"];
+    };
+    self.parser.onMetadata = ^(NSString *eventID, NSNumber *retry) { weakSelf.metadataChanged = YES; };
+    self.parser.onEvent = ^(NSString *eventName, NSString *data) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        if (strongSelf.authFailed || strongSelf.finished) return;
+        [strongSelf tl_flushMetadata];
+        [strongSelf.trace mark:TLWAITraceStageFirstFrame count:data.length];
+        TLWPerfLog(@"ai-stream frame length=%lu", (unsigned long)data.length);
+        [strongSelf tl_dispatchEvent:eventName data:data];
+    };
 }
 
-- (void)tl_parseFrame:(NSString *)frame {
-    NSArray<NSString *> *lines = [frame componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
-    NSString *eventName = nil;
-    NSMutableString *dataJoined = [NSMutableString string];
-    for (NSString *raw in lines) {
-        if (raw.length == 0) continue;
-        if ([raw hasPrefix:@":"]) continue;   // SSE 注释，如 ":close"、":keepalive"
-        if ([raw hasPrefix:@"event:"]) {
-            NSString *value = [raw substringFromIndex:6];
-            eventName = [value stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-            continue;
-        }
-        if ([raw hasPrefix:@"data:"]) {
-            NSString *value = [raw substringFromIndex:5];
-            if ([value hasPrefix:@" "]) value = [value substringFromIndex:1];
-            if (dataJoined.length > 0) [dataJoined appendString:@"\n"];
-            [dataJoined appendString:value];
-            continue;
-        }
-        // id:、retry: 等其他字段忽略
-    }
-    if (eventName.length == 0) return;
-    [self tl_dispatchEvent:eventName data:dataJoined.copy];
+- (void)tl_flushMetadata {
+    if (!self.metadataChanged) return;
+    self.metadataChanged = NO;
+    void (^callback)(NSString *, NSNumber *) = self.onMetadata;
+    NSString *eventID = self.parser.lastEventID;
+    NSNumber *retry = self.parser.retryMilliseconds;
+    if (callback) dispatch_async(dispatch_get_main_queue(), ^{ callback(eventID, retry); });
 }
 
 - (void)tl_dispatchEvent:(NSString *)eventName data:(NSString *)dataString {
+    if (self.onEventEnvelope) {
+        id json = [self tl_jsonObjectFromString:dataString];
+        TLWAIEventEnvelope *envelope = [[TLWAIEventEnvelope alloc] initWithEventName:eventName
+            eventID:self.parser.lastEventID payload:[json isKindOfClass:NSDictionary.class] ? json : @{}];
+        void (^callback)(TLWAIEventEnvelope *) = self.onEventEnvelope;
+        dispatch_async(dispatch_get_main_queue(), ^{ callback(envelope); });
+        return;
+    }
     if ([eventName isEqualToString:@"meta"]) {
         id json = [self tl_jsonObjectFromString:dataString];
         if ([json isKindOfClass:[NSDictionary class]]) {
@@ -255,6 +357,7 @@ didCompleteWithError:(NSError *)error {
     if ([eventName isEqualToString:@"plan_delta"]) {
         NSString *text = [self tl_deltaTextFromRawData:dataString];
         if (text.length > 0) {
+            [self.trace mark:TLWAITraceStageModelDelta count:text.length];
             void (^cb)(NSString *) = self.onPlanDelta;
             dispatch_async(dispatch_get_main_queue(), ^{
                 if (cb) cb(text);
@@ -274,6 +377,7 @@ didCompleteWithError:(NSError *)error {
     }
     if ([eventName isEqualToString:@"done"]) {
         self.finished = YES;
+        [self tl_closeSession];
         TLWPerfLog(@"ai-stream done total=%.0fms", TLWPerfMs(self.requestStartTime));
         id json = [self tl_jsonObjectFromString:dataString];
         NSDictionary *info = [json isKindOfClass:[NSDictionary class]] ? json : @{};
@@ -288,12 +392,21 @@ didCompleteWithError:(NSError *)error {
         NSString *msg = nil;
         if ([json isKindOfClass:[NSDictionary class]]) {
             NSDictionary *dict = json;
-            msg = dict[@"message"] ?: dict[@"error"] ?: dict[@"msg"];
+            msg = [self tl_firstStringInDictionary:dict];
+        } else if ([json isKindOfClass:NSString.class]) {
+            msg = json;
+        } else if (!json) {
+            // 后端也会发送纯文本错误，例如 "HTTP 400 "；不能用通用文案覆盖原因。
+            msg = dataString;
         }
-        [self tl_invokeError:nil message:msg.length > 0 ? msg : dataString];
+        [self tl_invokeError:nil message:msg.length > 0 ? msg : @"回复失败"];
         return;
     }
-    // "delta" 等不关心的事件直接丢弃（和 plan_delta 重复）
+    id json = [self tl_jsonObjectFromString:dataString];
+    NSDictionary *payload = [json isKindOfClass:NSDictionary.class] ? json : @{};
+    TLWAIEventEnvelope *envelope = [[TLWAIEventEnvelope alloc] initWithEventName:eventName eventID:self.parser.lastEventID payload:payload];
+    void (^callback)(TLWAIEventEnvelope *) = self.onUnknownEvent;
+    if (callback) dispatch_async(dispatch_get_main_queue(), ^{ callback(envelope); });
 }
 
 #pragma mark - Helpers
@@ -308,6 +421,7 @@ didCompleteWithError:(NSError *)error {
     if (self.finished) return;
     self.authFailed = YES;
     self.finished = YES;
+    [self tl_closeSession];
     void (^cb)(void) = self.onAuthFailure;
     dispatch_async(dispatch_get_main_queue(), ^{
         if (cb) cb();
@@ -322,51 +436,30 @@ didCompleteWithError:(NSError *)error {
     return [NSJSONSerialization JSONObjectWithData:d options:NSJSONReadingAllowFragments error:&err];
 }
 
-- (NSString *)tl_deltaTextFromRawData:(NSString *)dataString {
-    if (dataString.length == 0) return @"";
-    id json = [self tl_jsonObjectFromString:dataString];
-    if ([json isKindOfClass:[NSString class]]) return (NSString *)json;
-    if ([json isKindOfClass:[NSDictionary class]]) {
-        NSDictionary *dict = json;
-        NSString *v = dict[@"text"] ?: dict[@"delta"] ?: dict[@"content"];
-        if (v.length > 0) return v;
+- (NSString *)tl_firstStringInDictionary:(NSDictionary *)dictionary {
+    NSString * const keys[] = {@"controlPlan", @"text", @"delta", @"content", @"plan", @"answer", @"advice", @"solution", @"reason", @"message", @"error", @"msg", @"fallbackText"};
+    for (NSUInteger index = 0; index < sizeof(keys) / sizeof(keys[0]); index++) {
+        id value = dictionary[keys[index]];
+        if ([value isKindOfClass:NSString.class] && [value length] > 0) return value;
     }
-    return dataString;
+    return @"";
 }
-
-- (NSString *)tl_planFinalFromRawData:(NSString *)dataString {
-    if (dataString.length == 0) return @"";
+- (NSString *)tl_deltaTextFromRawData:(NSString *)dataString {
     id json = [self tl_jsonObjectFromString:dataString];
-    if ([json isKindOfClass:[NSString class]]) return (NSString *)json;
-    if ([json isKindOfClass:[NSDictionary class]]) {
-        NSDictionary *dict = json;
-        NSString *v = dict[@"controlPlan"] ?:
-                      dict[@"text"] ?:
-                      dict[@"plan"] ?:
-                      dict[@"content"] ?:
-                      dict[@"answer"] ?:
-                      dict[@"advice"] ?:
-                      dict[@"solution"] ?:
-                      dict[@"reason"] ?:
-                      dict[@"message"];
-        if (v.length > 0) return v;
-
-        id nested = dict[@"data"];
-        if ([nested isKindOfClass:[NSDictionary class]]) {
-            NSDictionary *nestedDict = (NSDictionary *)nested;
-            v = nestedDict[@"controlPlan"] ?:
-                nestedDict[@"text"] ?:
-                nestedDict[@"plan"] ?:
-                nestedDict[@"content"] ?:
-                nestedDict[@"answer"] ?:
-                nestedDict[@"advice"] ?:
-                nestedDict[@"solution"] ?:
-                nestedDict[@"reason"] ?:
-                nestedDict[@"message"];
-        }
-        if (v.length > 0) return v;
+    if ([json isKindOfClass:NSString.class]) return json;
+    if ([json isKindOfClass:NSDictionary.class]) return [self tl_firstStringInDictionary:json];
+    if (json || [dataString hasPrefix:@"{"] || [dataString hasPrefix:@"["]) return @"";
+    return dataString ?: @"";
+}
+- (NSString *)tl_planFinalFromRawData:(NSString *)dataString {
+    id json = [self tl_jsonObjectFromString:dataString];
+    if ([json isKindOfClass:NSDictionary.class]) {
+        NSString *text = [self tl_firstStringInDictionary:json];
+        if (text.length) return text;
+        id nested = json[@"data"];
+        return [nested isKindOfClass:NSDictionary.class] ? [self tl_firstStringInDictionary:nested] : @"";
     }
-    return dataString;
+    return [self tl_deltaTextFromRawData:dataString];
 }
 
 - (void)tl_invokeErrorWithMessage:(NSString *)message {
@@ -376,6 +469,7 @@ didCompleteWithError:(NSError *)error {
 - (void)tl_invokeError:(NSError *)error message:(NSString *)message {
     if (self.finished) return;
     self.finished = YES;
+    [self tl_closeSession];
     NSError *finalErr = error;
     if (!finalErr) {
         finalErr = [NSError errorWithDomain:@"TLWAIStreamClient"
@@ -387,6 +481,14 @@ didCompleteWithError:(NSError *)error {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (cb) cb(finalErr, serverMsg);
     });
+}
+
+/// 在持有 self 锁的终态路径调用；业务 done 后也主动结束 task，释放 session 对 delegate 的持有。
+- (void)tl_closeSession {
+    [self.currentTask cancel];
+    self.currentTask = nil;
+    [self.session finishTasksAndInvalidate];
+    self.session = nil;
 }
 
 @end

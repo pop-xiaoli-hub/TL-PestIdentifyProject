@@ -7,17 +7,23 @@
 //
 #import "TLWAIAssistantMessageCell.h"
 #import "TLWAIAssistantMessage.h"
+#import "TLWAIMarkdownBodyView.h"
+#import "TLWAITrace.h"
+#import "TLWAIProductPolicy.h"
+#import "TLWAIImageArchive.h"
+#import "TLWAIGestureCoordinator.h"
 #import <Masonry/Masonry.h>
 #import <SDWebImage/UIImageView+WebCache.h>
+#import <math.h>
 
 static CGFloat const kMessageVerticalInset = 6.0;
 static CGFloat const kBubbleSidePad = 5.0;
-
-@interface TLWAIAssistantMessageCell ()
+@interface TLWAIAssistantMessageCell () <UIScrollViewDelegate, UITextViewDelegate, UIContextMenuInteractionDelegate>
 @property (nonatomic, strong) UIView *container;
 @property (nonatomic, strong) UIView *bubbleView;
-@property (nonatomic, strong) UILabel *messageLabel;
+@property (nonatomic, strong) TLWAIMarkdownBodyView *messageBody;
 @property (nonatomic, strong) UILabel *statusLabel;
+@property (nonatomic, strong) UIButton *continueButton;
 // 图片条单独用横向 scrollView，后续多图、远程图回显都能共用这套布局。
 @property (nonatomic, strong) UIScrollView *imageScrollView;
 
@@ -27,9 +33,19 @@ static CGFloat const kBubbleSidePad = 5.0;
 @property (nonatomic, strong) MASConstraint *statusBottomConstraint;
 @property (nonatomic, strong) MASConstraint *messageTopConstraint;
 @property (nonatomic, strong) MASConstraint *messageBottomConstraint;
+@property (nonatomic, strong) MASConstraint *messageHeightConstraint;
 @property (nonatomic, strong) MASConstraint *imageTopConstraint;
 @property (nonatomic, strong) MASConstraint *imageHeightConstraint;
 @property (nonatomic, weak)   TLWAIAssistantMessage *currentMessage;
+@property (nonatomic, assign) CGFloat imageAreaWidth;
+@property (nonatomic, copy) NSString *displayedSource;
+@property (nonatomic, assign) TLWAIAssistantMessageStatus displayedStatus;
+@property (nonatomic, strong) TLWAIRelayTextView *auxiliaryTextView;
+@property (nonatomic, assign) CGFloat auxiliaryHeight;
+@property (nonatomic, assign) BOOL auxiliaryHasImages;
+@property (nonatomic, weak) TLWAIGestureCoordinator *relayCoordinator;
+@property (nonatomic, weak) UITableView *outerTable;
+@property (nonatomic) CGSize measuredLayoutSize;
 @end
 
 @implementation TLWAIAssistantMessageCell
@@ -45,6 +61,7 @@ static CGFloat const kBubbleSidePad = 5.0;
         self.contentView.backgroundColor = [UIColor clearColor];
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         [self tl_setupViews];
+        [self.bubbleView addInteraction:[[UIContextMenuInteraction alloc] initWithDelegate:self]];
     }
     return self;
 }
@@ -53,14 +70,17 @@ static CGFloat const kBubbleSidePad = 5.0;
     [super prepareForReuse];
     [self.imageScrollView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
     self.imageScrollView.contentSize = CGSizeZero;
-    self.messageLabel.attributedText = nil;
+    [self.messageBody applySource:@"" literal:YES selectable:NO textColor:UIColor.labelColor];
+    self.displayedSource = nil;
     self.statusLabel.text = @"";
     self.statusLabel.hidden = YES;
+    self.continueButton.hidden = YES;
     self.bubbleView.layer.borderWidth = 0;
     self.bubbleView.layer.borderColor = [UIColor clearColor].CGColor;
     [self.bubbleBottomConstraint deactivate];
     [self.statusBottomConstraint deactivate];
     self.currentMessage = nil;
+    self.measuredLayoutSize = CGSizeZero;
 }
 
 - (void)configureWithMessage:(TLWAIAssistantMessage *)message {
@@ -73,17 +93,20 @@ static CGFloat const kBubbleSidePad = 5.0;
         self.bubbleView.layer.borderWidth = 0;
         self.bubbleView.layer.borderColor = [UIColor clearColor].CGColor;
     } else {
-        // AI 回复：白色背景 + 橙黄色描边 #FFB524 2px
-        self.bubbleView.backgroundColor = [UIColor whiteColor];
+        // AI 回复：白色背景 + 橙黄色描边 #FFB524 2px。
+        self.bubbleView.backgroundColor = UIColor.whiteColor;
         self.bubbleView.layer.borderWidth = 2.0;
         self.bubbleView.layer.borderColor = [UIColor colorWithRed:1.0 green:0.710 blue:0.141 alpha:1.0].CGColor;
     }
-    UIColor *textColor = isUser
-        ? [UIColor whiteColor]
-        : [UIColor colorWithRed:0.153 green:0.153 blue:0.153 alpha:1.0]; // #272727
-    self.messageLabel.textColor = textColor;
-    NSString *preprocessed = [self tl_preprocessMarkdown:message.text];
-    self.messageLabel.attributedText = [self tl_attributedStringFromText:preprocessed textColor:textColor];
+    UIColor *textColor = isUser ? UIColor.whiteColor : [UIColor colorWithRed:0.153 green:0.153 blue:0.153 alpha:1.0];
+    BOOL isStreamingStatus = (message.status == TLWAIAssistantMessageStatusSending ||
+                               message.status == TLWAIAssistantMessageStatusWaiting ||
+                               message.status == TLWAIAssistantMessageStatusRecovering);
+    BOOL canSelect = !isStreamingStatus && (isUser || message.completed);
+    [self.messageBody applySource:message.text ?: @"" literal:isUser selectable:canSelect textColor:textColor];
+    self.displayedSource = message.text ?: @"";
+    self.messageBody.accessibilityElementsHidden = isStreamingStatus && !isUser;
+    self.accessibilityLabel = (!isUser && (isStreamingStatus || message.completed)) ? TLWAIAccessibilityLabel(isStreamingStatus, self.messageBody.text) : nil;
 
     [self.statusLeadingConstraint deactivate];
     [self.statusTrailingConstraint deactivate];
@@ -94,6 +117,7 @@ static CGFloat const kBubbleSidePad = 5.0;
     }
 
     [self tl_configureImageStripWithMessage:message];
+    [self tl_updateAuxiliaryCard];
 
     BOOL hasImages = (message.localImages.count + message.remoteImageURLs.count) > 0;
     BOOL hasText = message.text.length > 0;
@@ -127,6 +151,7 @@ static CGFloat const kBubbleSidePad = 5.0;
             imageAreaWidth = imageCount * 120.0 + (imageCount - 1) * 8.0;
         }
     }
+    self.imageAreaWidth = imageAreaWidth;
 
     // 一条消息可能只有图、只有字、图文并存，所以顶部和底部约束都要动态切换。
     self.imageScrollView.hidden = !hasImages;
@@ -134,17 +159,24 @@ static CGFloat const kBubbleSidePad = 5.0;
     [self.imageTopConstraint setOffset:hasImages ? 12 : 0];
 
     [self.messageTopConstraint uninstall];
-    [self.messageLabel mas_updateConstraints:^(MASConstraintMaker *make) {
-        if (hasImages) {
+    [self.messageBody mas_updateConstraints:^(MASConstraintMaker *make) {
+        if (self.auxiliaryTextView) {
+            self.messageTopConstraint = make.top.equalTo(self.auxiliaryTextView.mas_bottom).offset(hasText ? 10 : 0);
+        } else if (hasImages) {
             self.messageTopConstraint = make.top.equalTo(self.imageScrollView.mas_bottom).offset(hasText ? 10 : 0);
         } else {
             self.messageTopConstraint = make.top.equalTo(self.bubbleView).offset(hasText ? 12 : 0);
         }
     }];
 
-    self.messageLabel.hidden = !hasText;
+    self.messageBody.hidden = !hasText;
+    if (hasText) {
+        [self.messageHeightConstraint activate];
+    } else {
+        [self.messageHeightConstraint deactivate];
+    }
     [self.messageBottomConstraint uninstall];
-    [self.messageLabel mas_updateConstraints:^(MASConstraintMaker *make) {
+    [self.messageBody mas_updateConstraints:^(MASConstraintMaker *make) {
         if (hasText) {
             self.messageBottomConstraint = make.bottom.equalTo(self.bubbleView).offset(-12);
         }
@@ -157,27 +189,42 @@ static CGFloat const kBubbleSidePad = 5.0;
             make.right.equalTo(self.container).offset(-kBubbleSidePad);
         } else {
             make.left.equalTo(self.container).offset(kBubbleSidePad);
+            make.width.equalTo(self.container.mas_width).offset(-kBubbleSidePad * 2);
         }
         // 有图片时给气泡设最小宽度，防止 UIScrollView 无 intrinsicContentSize 导致气泡塌缩
         if (hasImages) {
-            CGFloat maxBubbleWidth = [UIScreen mainScreen].bounds.size.width - kBubbleSidePad * 2;
+            CGFloat maxBubbleWidth = MAX(1, CGRectGetWidth(self.bounds) - kBubbleSidePad * 2);
             CGFloat minW = MIN(imageAreaWidth + 24, maxBubbleWidth);
             make.width.mas_greaterThanOrEqualTo(minW);
         }
-        if (!hasImages && !hasText) {
+        if (!hasImages && !hasText && !self.auxiliaryTextView) {
             make.height.mas_equalTo(44);
         } else if (hasText) {
-            make.bottom.equalTo(self.messageLabel.mas_bottom).offset(12);
+            make.bottom.equalTo(self.messageBody.mas_bottom).offset(12);
+        } else if (self.auxiliaryTextView) {
+            make.bottom.equalTo(self.auxiliaryTextView.mas_bottom).offset(12);
         } else {
             make.bottom.equalTo(self.imageScrollView.mas_bottom).offset(12);
         }
     }];
 
     NSString *statusText = [self tl_statusTextForMessage:message];
+    self.displayedStatus = message.status;
     self.statusLabel.text = statusText;
     self.statusLabel.hidden = statusText.length == 0;
-    if (statusText.length > 0) {
-        // 有状态文案时，让整条 cell 的底部跟随状态标签，而不是气泡本身。
+    self.continueButton.hidden = !message.canContinue;
+    [self.continueButton setTitle:message.canResumeJob ? @"继续接收" : @"重新生成" forState:UIControlStateNormal];
+    if (message.canContinue) {
+        [self.bubbleBottomConstraint deactivate];
+        [self.statusBottomConstraint deactivate];
+        [self.continueButton mas_remakeConstraints:^(MASConstraintMaker *make) {
+            if (statusText.length) make.top.equalTo(self.statusLabel.mas_bottom).offset(2);
+            else make.top.equalTo(self.bubbleView.mas_bottom).offset(4);
+            make.left.equalTo(self.bubbleView);
+            make.bottom.equalTo(self.container);
+            make.height.mas_equalTo(28);
+        }];
+    } else if (statusText.length > 0) {
         [self.bubbleBottomConstraint deactivate];
         if (!self.statusBottomConstraint) {
             [self.statusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -191,7 +238,172 @@ static CGFloat const kBubbleSidePad = 5.0;
         [self.bubbleBottomConstraint activate];
     }
 
+    [self tl_updateBodyHeightForCellWidth:CGRectGetWidth(self.bounds)];
     [self.contentView setNeedsLayout];
+}
+
+- (BOOL)applyStreamingText:(NSString *)text {
+    CGFloat width = CGRectGetWidth(self.bounds);
+    CGSize previous = self.measuredLayoutSize;
+    // 宽度变化也可能改变行高，不能先用新宽度覆盖旧测量基线。
+    if (width > 38 && (previous.height <= 0 || previous.width <= 38)) {
+        previous = [self systemLayoutSizeFittingSize:CGSizeMake(width, UILayoutFittingCompressedSize.height)
+            withHorizontalFittingPriority:UILayoutPriorityRequired verticalFittingPriority:UILayoutPriorityFittingSizeLevel];
+    }
+    if (self.displayedStatus != self.currentMessage.status) {
+        self.displayedStatus = self.currentMessage.status;
+        NSString *status = [self tl_statusTextForMessage:self.currentMessage];
+        self.statusLabel.text = status;
+        self.statusLabel.hidden = status.length == 0;
+    }
+    if ([self tl_updateAuxiliaryCard]) {
+        [self.messageTopConstraint uninstall];
+        [self.messageBody mas_updateConstraints:^(MASConstraintMaker *make) {
+            if (self.auxiliaryTextView) self.messageTopConstraint = make.top.equalTo(self.auxiliaryTextView.mas_bottom).offset(10);
+            else if (!self.imageScrollView.hidden) self.messageTopConstraint = make.top.equalTo(self.imageScrollView.mas_bottom).offset(10);
+            else self.messageTopConstraint = make.top.equalTo(self.bubbleView).offset(12);
+        }];
+    }
+    text = text ?: @"";
+    NSString *old = self.displayedSource ?: @"";
+    NSString *tail = [text hasPrefix:old] ? [text substringFromIndex:old.length] : text;
+    self.displayedSource = text;
+    BOOL isUser = self.currentMessage.role == TLWAIAssistantMessageRoleUser;
+    [self.messageBody applySource:text literal:isUser selectable:NO
+        textColor:isUser ? UIColor.whiteColor : [UIColor colorWithRed:0.153 green:0.153 blue:0.153 alpha:1]];
+    self.accessibilityLabel = isUser ? nil : TLWAIAccessibilityLabel(YES, nil);
+    self.messageBody.accessibilityElementsHidden = !isUser;
+    // 首个 delta 到达前正文可能为空，不能继续保留隐藏/无高度状态。
+    if (text.length && self.messageBody.hidden) {
+        self.messageBody.hidden = NO;
+        [self configureWithMessage:self.currentMessage];
+    }
+    if (self.window && self.currentMessage.hasAssistantOutput && tail.length) {
+        __block NSUInteger graphemes = 0;
+        [tail enumerateSubstringsInRange:NSMakeRange(0, tail.length) options:NSStringEnumerationByComposedCharacterSequences
+            usingBlock:^(NSString *substring, NSRange range, NSRange enclosing, BOOL *stop) { graphemes++; }];
+        [self.currentMessage.trace mark:TLWAITraceStageFirstVisible count:1];
+        [self.currentMessage.trace mark:TLWAITraceStageVisibleFrame count:graphemes];
+    }
+    [self tl_updateBodyHeightForCellWidth:CGRectGetWidth(self.bounds)];
+    [self setNeedsLayout];
+    if (width <= 38) return YES;
+    CGSize current = [self systemLayoutSizeFittingSize:CGSizeMake(width, UILayoutFittingCompressedSize.height)
+        withHorizontalFittingPriority:UILayoutPriorityRequired verticalFittingPriority:UILayoutPriorityFittingSizeLevel];
+    return fabs(current.height - previous.height) >= 0.5;
+}
+
+- (void)tl_updateBodyHeightForCellWidth:(CGFloat)width {
+    if (width <= 38 || !self.currentMessage || self.messageBody.hidden) return;
+    CGFloat bubbleWidth = width - kBubbleSidePad * 2;
+    if (self.currentMessage.role == TLWAIAssistantMessageRoleUser) {
+        CGFloat naturalWidth = ceil([self.messageBody.attributedText boundingRectWithSize:CGSizeMake(bubbleWidth - 28, CGFLOAT_MAX)
+            options:NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading context:nil].size.width) + 28;
+        bubbleWidth = MIN(bubbleWidth, MAX(44, MAX(naturalWidth, self.imageAreaWidth + 24)));
+        [self.bubbleView mas_updateConstraints:^(MASConstraintMaker *make) { make.width.mas_equalTo(bubbleWidth); }];
+    }
+    CGFloat height = [self.messageBody heightForWidth:MAX(1, bubbleWidth - 28)];
+    [self.messageHeightConstraint setOffset:height];
+}
+
+- (CGSize)systemLayoutSizeFittingSize:(CGSize)targetSize withHorizontalFittingPriority:(UILayoutPriority)horizontalPriority verticalFittingPriority:(UILayoutPriority)verticalPriority {
+    [self tl_updateBodyHeightForCellWidth:targetSize.width];
+    CGSize size = [super systemLayoutSizeFittingSize:targetSize withHorizontalFittingPriority:horizontalPriority verticalFittingPriority:verticalPriority];
+    self.measuredLayoutSize = CGSizeMake(targetSize.width, size.height);
+    return size;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    [self tl_updateBodyHeightForCellWidth:CGRectGetWidth(self.bounds)];
+    if (self.window && self.currentMessage.hasAssistantOutput) [self.currentMessage.trace mark:TLWAITraceStageFirstVisible count:1];
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (self.currentMessage && ![self.traitCollection.preferredContentSizeCategory isEqualToString:previousTraitCollection.preferredContentSizeCategory])
+        [self configureWithMessage:self.currentMessage];
+}
+
++ (CGFloat)auxiliaryHeightForMessage:(TLWAIAssistantMessage *)message {
+    if (!message.auxiliaryText.length) return 0;
+    return message.supplementalText.length ? 112 : 76;
+}
+- (BOOL)tl_updateAuxiliaryCard {
+    TLWAIAssistantMessage *message = self.currentMessage;
+    CGFloat height = [self.class auxiliaryHeightForMessage:message];
+    BOOL hasImages = message.localImages.count + message.remoteImageURLs.count > 0;
+    BOOL changed = height != self.auxiliaryHeight || (height && hasImages != self.auxiliaryHasImages);
+    if (!height) {
+        [self.auxiliaryTextView removeFromSuperview]; self.auxiliaryTextView = nil;
+    } else {
+        if (!self.auxiliaryTextView) {
+            self.auxiliaryTextView = [TLWAIRelayTextView new];
+            self.auxiliaryTextView.editable = NO; self.auxiliaryTextView.selectable = NO;
+            self.auxiliaryTextView.scrollsToTop = NO; self.auxiliaryTextView.alwaysBounceVertical = NO;
+            self.auxiliaryTextView.directionalLockEnabled = YES;
+            self.auxiliaryTextView.textContainerInset = UIEdgeInsetsMake(8, 10, 8, 10);
+            self.auxiliaryTextView.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+            self.auxiliaryTextView.textColor = UIColor.labelColor;
+            self.auxiliaryTextView.backgroundColor = UIColor.tertiarySystemBackgroundColor;
+            self.auxiliaryTextView.layer.cornerRadius = 10;
+            self.auxiliaryTextView.delegate = (id<UITextViewDelegate>)self;
+            self.auxiliaryTextView.accessibilityIdentifier = @"ai.diseaseCard";
+            [self.bubbleView addSubview:self.auxiliaryTextView];
+            if (self.outerTable) [self.relayCoordinator registerTextView:self.auxiliaryTextView outerTable:self.outerTable];
+            changed = YES;
+        }
+        if (![self.auxiliaryTextView.text isEqualToString:message.auxiliaryText]) {
+            self.auxiliaryTextView.text = message.auxiliaryText;
+            [self setNeedsLayout];
+        }
+        if (changed) [self.auxiliaryTextView mas_remakeConstraints:^(MASConstraintMaker *make) {
+            make.left.right.equalTo(self.bubbleView).insets(UIEdgeInsetsMake(0, 12, 0, 12));
+            if (hasImages) make.top.equalTo(self.imageScrollView.mas_bottom).offset(10);
+            else make.top.equalTo(self.bubbleView).offset(12);
+            make.height.mas_equalTo(height);
+        }];
+    }
+    self.auxiliaryHeight = height; self.auxiliaryHasImages = hasImages;
+    return changed;
+}
+
+- (void)registerGestureCoordinator:(TLWAIGestureCoordinator *)coordinator outerTable:(UITableView *)table {
+    self.relayCoordinator = coordinator; self.outerTable = table;
+    if (self.auxiliaryTextView) [coordinator registerTextView:self.auxiliaryTextView outerTable:table];
+}
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+    if (scrollView == self.auxiliaryTextView) {
+        if (!self.relayCoordinator.applyingOffsets) [self.relayCoordinator correctRelayOffsets];
+        return;
+    }
+    // 正文不再拥有纵向 contentOffset；横向图片条不参与纵向接力。
+}
+
+- (BOOL)hasDeferredUpdates { return self.messageBody.hasDeferredUpdates; }
+
+- (BOOL)interactionActive {
+    return self.messageBody.interactionActive ||
+           self.imageScrollView.isTracking || self.imageScrollView.isDragging || self.imageScrollView.isDecelerating ||
+           self.auxiliaryTextView.isTracking || self.auxiliaryTextView.isDragging || self.auxiliaryTextView.isDecelerating;
+}
+- (BOOL)stopDecelerationForExplicitJump {
+    BOOL fingerDown = [self.messageBody stopDecelerationForExplicitJump];
+    for (UIScrollView *scrollView in @[self.imageScrollView ?: [NSNull null], self.auxiliaryTextView ?: [NSNull null]]) {
+        if (![scrollView isKindOfClass:UIScrollView.class]) continue;
+        if (scrollView.isTracking || scrollView.isDragging) fingerDown = YES;
+        else if (scrollView.isDecelerating) scrollView.contentOffset = scrollView.contentOffset;
+    }
+    return fingerDown;
+}
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    if (self.onInteractionChanged) self.onInteractionChanged();
+}
+- (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate {
+    if (!decelerate && self.onInteractionChanged) self.onInteractionChanged();
+}
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView {
+    if (self.onInteractionChanged) self.onInteractionChanged();
 }
 
 #pragma mark - Private
@@ -203,7 +415,7 @@ static CGFloat const kBubbleSidePad = 5.0;
     [self.container mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.contentView).offset(kMessageVerticalInset);
         make.left.right.equalTo(self.contentView);
-        make.bottom.equalTo(self.contentView).offset(-kMessageVerticalInset);
+        make.bottom.lessThanOrEqualTo(self.contentView).offset(-kMessageVerticalInset);
     }];
 
     self.bubbleView = [[UIView alloc] init];
@@ -216,10 +428,13 @@ static CGFloat const kBubbleSidePad = 5.0;
         make.left.equalTo(self.container).offset(kBubbleSidePad);
     }];
 
-    self.imageScrollView = [[UIScrollView alloc] init];
+    self.imageScrollView = [[TLWAIHorizontalScrollView alloc] init];
     self.imageScrollView.showsHorizontalScrollIndicator = NO;
     self.imageScrollView.alwaysBounceHorizontal = NO;
     self.imageScrollView.backgroundColor = [UIColor clearColor];
+    self.imageScrollView.scrollsToTop = NO;
+    self.imageScrollView.directionalLockEnabled = YES;
+    self.imageScrollView.delegate = self;
     [self.bubbleView addSubview:self.imageScrollView];
     [self.imageScrollView mas_makeConstraints:^(MASConstraintMaker *make) {
         self.imageTopConstraint = make.top.equalTo(self.bubbleView).offset(12);
@@ -228,33 +443,49 @@ static CGFloat const kBubbleSidePad = 5.0;
         self.imageHeightConstraint = make.height.mas_equalTo(72);
     }];
 
-    self.messageLabel = [[UILabel alloc] init];
-    self.messageLabel.numberOfLines = 0;
-    self.messageLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-    [self.bubbleView addSubview:self.messageLabel];
-    [self.messageLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+    self.messageBody = [[TLWAIMarkdownBodyView alloc] init];
+    self.messageBody.textDelegate = self;
+    __weak typeof(self) weakSelf = self;
+    self.messageBody.onInteractionChanged = ^{ if (weakSelf.onInteractionChanged) weakSelf.onInteractionChanged(); };
+    [self.bubbleView addSubview:self.messageBody];
+    [self.messageBody mas_makeConstraints:^(MASConstraintMaker *make) {
         self.messageTopConstraint = make.top.equalTo(self.imageScrollView.mas_bottom).offset(10);
         make.left.equalTo(self.bubbleView).offset(14);
         make.right.equalTo(self.bubbleView).offset(-14);
+        self.messageHeightConstraint = make.height.mas_equalTo(22);
         self.messageBottomConstraint = make.bottom.equalTo(self.bubbleView).offset(-12);
     }];
 
     self.statusLabel = [[UILabel alloc] init];
     self.statusLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
     self.statusLabel.textColor = [UIColor colorWithWhite:0.42 alpha:1.0];
+    self.statusLabel.numberOfLines = 0;
     [self.container addSubview:self.statusLabel];
     [self.statusLabel mas_makeConstraints:^(MASConstraintMaker *make) {
         make.top.equalTo(self.bubbleView.mas_bottom).offset(4);
         self.statusLeadingConstraint = make.left.equalTo(self.bubbleView).offset(4);
         self.statusTrailingConstraint = make.right.equalTo(self.bubbleView).offset(-4);
     }];
-
+    self.continueButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.continueButton setTitle:@"重新生成" forState:UIControlStateNormal];
+    self.continueButton.hidden = YES;
+    self.continueButton.exclusiveTouch = YES;
+    [self.continueButton addTarget:self action:@selector(tl_continueTapped) forControlEvents:UIControlEventTouchUpInside];
+    [self.container addSubview:self.continueButton];
     [self.bubbleView mas_makeConstraints:^(MASConstraintMaker *make) {
         self.bubbleBottomConstraint = make.bottom.equalTo(self.container);
     }];
 }
 
 - (void)tl_configureImageStripWithMessage:(TLWAIAssistantMessage *)message {
+    if (!message.localImages.count && message.imageRelativePaths.count) {
+        NSMutableArray<UIImage *> *loaded = [NSMutableArray array];
+        for (NSString *path in message.imageRelativePaths) {
+            UIImage *image = [TLWAIImageArchive activeImageForRelativePath:path];
+            if (image) [loaded addObject:image];
+        }
+        if (loaded.count) message.localImages = loaded;
+    }
     [self.imageScrollView.subviews makeObjectsPerformSelector:@selector(removeFromSuperview)];
 
     NSInteger imageCount = message.localImages.count + message.remoteImageURLs.count;
@@ -405,99 +636,58 @@ static CGFloat const kBubbleSidePad = 5.0;
 }
 
 - (NSString *)tl_statusTextForMessage:(TLWAIAssistantMessage *)message {
-    // 这里先收口成展示文案，业务层只需要改 message.status 和 errorMessage。
-    if (message.status == TLWAIAssistantMessageStatusSending) {
-        return @"发送中";
-    }
-    if (message.status == TLWAIAssistantMessageStatusFailed) {
-        return message.errorMessage.length > 0 ? message.errorMessage : @"发送失败";
-    }
-    return @"";
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    if (message.status == TLWAIAssistantMessageStatusQueued) [parts addObject:@"排队中"];
+    else if (message.status == TLWAIAssistantMessageStatusWaiting) [parts addObject:@"网络较慢，等待中"];
+    else if (message.status == TLWAIAssistantMessageStatusRecovering) [parts addObject:@"正在恢复连接，保留当前回复"];
+    else if (message.status == TLWAIAssistantMessageStatusSending) [parts addObject:@"发送中"];
+    else if (message.status == TLWAIAssistantMessageStatusFailed) [parts addObject:message.errorMessage.length ? message.errorMessage : @"发送失败"];
+    BOOL streaming = message.status == TLWAIAssistantMessageStatusSending || message.status == TLWAIAssistantMessageStatusWaiting || message.status == TLWAIAssistantMessageStatusRecovering;
+    if (!streaming && message.localHypothesis.length) [parts addObject:message.localHypothesis];
+    if (!streaming && message.role == TLWAIAssistantMessageRoleAssistant && message.moderationNote.length) [parts addObject:message.moderationNote];
+    return [parts componentsJoinedByString:@"\n"];
 }
 
-/// 把 markdown 块级语法转成可读纯文本，保留内联语法（**bold**）供后续渲染
-- (NSString *)tl_preprocessMarkdown:(NSString *)text {
-    if (text.length == 0) return @"";
-    NSArray<NSString *> *lines = [text componentsSeparatedByString:@"\n"];
-    NSMutableArray<NSString *> *processed = [NSMutableArray arrayWithCapacity:lines.count];
-    for (NSString *line in lines) {
-        NSString *trimmed = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-        // ## 标题 → **标题**（h1/h2 保留粗体语义，h3+ 直接去掉 #）
-        if ([trimmed hasPrefix:@"#"]) {
-            NSUInteger hashCount = 0;
-            while (hashCount < trimmed.length && [trimmed characterAtIndex:hashCount] == '#') hashCount++;
-            NSString *headerText = [[trimmed substringFromIndex:hashCount]
-                                    stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-            [processed addObject:(hashCount <= 2)
-                ? [NSString stringWithFormat:@"**%@**", headerText]
-                : headerText];
-        // - 列表 / * 列表 / + 列表 → • 列表
-        } else if ([trimmed hasPrefix:@"- "] || [trimmed hasPrefix:@"* "] || [trimmed hasPrefix:@"+ "]) {
-            [processed addObject:[NSString stringWithFormat:@"• %@", [trimmed substringFromIndex:2]]];
-        } else {
-            [processed addObject:line];
-        }
-    }
-    NSString *joined = [processed componentsJoinedByString:@"\n"];
-    // 连续 3 个以上空行压缩为 2 个
-    NSRegularExpression *blankLines = [NSRegularExpression regularExpressionWithPattern:@"\n{3,}" options:0 error:nil];
-    return [blankLines stringByReplacingMatchesInString:joined options:0
-                                                  range:NSMakeRange(0, joined.length)
-                                           withTemplate:@"\n\n"];
+- (void)tl_continueTapped {
+    if (self.onContinue) self.onContinue(self.currentMessage);
 }
-
-/// iOS 15+ 用系统 inline markdown 渲染 **粗体**；iOS 12-14 降级纯文本清洗
-- (NSAttributedString *)tl_attributedStringFromText:(NSString *)text textColor:(UIColor *)textColor {
-    UIFont *baseFont = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-    UIFont *boldFont = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
-    NSDictionary *baseAttrs = @{ NSFontAttributeName: baseFont, NSForegroundColorAttributeName: textColor };
-    if (text.length == 0) return [[NSAttributedString alloc] initWithString:@"" attributes:baseAttrs];
-
-    if (@available(iOS 15.0, *)) {
-        NSAttributedStringMarkdownParsingOptions *opts = [[NSAttributedStringMarkdownParsingOptions alloc] init];
-        opts.interpretedSyntax = NSAttributedStringMarkdownInterpretedSyntaxInlineOnlyPreservingWhitespace;
-        NSError *err = nil;
-        NSAttributedString *attrStr = [[NSAttributedString alloc] initWithMarkdownString:text
-                                                                                 options:opts
-                                                                                 baseURL:nil
-                                                                                   error:&err];
-        if (err || !attrStr) {
-            return [[NSAttributedString alloc] initWithString:text attributes:baseAttrs];
+- (void)textViewDidChangeSelection:(UITextView *)textView {
+    if (self.onInteractionChanged) self.onInteractionChanged();
+}
+- (BOOL)textView:(UITextView *)textView shouldInteractWithURL:(NSURL *)URL inRange:(NSRange)characterRange interaction:(UITextItemInteraction)interaction {
+    NSArray *confirmed = [NSUserDefaults.standardUserDefaults arrayForKey:@"TLWAIConfirmedHTTPSHosts"] ?: @[];
+    TLWAILinkDecision decision = TLWAIDecideLink(URL.scheme, URL.host, [confirmed containsObject:URL.host.lowercaseString ?: @""]);
+    if (decision == TLWAILinkDecisionAllow) return YES;
+    if (decision == TLWAILinkDecisionConfirm) {
+        UIViewController *controller = nil;
+        for (UIResponder *responder = self; responder; responder = responder.nextResponder) {
+            if ([responder isKindOfClass:UIViewController.class]) { controller = (UIViewController *)responder; break; }
         }
-        NSMutableAttributedString *mutable = [attrStr mutableCopy];
-        [mutable enumerateAttributesInRange:NSMakeRange(0, mutable.length)
-                                    options:0
-                                 usingBlock:^(NSDictionary<NSAttributedStringKey, id> *attrs, NSRange range, BOOL *stop) {
-            UIFont *existing = attrs[NSFontAttributeName];
-            BOOL isBold = NO;
-            if (existing) {
-                UIFontDescriptorSymbolicTraits traits = existing.fontDescriptor.symbolicTraits;
-                isBold = (traits & UIFontDescriptorTraitBold) != 0;
-            }
-            [mutable addAttribute:NSFontAttributeName value:(isBold ? boldFont : baseFont) range:range];
-            [mutable addAttribute:NSForegroundColorAttributeName value:textColor range:range];
+        if (!controller) return NO;
+        NSString *host = URL.host.lowercaseString ?: @"";
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"打开链接" message:host preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"打开" style:UIAlertActionStyleDefault handler:^(__kindof UIAlertAction *action) {
+            NSMutableArray *hosts = [confirmed mutableCopy];
+            if (host.length && ![hosts containsObject:host]) [hosts addObject:host];
+            [NSUserDefaults.standardUserDefaults setObject:hosts forKey:@"TLWAIConfirmedHTTPSHosts"];
+            [UIApplication.sharedApplication openURL:URL options:@{} completionHandler:nil];
+        }]];
+        [controller presentViewController:alert animated:YES completion:nil];
+    }
+    return NO;
+}
+- (UIContextMenuConfiguration *)contextMenuInteraction:(UIContextMenuInteraction *)interaction configurationForMenuAtLocation:(CGPoint)location {
+    TLWAIAssistantMessage *message = self.currentMessage;
+    BOOL streaming = message.status == TLWAIAssistantMessageStatusSending || message.status == TLWAIAssistantMessageStatusWaiting || message.status == TLWAIAssistantMessageStatusRecovering;
+    if (!message || streaming || !(message.completed || message.role == TLWAIAssistantMessageRoleUser)) return nil;
+    NSString *text = message.text ?: @"";
+    return [UIContextMenuConfiguration configurationWithIdentifier:nil previewProvider:nil actionProvider:^UIMenu *(NSArray<UIMenuElement *> *suggested) {
+        UIAction *copy = [UIAction actionWithTitle:@"复制" image:nil identifier:nil handler:^(__kindof UIAction *action) {
+            UIPasteboard.generalPasteboard.string = text;
         }];
-        return mutable.copy;
-    }
-
-    // iOS 12-14 降级：去掉剩余内联 markdown 符号
-    return [[NSAttributedString alloc] initWithString:[self tl_stripInlineMarkdown:text] attributes:baseAttrs];
-}
-
-/// 去掉 **bold**、*italic*、`code` 的符号，保留文字内容
-- (NSString *)tl_stripInlineMarkdown:(NSString *)text {
-    NSMutableString *result = [text mutableCopy];
-    for (NSArray *pair in @[
-        @[@"\\*\\*(.+?)\\*\\*", @"$1"],  // **bold**
-        @[@"\\*(.+?)\\*",       @"$1"],  // *italic*
-        @[@"`(.+?)`",           @"$1"],  // `code`
-    ]) {
-        NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:pair[0]
-                                                                            options:NSRegularExpressionDotMatchesLineSeparators
-                                                                              error:nil];
-        [re replaceMatchesInString:result options:0 range:NSMakeRange(0, result.length) withTemplate:pair[1]];
-    }
-    return result.copy;
+        return [UIMenu menuWithTitle:@"" children:@[copy]];
+    }];
 }
 
 @end

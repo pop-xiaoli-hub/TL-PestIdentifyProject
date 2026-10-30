@@ -22,6 +22,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)startRecording;
 - (void)stopRecording;
+/// 停止录音且不回调 resultHandler。不影响 stopRecording 的提交语义。
+- (void)cancelRecording;
 
 @end
 

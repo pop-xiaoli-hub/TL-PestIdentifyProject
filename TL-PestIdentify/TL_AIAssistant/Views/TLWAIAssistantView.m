@@ -58,6 +58,8 @@ static CGFloat const kNavHeight = 48.0;
 - (UIButton *)plusAICallButton {
     return self.composerView.plusAICallButton;
 }
+- (UIButton *)plusSessionButton { return self.composerView.plusSessionButton; }
+- (UIButton *)plusLocationButton { return self.composerView.plusLocationButton; }
 
 - (UIButton *)sendButton {
     return self.composerView.sendButton;
@@ -76,12 +78,22 @@ static CGFloat const kNavHeight = 48.0;
     self.composerView.onRemoveImageAtIndex = _onRemoveImageAtIndex;
 }
 
-- (void)adjustForKeyboardHeight:(CGFloat)height duration:(NSTimeInterval)duration {
+- (void)setOnContinueMessage:(void (^)(TLWAIAssistantMessage *))callback {
+    _onContinueMessage = [callback copy];
+    self.messageListView.onContinueMessage = callback;
+}
+- (void)setVoiceCancelArmed:(BOOL)armed { [self.composerView setVoiceCancelArmed:armed]; }
+- (void)setGestureCoordinator:(TLWAIGestureCoordinator *)coordinator {
+    _gestureCoordinator = coordinator;
+    self.messageListView.gestureCoordinator = coordinator;
+}
+
+- (void)adjustForKeyboardHeight:(CGFloat)height duration:(NSTimeInterval)duration options:(UIViewAnimationOptions)options {
     // 键盘位移只作用在 composer，消息列表天然跟着顶部约束和底部锚点收缩。
     self.composerBottomConstraint.offset = -height;
-    [UIView animateWithDuration:duration animations:^{
+    [UIView animateWithDuration:duration delay:0 options:options animations:^{
         [self layoutIfNeeded];
-    }];
+    } completion:nil];
 }
 
 - (void)setInputText:(NSString *)text {
@@ -143,6 +155,15 @@ static CGFloat const kNavHeight = 48.0;
 - (void)scrollMessagesToBottomAnimated:(BOOL)animated {
     [self.messageListView scrollToBottomAnimated:animated];
 }
+
+- (void)followMessagesToBottomIfNeededAnimated:(BOOL)animated {
+    [self.messageListView followBottomIfNeededAnimated:animated];
+}
+
+- (void)reloadMessage:(TLWAIAssistantMessage *)message {
+    [self.messageListView reloadMessage:message];
+}
+
 
 #pragma mark - Setup
 

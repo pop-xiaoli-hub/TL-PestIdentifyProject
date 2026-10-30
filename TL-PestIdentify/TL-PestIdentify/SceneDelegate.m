@@ -13,6 +13,10 @@
 #import "TLWSDKManager.h"
 #import "TLWToast.h"
 #import "TLWPerfLog.h"
+#if DEBUG
+#import "TLWAIAssistantController.h"
+#import "TLWAIStreamDebugConfiguration.h"
+#endif
 
 static const NSInteger kLaunchProfileRetryCount = 3;
 static const NSTimeInterval kLaunchProfileRetryDelay = 1.0;
@@ -81,6 +85,17 @@ static inline void TLWLaunchDebugToast(NSString *message) {
 - (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
   UIWindowScene *windowScene = (UIWindowScene *)scene;
   self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
+#if DEBUG
+  if (TLWAIStreamTestEndpoint() != nil) {
+      // 本地验收不依赖正式登录/资料接口；保留真实返回栈以验证离页取消和返回手势。
+      UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:[TLWPasswordLoginController new]];
+      nav.navigationBarHidden = YES;
+      [nav pushViewController:[[TLWAIAssistantController alloc] initWithInitialQuestion:nil] animated:NO];
+      self.window.rootViewController = nav;
+      [self.window makeKeyAndVisible];
+      return;
+  }
+#endif
 
   if ([[TLWSDKManager shared].sessionManager isLoggedIn]) {
       // 有登录态，拉取用户资料后决定进哪个页面

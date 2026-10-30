@@ -20,6 +20,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, readonly) UIButton *plusCameraButton;
 @property (nonatomic, strong, readonly) UIButton *plusAlbumButton;
 @property (nonatomic, strong, readonly) UIButton *plusAICallButton;
+@property (nonatomic, strong, readonly) UIButton *plusSessionButton;
+@property (nonatomic, strong, readonly) UIButton *plusLocationButton;
 @property (nonatomic, assign, readonly) BOOL isPlusPanelVisible;
 @property (nonatomic, strong, readonly) UIButton *stopButton;
 @property (nonatomic, copy, nullable) void (^onRemoveImageAtIndex)(NSUInteger index);
@@ -32,6 +34,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)hideSelectedImage;
 - (void)showVoicePanel;
 - (void)hideVoicePanel;
+- (void)setVoiceCancelArmed:(BOOL)armed;
 - (void)showPlusPanel;
 - (void)hidePlusPanel;
 - (void)enterAILoadingMode;

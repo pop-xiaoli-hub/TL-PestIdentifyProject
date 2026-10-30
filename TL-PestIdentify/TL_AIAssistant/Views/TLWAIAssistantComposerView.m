@@ -6,6 +6,7 @@
 //  职责：实现AI助手页面视图组件。
 //
 #import "TLWAIAssistantComposerView.h"
+#import "TLWAIGestureCoordinator.h"
 #import <Masonry/Masonry.h>
 
 static CGFloat const kRoundBaseHeight = 53.0;
@@ -13,7 +14,7 @@ static CGFloat const kInputBoxHeight = 54.0;
 static CGFloat const kTextViewBaseHeight = 34.0;
 static CGFloat const kPreviewAreaHeight = 96.0;
 static CGFloat const kVoicePanelHeight = 180.0;
-static CGFloat const kPlusPanelHeight = 120.0;
+static CGFloat const kPlusPanelHeight = 168.0;
 static NSTimeInterval const kPanelTransitionDuration = 0.18;
 
 @interface TLWAIAssistantComposerView () <UITextViewDelegate>
@@ -26,6 +27,9 @@ static NSTimeInterval const kPanelTransitionDuration = 0.18;
 @property (nonatomic, strong, readwrite) UIButton *plusCameraButton;
 @property (nonatomic, strong, readwrite) UIButton *plusAlbumButton;
 @property (nonatomic, strong, readwrite) UIButton *plusAICallButton;
+@property (nonatomic, strong, readwrite) UIButton *plusSessionButton;
+@property (nonatomic, strong, readwrite) UIButton *plusLocationButton;
+@property (nonatomic, strong) UILabel *voiceCancelLabel;
 @property (nonatomic, strong, readwrite) UIButton *stopButton;
 @property (nonatomic, assign) BOOL isAILoading;
 @property (nonatomic, strong) MASConstraint *plusButtonRightConstraint;
@@ -136,8 +140,10 @@ static NSTimeInterval const kPanelTransitionDuration = 0.18;
         make.height.mas_equalTo(kPreviewAreaHeight);
     }];
 
-    _previewScrollView = [[UIScrollView alloc] init];
+    _previewScrollView = [[TLWAIHorizontalScrollView alloc] init];
     _previewScrollView.showsHorizontalScrollIndicator = NO;
+    _previewScrollView.scrollsToTop = NO;
+    _previewScrollView.directionalLockEnabled = YES;
     _previewScrollView.showsVerticalScrollIndicator = NO;
     [_previewRow addSubview:_previewScrollView];
     [_previewScrollView mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -205,6 +211,7 @@ static NSTimeInterval const kPanelTransitionDuration = 0.18;
     _inputTextField.font = [UIFont systemFontOfSize:15];
     _inputTextField.textColor = [UIColor colorWithRed:0.16 green:0.16 blue:0.16 alpha:1.0];
     _inputTextField.scrollEnabled = NO;
+    _inputTextField.scrollsToTop = NO;
     _inputTextField.textContainer.lineBreakMode = NSLineBreakByWordWrapping;
     _inputTextField.textContainerInset = UIEdgeInsetsMake(0, 4, 0, 4);
     _inputTextField.returnKeyType = UIReturnKeyDefault;
@@ -231,11 +238,22 @@ static NSTimeInterval const kPanelTransitionDuration = 0.18;
     _voiceSpeechImageView = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"iconSpeechInput"]];
     _voiceSpeechImageView.contentMode = UIViewContentModeScaleAspectFit;
     _voiceSpeechImageView.userInteractionEnabled = YES;
+    _voiceSpeechImageView.exclusiveTouch = YES;
     [_voicePanel addSubview:_voiceSpeechImageView];
     [_voiceSpeechImageView mas_makeConstraints:^(MASConstraintMaker *make) {
         make.centerX.equalTo(self->_voicePanel);
         make.top.mas_equalTo(20);
         make.width.height.mas_equalTo(110);
+    }];
+    _voiceCancelLabel = [[UILabel alloc] init];
+    _voiceCancelLabel.text = @"松开发送，上滑取消";
+    _voiceCancelLabel.textAlignment = NSTextAlignmentCenter;
+    _voiceCancelLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    _voiceCancelLabel.textColor = UIColor.secondaryLabelColor;
+    [_voicePanel addSubview:_voiceCancelLabel];
+    [_voiceCancelLabel mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.top.equalTo(self->_voiceSpeechImageView.mas_bottom).offset(8);
+        make.left.right.equalTo(self->_voicePanel);
     }];
 
     // Plus 面板
@@ -272,6 +290,22 @@ static NSTimeInterval const kPanelTransitionDuration = 0.18;
         make.left.equalTo(self->_plusAlbumButton.mas_right).offset(btnGap);
         make.top.equalTo(self->_plusCameraButton);
         make.width.mas_equalTo(btnSize);
+    }];
+    _plusSessionButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_plusSessionButton setTitle:@"会话" forState:UIControlStateNormal];
+    _plusLocationButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [_plusLocationButton setTitle:@"附带定位" forState:UIControlStateNormal];
+    [_plusPanel addSubview:_plusSessionButton];
+    [_plusPanel addSubview:_plusLocationButton];
+    [_plusSessionButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.mas_equalTo(24);
+        make.top.equalTo(self->_plusCameraButton.mas_bottom).offset(8);
+        make.height.mas_equalTo(32);
+    }];
+    [_plusLocationButton mas_makeConstraints:^(MASConstraintMaker *make) {
+        make.left.equalTo(self->_plusSessionButton.mas_right).offset(16);
+        make.centerY.equalTo(self->_plusSessionButton);
+        make.height.mas_equalTo(32);
     }];
 }
 
@@ -373,6 +407,11 @@ static NSTimeInterval const kPanelTransitionDuration = 0.18;
     }];
 }
 
+- (void)setVoiceCancelArmed:(BOOL)armed {
+    self.voiceCancelLabel.text = armed ? @"松开取消" : @"松开发送，上滑取消";
+    self.voiceCancelLabel.textColor = armed ? UIColor.systemRedColor : UIColor.secondaryLabelColor;
+}
+
 - (void)showPlusPanel {
     self.plusPanel.hidden = NO;
     // 互斥：收起语音面板
@@ -405,6 +444,7 @@ static NSTimeInterval const kPanelTransitionDuration = 0.18;
     self.isAILoading = YES;
     self.micButton.hidden = YES;
     self.stopButton.hidden = NO;
+    [self tl_updateSendButtonVisibility];
     // plus 移到 mic 的位置（stop 右侧偏左）
     self.plusButtonRightConstraint.offset = -(10 + 30 + 8);
     [UIView animateWithDuration:0.2 animations:^{
@@ -416,6 +456,7 @@ static NSTimeInterval const kPanelTransitionDuration = 0.18;
     self.isAILoading = NO;
     self.micButton.hidden = NO;
     self.stopButton.hidden = YES;
+    [self tl_updateSendButtonVisibility];
     // plus 恢复原位
     self.plusButtonRightConstraint.offset = -10;
     [UIView animateWithDuration:0.2 animations:^{
@@ -452,7 +493,10 @@ static NSTimeInterval const kPanelTransitionDuration = 0.18;
 
 - (void)tl_updateSendButtonVisibility {
     BOOL hasContent = (self.inputTextField.text.length > 0) || (self.previewImages.count > 0);
-    if (hasContent) {
+    self.sendButton.enabled = !self.isAILoading;
+    self.sendButton.hidden = self.isAILoading;
+    self.stopButton.hidden = !self.isAILoading;
+    if (hasContent && !self.isAILoading) {
         self.micButton.hidden = YES;
         self.plusButton.hidden = YES;
         self.sendButtonWrapper.hidden = NO;

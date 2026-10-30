@@ -13,6 +13,7 @@
 @property (nonatomic, strong) SFSpeechAudioBufferRecognitionRequest *request;
 @property (nonatomic, strong) SFSpeechRecognitionTask *task;
 @property (nonatomic, strong) AVAudioEngine *audioEngine;
+@property (nonatomic, assign) BOOL suppressResults;
 @property (nonatomic, assign, readwrite) BOOL isRecording;
 @end
 
@@ -38,6 +39,7 @@
 }
 
 - (void)startRecording {
+    self.suppressResults = NO;
     self.isRecording = YES;
 
     [[AVAudioSession sharedInstance] requestRecordPermission:^(BOOL granted) {
@@ -111,11 +113,11 @@
                                                                    NSError *error) {
         if (result) {
             NSString *text = result.bestTranscription.formattedString;
-            if (weakSelf.resultHandler) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    weakSelf.resultHandler(text, result.isFinal);
-                });
-            }
+            BOOL finalResult = result.isFinal;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (weakSelf.suppressResults || !weakSelf.resultHandler) return;
+                weakSelf.resultHandler(text, finalResult);
+            });
         }
 
         if (error) {
@@ -149,6 +151,18 @@
 
     [self.task cancel];
     self.task = nil;
+}
+- (void)cancelRecording {
+    self.suppressResults = YES;
+    self.isRecording = NO;
+    if (self.audioEngine.isRunning) {
+        [self.audioEngine stop];
+        [self.audioEngine.inputNode removeTapOnBus:0];
+        [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
+    }
+    [self.task cancel];
+    self.task = nil;
+    self.request = nil;
 }
 
 #pragma mark - Private
