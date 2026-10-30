@@ -13,6 +13,7 @@
 static NSString * const kKeychainService = @"com.tl.pestidentify.auth";
 static NSString * const kKeychainAccessToken  = @"access_token";
 static NSString * const kKeychainRefreshToken = @"refresh_token";
+static NSString * const kKeychainSession = @"auth_session";
 
 static NSString * const kLegacyTokenKey = @"TLW_access_token";
 static NSString * const kLegacyRefreshKey = @"TLW_refresh_token";
@@ -51,29 +52,28 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 
 #pragma mark - Keychain Helpers
 
-+ (BOOL)_keychainSave:(NSString *)value forAccount:(NSString *)account {
-    if (!value) return NO;
-    NSData *data = [value dataUsingEncoding:NSUTF8StringEncoding];
-    NSDictionary *delQuery = @{
++ (BOOL)_keychainSave:(NSDictionary *)record forAccount:(NSString *)account {
+    NSData *data = [NSJSONSerialization dataWithJSONObject:record options:0 error:NULL];
+    if (!data) return NO;
+    NSDictionary *query = @{
         (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
         (__bridge id)kSecAttrService: kKeychainService,
         (__bridge id)kSecAttrAccount: account,
     };
-    SecItemDelete((__bridge CFDictionaryRef)delQuery);
-
-    NSDictionary *addQuery = @{
-        (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
-        (__bridge id)kSecAttrService: kKeychainService,
-        (__bridge id)kSecAttrAccount: account,
+    NSDictionary *values = @{
         (__bridge id)kSecValueData: data,
         (__bridge id)kSecAttrAccessible: (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
     };
-    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)addQuery, NULL);
+    OSStatus status = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)values);
+    if (status == errSecItemNotFound) {
+        NSMutableDictionary *add = [query mutableCopy];
+        [add addEntriesFromDictionary:values];
+        status = SecItemAdd((__bridge CFDictionaryRef)add, NULL);
+    }
     return status == errSecSuccess;
 }
-//从keychain中，按照account读取一条通用秘码记录，并将取出的二进制数据按照UTF-8解码为NSString字符串
-+ (nullable NSString *)_keychainLoadForAccount:(NSString *)account {
-  //构造传给SecItemCopyMathcing的查询条件
+// 区分不存在与暂时不可读，避免锁屏/Keychain 错误被当作凭证损坏清除。
++ (nullable NSData *)_keychainDataForAccount:(NSString *)account status:(OSStatus *)outStatus {
     NSDictionary *query = @{
         (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
         (__bridge id)kSecAttrService: kKeychainService,
@@ -83,10 +83,8 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
     };
     CFTypeRef result = NULL;
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
-    if (status == errSecSuccess && result) {
-        return [[NSString alloc] initWithData:(__bridge_transfer NSData *)result encoding:NSUTF8StringEncoding];
-    }
-    return nil;
+    if (outStatus) *outStatus = status;
+    return CFBridgingRelease(result);
 }
 
 + (void)_keychainDeleteForAccount:(NSString *)account {
@@ -96,6 +94,17 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
         (__bridge id)kSecAttrAccount: account,
     };
     SecItemDelete((__bridge CFDictionaryRef)query);
+}
+
++ (nullable NSDictionary *)_sessionRecordFromData:(NSData *)data {
+    if (!data) return nil;
+    id record = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
+    if (![record isKindOfClass:NSDictionary.class] || ![record[@"version"] isEqual:@1]) return nil;
+    if (![record[@"accessToken"] isKindOfClass:NSString.class] || [record[@"accessToken"] length] == 0 ||
+        ![record[@"refreshToken"] isKindOfClass:NSString.class] || [record[@"refreshToken"] length] == 0 ||
+        ![record[@"userId"] isKindOfClass:NSNumber.class] || [record[@"userId"] integerValue] <= 0 ||
+        (record[@"username"] && ![record[@"username"] isKindOfClass:NSString.class])) return nil;
+    return record;
 }
 
 #pragma mark - Lifecycle
@@ -125,6 +134,11 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 }
 
 - (BOOL)saveAuthResponse:(AGAuthResponse *)auth {
+    return [self tl_saveAuthResponse:auth persistenceFailed:NULL];
+}
+
+- (BOOL)tl_saveAuthResponse:(AGAuthResponse *)auth persistenceFailed:(BOOL *)persistenceFailed {
+    if (persistenceFailed) *persistenceFailed = NO;
     if (!auth.token.length) {
         NSLog(@"[Token] saveAuthResponse: token 为空，跳过保存");
         return NO;
@@ -138,19 +152,16 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
         return NO;
     }
 
-    BOOL tokenSaved = [TLWSessionManager _keychainSave:auth.token forAccount:kKeychainAccessToken];
-    if (!tokenSaved) {
-        NSLog(@"[Token] accessToken 写入 Keychain 失败");
+    NSDictionary *record = @{@"version": @1, @"accessToken": auth.token,
+        @"refreshToken": auth.refreshToken, @"userId": auth.userId, @"username": auth.username ?: @""};
+    if (![TLWSessionManager _keychainSave:record forAccount:kKeychainSession]) {
+        if (persistenceFailed) *persistenceFailed = YES;
+        NSLog(@"[Token] 会话凭证写入 Keychain 失败，保留原会话");
         return NO;
     }
-
-    BOOL refreshSaved = [TLWSessionManager _keychainSave:auth.refreshToken forAccount:kKeychainRefreshToken];
-    if (!refreshSaved) {
-        NSLog(@"[Token] refreshToken 写入 Keychain 失败，回滚 accessToken");
-        [TLWSessionManager _keychainDeleteForAccount:kKeychainAccessToken];
-        [TLWSessionManager _keychainDeleteForAccount:kKeychainRefreshToken];
-        return NO;
-    }
+    // 一条记录原子替换双 Token 和身份，提交成功后才删除旧版的两条记录。
+    [TLWSessionManager _keychainDeleteForAccount:kKeychainAccessToken];
+    [TLWSessionManager _keychainDeleteForAccount:kKeychainRefreshToken];
 
     //  把accessToken写入全局配置
     [AGDefaultConfiguration sharedConfig].accessToken = auth.token;
@@ -263,7 +274,8 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 }
 
 - (nullable NSString *)refreshToken {
-    return [TLWSessionManager _keychainLoadForAccount:kKeychainRefreshToken];
+    NSData *data = [TLWSessionManager _keychainDataForAccount:kKeychainSession status:NULL];
+    return [TLWSessionManager _sessionRecordFromData:data][@"refreshToken"];
 }
 
 - (nullable NSString *)generatedPassword {
@@ -427,7 +439,8 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
             if (shouldIgnore) return;
 
             if (!error && output.code.integerValue == 200) {
-                BOOL saved = [self saveAuthResponse:output.data];
+                BOOL persistenceFailed = NO;
+                BOOL saved = [self tl_saveAuthResponse:output.data persistenceFailed:&persistenceFailed];
                 if (saved) {
                     NSArray<dispatch_block_t> *blocks = nil;
                     @synchronized (self) {
@@ -445,10 +458,7 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
                     return;
                 }
 
-                NSLog(@"[Token] refresh returned 200 but auth data invalid: token=%@ refreshToken=%@ userId=%@",
-                      output.data.token.length > 0 ? @"present" : @"nil",
-                      output.data.refreshToken.length > 0 ? @"present" : @"nil",
-                      output.data.userId ?: @"<nil>");
+                NSLog(@"[Token] refresh result could not be saved: persistenceFailure=%@", persistenceFailed ? @"YES" : @"NO");
                 NSArray<dispatch_block_t> *refreshFailureBlocks = nil;
                 @synchronized (self) {
                     refreshFailureBlocks = [self.pendingRefreshFailureBlocks copy];
@@ -458,7 +468,12 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
                 for (dispatch_block_t block in refreshFailureBlocks) {
                     block();
                 }
-                [self tl_forceLogoutAndNotifyWithMessage:@"登录状态恢复失败，可能该账号已在其他设备登录，请重新登录"];
+                if (persistenceFailed) {
+                    // 不执行排队请求，也不销毁仍完整的旧凭证；这不是刷新成功。
+                    [self tl_showAuthToastIfNeeded:@"登录信息保存失败，请稍后重试"];
+                } else {
+                    [self tl_forceLogoutAndNotifyWithMessage:@"登录状态恢复失败，请重新登录"];
+                }
                 return;
             }
 
@@ -545,29 +560,51 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 }
 
 - (void)tl_restoreSessionFromPersistence {
-    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    NSString *token = [TLWSessionManager _keychainLoadForAccount:kKeychainAccessToken];//获取当前账号的accessToken
-    NSString *refreshToken = [TLWSessionManager _keychainLoadForAccount:kKeychainRefreshToken];//获取刷新token
-    NSInteger persistedUserId = [ud integerForKey:kUserIdKey];
-
-    BOOL hasCompleteSession = token.length > 0 && refreshToken.length > 0 && persistedUserId > 0;//判断会话是否完整
-    if (hasCompleteSession) {
-        [AGDefaultConfiguration sharedConfig].accessToken = token;
-        self.userId = persistedUserId;
-        self.username = [ud stringForKey:kUsernameKey];
-        return;
+    NSUserDefaults *ud = NSUserDefaults.standardUserDefaults;
+    OSStatus status = errSecSuccess;
+    NSData *data = [TLWSessionManager _keychainDataForAccount:kKeychainSession status:&status];
+    NSDictionary *record = nil;
+    if (status == errSecSuccess) {
+        record = [TLWSessionManager _sessionRecordFromData:data];
+        // 已有新版记录就是权威；损坏时不能复活旧版 Token。
+        if (!record) [self tl_clearPersistedSessionArtifacts];
+    } else if (status == errSecItemNotFound) {
+        OSStatus accessStatus, refreshStatus;
+        NSData *access = [TLWSessionManager _keychainDataForAccount:kKeychainAccessToken status:&accessStatus];
+        NSData *refresh = [TLWSessionManager _keychainDataForAccount:kKeychainRefreshToken status:&refreshStatus];
+        if ((accessStatus != errSecSuccess && accessStatus != errSecItemNotFound) ||
+            (refreshStatus != errSecSuccess && refreshStatus != errSecItemNotFound)) {
+            [self tl_resetInMemorySession];
+            return;
+        }
+        NSString *token = access ? [[NSString alloc] initWithData:access encoding:NSUTF8StringEncoding] : nil;
+        NSString *refreshToken = refresh ? [[NSString alloc] initWithData:refresh encoding:NSUTF8StringEncoding] : nil;
+        NSInteger userId = [ud integerForKey:kUserIdKey];
+        if (token.length && refreshToken.length && userId > 0) {
+            record = @{@"version": @1, @"accessToken": token, @"refreshToken": refreshToken,
+                @"userId": @(userId), @"username": [ud stringForKey:kUsernameKey] ?: @""};
+            if (![TLWSessionManager _keychainSave:record forAccount:kKeychainSession]) {
+                // 迁移未提交：保留旧存储，下一次启动可再迁移，不启用半套登录态。
+                [self tl_resetInMemorySession];
+                return;
+            }
+        } else {
+            [self tl_clearPersistedSessionArtifacts];
+        }
     }
-
-    BOOL hasStalePersistedAuth = token.length > 0
-        || refreshToken.length > 0
-        || persistedUserId > 0
-        || [ud stringForKey:kLegacyTokenKey].length > 0
-        || [ud stringForKey:kLegacyRefreshKey].length > 0
-        || [ud stringForKey:kUsernameKey].length > 0
-        || [ud stringForKey:kGeneratedPasswordKey].length > 0;
-    if (hasStalePersistedAuth) {
-        NSLog(@"[Token] cold start detected stale auth, clearing local credentials");
-        [self tl_clearPersistedSessionArtifacts];
+    if (record) {
+        [AGDefaultConfiguration sharedConfig].accessToken = record[@"accessToken"];
+        self.userId = [record[@"userId"] integerValue];
+        self.username = [record[@"username"] length] ? record[@"username"] : nil;
+        [ud setInteger:self.userId forKey:kUserIdKey];
+        if (self.username) [ud setObject:self.username forKey:kUsernameKey];
+        else [ud removeObjectForKey:kUsernameKey];
+        [ud removeObjectForKey:kLegacyTokenKey];
+        [ud removeObjectForKey:kLegacyRefreshKey];
+        [ud removeObjectForKey:kGeneratedPasswordKey];
+        [TLWSessionManager _keychainDeleteForAccount:kKeychainAccessToken];
+        [TLWSessionManager _keychainDeleteForAccount:kKeychainRefreshToken];
+        return;
     }
     [self tl_resetInMemorySession];
 }
@@ -580,6 +617,7 @@ NSString * const TLWProfileDidUpdateNotification = @"TLWProfileDidUpdateNotifica
 }
 
 - (void)tl_clearPersistedSessionArtifacts {
+    [TLWSessionManager _keychainDeleteForAccount:kKeychainSession];
     [TLWSessionManager _keychainDeleteForAccount:kKeychainAccessToken];
     [TLWSessionManager _keychainDeleteForAccount:kKeychainRefreshToken];
 

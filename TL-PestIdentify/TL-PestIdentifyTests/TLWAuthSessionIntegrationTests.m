@@ -6,8 +6,10 @@
 #import <XCTest/XCTest.h>
 #import <Security/Security.h>
 #import <objc/message.h>
+#import <objc/runtime.h>
 #import "TLWDBManager.h"
 #import "TLWDBMyPublishedModel.h"
+#import "TLWAuthStatePreservingTestCase.h"
 
 @interface TLWSessionManager : NSObject
 - (instancetype)initWithAPIService:(id)api;
@@ -82,7 +84,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 
 @end
 
-@interface TLWAuthSessionIntegrationTests : XCTestCase
+@interface TLWAuthSessionIntegrationTests : TLWAuthStatePreservingTestCase
 @property (nonatomic, strong) TLWSessionManager *manager;
 @end
 
@@ -256,6 +258,85 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
     [self tl_assertRuntimeAccessTokenCleared];
 }
 
+- (void)testFailedCredentialReplacementKeepsThePreviousCompleteSession {
+    XCTAssertTrue([self.manager saveAuthResponse:[self tl_authResponseWithToken:@"old_access"
+        refreshToken:@"old_refresh" userId:90001 username:@"old_user" generatedPassword:nil]]);
+    SEL selector = NSSelectorFromString(@"_keychainSave:forAccount:");
+    Method method = class_getClassMethod(TLWSessionManager.class, selector);
+    IMP original = method_getImplementation(method);
+    IMP failing = imp_implementationWithBlock(^BOOL(id receiver, id value, NSString *account) {
+        if ([[value description] containsString:@"rejected_refresh"]) return NO;
+        return ((BOOL (*)(id, SEL, id, NSString *))original)(receiver, selector, value, account);
+    });
+    method_setImplementation(method, failing);
+    @try {
+        XCTAssertFalse([self.manager saveAuthResponse:[self tl_authResponseWithToken:@"new_access"
+            refreshToken:@"rejected_refresh" userId:90002 username:@"new_user" generatedPassword:nil]]);
+        XCTAssertTrue(self.manager.isLoggedIn);
+        XCTAssertEqualObjects(self.manager.refreshToken, @"old_refresh");
+        TLWSessionManager *restored = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
+        XCTAssertEqual(restored.userId, 90001);
+        XCTAssertEqualObjects(restored.refreshToken, @"old_refresh");
+    } @finally {
+        method_setImplementation(method, original);
+        imp_removeBlock(failing);
+    }
+}
+
+- (void)testRefreshPersistenceFailureDoesNotDestroyThePreviousCredentialPair {
+    XCTAssertTrue([self.manager saveAuthResponse:[self tl_authResponseWithToken:@"old_access"
+        refreshToken:@"old_refresh" userId:90001 username:@"old_user" generatedPassword:nil]]);
+    TLWMockApiService *api = [TLWMockApiService new];
+    [self.manager updateAPIService:api];
+    __block TLWRefreshCompletion completion;
+    api.onRefreshCalled = ^(TLWRefreshCompletion callback) { completion = callback; };
+    __block BOOL retried = NO;
+    XCTestExpectation *failed = [self expectationWithDescription:@"refresh persistence failure reported"];
+    SEL selector = NSSelectorFromString(@"_keychainSave:forAccount:");
+    Method method = class_getClassMethod(TLWSessionManager.class, selector);
+    IMP original = method_getImplementation(method);
+    IMP failing = imp_implementationWithBlock(^BOOL(id receiver, id value, NSString *account) { return NO; });
+    method_setImplementation(method, failing);
+    @try {
+        [self.manager handleUnauthorizedWithRetry:^{ retried = YES; } failure:^{ [failed fulfill]; }];
+        XCTAssertNotNil(completion);
+        TLWFakeResultAuthResponse *result = [TLWFakeResultAuthResponse new];
+        result.code = @200;
+        result.data = [self tl_authResponseWithToken:@"replacement_access"
+            refreshToken:@"replacement_refresh" userId:90001 username:@"old_user" generatedPassword:nil];
+        completion(result, nil);
+        [self waitForExpectations:@[failed] timeout:2];
+        XCTAssertFalse(retried);
+        XCTAssertTrue(self.manager.isLoggedIn);
+        XCTAssertEqualObjects(self.manager.refreshToken, @"old_refresh");
+    } @finally {
+        method_setImplementation(method, original);
+        imp_removeBlock(failing);
+    }
+}
+
+- (void)testColdStartUsesTheIdentityBoundToItsCredentialPair {
+    XCTAssertTrue([self.manager saveAuthResponse:[self tl_authResponseWithToken:@"bound_access"
+        refreshToken:@"bound_refresh" userId:90003 username:@"bound_user" generatedPassword:nil]]);
+    [NSUserDefaults.standardUserDefaults setInteger:123456 forKey:kUserIdKey];
+    [NSUserDefaults.standardUserDefaults setObject:@"unrelated_user" forKey:kUsernameKey];
+    TLWSessionManager *restored = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
+    XCTAssertEqual(restored.userId, 90003);
+    XCTAssertEqualObjects(restored.username, @"bound_user");
+    XCTAssertEqualObjects(restored.refreshToken, @"bound_refresh");
+}
+
+- (void)testMalformedCanonicalCredentialsCannotReviveAnOlderPair {
+    [self tl_saveKeychainValue:@"not-json" account:@"auth_session"];
+    [self tl_saveKeychainValue:@"obsolete_access" account:kAccessTokenAccount];
+    [self tl_saveKeychainValue:@"obsolete_refresh" account:kRefreshTokenAccount];
+    [NSUserDefaults.standardUserDefaults setInteger:90004 forKey:kUserIdKey];
+    TLWSessionManager *restored = [[TLWSessionManager alloc] initWithAPIService:[NSObject new]];
+    XCTAssertFalse(restored.isLoggedIn);
+    XCTAssertEqual(restored.userId, 0);
+    XCTAssertNil(restored.refreshToken);
+}
+
 - (void)testLogoutClearsPersistedIdentityAndTokens {
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     TLWFakeAuthResponse *auth = [self tl_authResponseWithToken:@"logout_access"
@@ -300,7 +381,8 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 }
 
 - (void)testConcurrentUnauthorizedRequestsOnlyTriggerSingleRefresh {
-    [self tl_saveKeychainValue:@"refresh_for_concurrency" account:kRefreshTokenAccount];
+    XCTAssertTrue([self.manager saveAuthResponse:[self tl_authResponseWithToken:@"access_for_concurrency"
+        refreshToken:@"refresh_for_concurrency" userId:1001 username:@"retry_user" generatedPassword:nil]]);
 
     TLWMockApiService *mockApi = [[TLWMockApiService alloc] init];
     [self.manager updateAPIService:mockApi];
@@ -508,7 +590,8 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 }
 
 - (void)testLogoutDuringInFlightRefreshDoesNotRestoreSession {
-    [self tl_saveKeychainValue:@"refresh_for_logout_race" account:kRefreshTokenAccount];
+    XCTAssertTrue([self.manager saveAuthResponse:[self tl_authResponseWithToken:@"access_for_logout_race"
+        refreshToken:@"refresh_for_logout_race" userId:2002 username:@"race_user" generatedPassword:nil]]);
 
     TLWMockApiService *mockApi = [[TLWMockApiService alloc] init];
     [self.manager updateAPIService:mockApi];
@@ -638,6 +721,7 @@ typedef void (^TLWRefreshCompletion)(id output, NSError *error);
 - (void)tl_clearPersistedAuthState {
     [self tl_deleteKeychainValueForAccount:kAccessTokenAccount];
     [self tl_deleteKeychainValueForAccount:kRefreshTokenAccount];
+    [self tl_deleteKeychainValueForAccount:@"auth_session"];
 
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     [ud removeObjectForKey:kLegacyTokenKey];

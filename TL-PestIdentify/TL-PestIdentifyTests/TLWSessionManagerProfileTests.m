@@ -1,5 +1,6 @@
 #import <XCTest/XCTest.h>
 #import <Security/Security.h>
+#import "TLWAuthStatePreservingTestCase.h"
 
 extern NSString * const TLWProfileDidUpdateNotification;
 
@@ -62,7 +63,7 @@ typedef void (^TLWProfileCompletion)(id output, NSError *error);
 
 @end
 
-@interface TLWSessionManagerProfileTests : XCTestCase
+@interface TLWSessionManagerProfileTests : TLWAuthStatePreservingTestCase
 @property (nonatomic, strong) TLWSessionManager *manager;
 @property (nonatomic, strong) TLWFakeProfileApiService *mockApi;
 @end
@@ -198,6 +199,7 @@ typedef void (^TLWProfileCompletion)(id output, NSError *error);
 - (void)tl_clearPersistedAuthState {
     [self tl_deleteKeychainValueForAccount:kProfileAccessTokenAccount];
     [self tl_deleteKeychainValueForAccount:kProfileRefreshTokenAccount];
+    [self tl_deleteKeychainValueForAccount:@"auth_session"];
 
     NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
     [ud removeObjectForKey:kProfileLegacyTokenKey];
